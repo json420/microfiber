@@ -15,10 +15,16 @@ def dumps(obj):
     return json.dumps(obj, sort_keys=True, separators=(',',':'))
 
 
-def jsonquery(**options):
-    return urlencode(
-        tuple((key, dumps(options[key])) for key in sorted(options))
-    )
+def queryiter(**options):
+    for key in sorted(options):
+        value = options[key]
+        if isinstance(value, bool):
+            value = json.dumps(value)
+        yield (key, value)
+
+
+def query(**options):
+    return urlencode(tuple(queryiter(**options)))
 
 
 class HTTPError(Exception):
@@ -90,7 +96,7 @@ class CouchCore(object):
         assert t.scheme in ('http', 'https')
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc, **connargs)
-        self.conn.set_debuglevel(10)
+        #self.conn.set_debuglevel(1)
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.url)
@@ -98,20 +104,22 @@ class CouchCore(object):
     def request_url(self, *parts, **options):
         url = self.base + '/'.join(parts)
         if options:
-            return '?'.join([url, jsonquery(**options)])
+            return '?'.join([url, query(**options)])
         return url
 
-    def request(self, method, obj, *parts, **options):
-        url = self.request_url(*parts, **options)
+    def request(self, method, body, *parts, **options):
         headers = {
             'Accept': 'application/json',
             'User-Agent': USER_AGENT,
         }
-        if obj is None:
-            body = None
-        else:
+        if isinstance(body, dict):
             headers['Content-Type'] = 'application/json'
-            body = dumps(obj)
+            body = dumps(body)
+        else:
+            headers['Content-Type'] = options.pop('content_type',
+                'application/octet-stream'
+            )
+        url = self.request_url(*parts, **options)
         self.conn.request(method, url, body, headers)
         r = self.conn.getresponse()
         data = r.read()
@@ -142,10 +150,21 @@ class Server(CouchCore):
     def __init__(self, url='http://localhost:5984/', **connargs):
         super().__init__(url, **connargs)
 
+class Database(CouchCore):
+    def __init__(self, url='http://localhost:5984/_users/', **connargs):
+        super().__init__(url, **connargs)
+
 
 s = Server()
-try:
-    print(s.put(None, 'dmedia').loads())
-except PreconditionFailed:
-    pass
 print(s.get('dmedia').loads())
+doc = s.get('dmedia', 'app').loads()
+print(doc)
+r = s.put('foo bar baz'.encode('utf-8'), 'dmedia', 'app', 'stuff.txt',
+    content_type='text/plain',
+    rev=doc['_rev'],
+)
+
+print(r.loads())
+
+db = Database()
+print(db.get().loads())
