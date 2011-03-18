@@ -12,6 +12,10 @@ USER_AGENT = 'microfiber ' + __version__
 
 
 
+def dumps(obj):
+    return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+
+
 def queryiter(**options):
     for key in sorted(options):
         value = options[key]
@@ -29,12 +33,13 @@ class HTTPError(Exception):
     Base class for custom `microfiber` exceptions.
     """
 
-    __slots__ = ('response', 'method', 'url')
+    __slots__ = ('response', 'method', 'url', 'data')
 
     def __init__(self, response, method, url):
         self.response = response
         self.method = method
         self.url = url
+        self.data = response.read()
         super().__init__('%r %r %r %r' %
             (response.status, response.reason, method, url)
         )
@@ -74,15 +79,24 @@ class ServerError(HTTPError):
 
 
 class Response(object):
-    __slots__ = ('response', 'data')
+    __slots__ = ('response', '_data')
 
-    def __init__(self, response, data):
+    def __init__(self, response):
         self.response = response
-        self.data = data
+        self._data = None
+
+    @property
+    def data(self):
+        if self._data is None:
+            self._data = self.response.read()
+        return self._data
+
+    def head(self):
+        self.data
+        return dict(self.response.getheaders())
 
     def loads(self):
         return json.loads(self.data.decode('utf-8'))
-
 
 class CouchCore(object):
     def __init__(self, url, **connargs):
@@ -100,58 +114,60 @@ class CouchCore(object):
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.url)
 
-    def relurl(self, *parts, **options):
+    def path(self, *parts, **options):
         url = self.basepath + '/'.join(parts)
         if options:
             return '?'.join([url, query(**options)])
         return url
 
-    def request(self, method, body, *parts, **options):
-        headers = {
-            'Accept': 'application/json',
+    def request(self, method, url, body=None, headers=None):
+        h = {
             'User-Agent': USER_AGENT,
+            'Accept': 'application/json',
         }
-        if body is None:
-            headers['Content-Type'] = 'application/json'
-        elif isinstance(body, dict):
-            headers['Content-Type'] = 'application/json'
-            body = json.dumps(body, sort_keys=True, separators=(',',':'))
-        else:
-            headers['Content-Type'] = options.pop('content_type',
-                'application/octet-stream'
-            )
-        url = self.relurl(*parts, **options)
-        self.conn.request(method, url, body, headers)
+        if headers:
+            h.update(headers)
+        self.conn.request(method, url, body, h)
         r = self.conn.getresponse()
-        data = r.read()
         if r.status >= 500:
             raise ServerError(r, method, url)
         if r.status >= 400:
             E = errors.get(r.status, ClientError)
             raise E(r, method, url)
-        if r.getheader('Content-Type') == 'application/json':
-            return json.loads(data.decode('utf-8'))
-        return Response(r, data)
+        return Response(r)
+
+    def _json(self, method, obj, *parts, **options):
+        """
+        Make a PUT or POST request with a JSON body.
+        """
+        url = self.path(*parts, **options)
+        body = (None if obj is None else dumps(obj))
+        headers = {'Content-Type': 'application/json'}
+        return self.request(method, url, body, headers)
 
     def post(self, obj, *parts, **options):
-        return self.request('POST', obj, *parts, **options)
+        return self._json('POST', obj, *parts, **options).loads()
 
     def put(self, obj, *parts, **options):
-        return self.request('PUT', obj, *parts, **options)
+        return self._json('PUT', obj, *parts, **options).loads()
 
     def get(self, *parts, **options):
-        return self.request('GET', None, *parts, **options)
-
-    def head(self, *parts, **options):
-        return self.request('HEAD', None, *parts, **options)
+        return self.request('GET', self.path(*parts, **options)).loads()
 
     def delete(self, *parts, **options):
-        return self.request('DELETE', None, *parts, **options)
+        return self.request('DELETE', self.path(*parts, **options)).loads()
+
+    def head(self, *parts, **options):
+        return self.request('HEAD', self.path(*parts, **options)).head()
 
 
 class Server(CouchCore):
     def __init__(self, url='http://localhost:5984/', **connargs):
         super().__init__(url, **connargs)
+
+    def __iter__(self):
+        for name in sorted(self.get('_all_dbs')):
+            yield name
 
     def db(self, name):
         try:
@@ -164,6 +180,13 @@ class Server(CouchCore):
 class Database(CouchCore):
     def __init__(self, url='http://localhost:5984/_users/', **connargs):
         super().__init__(url, **connargs)
+
+    def __iter__(self):
+        for row in self.get('_all_docs')['rows']:
+            yield row['id']
+
+    def __getitem__(self, _id):
+        return self.get(_id, attachments=True)
 
     def compact(self):
         return self.post(None, '_compact')
@@ -183,11 +206,22 @@ class Database(CouchCore):
 
 
 s = Server()
-s.delete('dmedia_test')
+print(list(s))
+
+try:
+    print(s.delete('dmedia_test'))
+except NotFound:
+    pass
 db = s.db('dmedia_test')
-docs = [{'foo': 'bar'} for i in range(1000)]
+docs = [{'foo': 'bar'} for i in range(100)]
 db.bulksave(docs)
 for d in docs:
     d['stuff'] = 17
 db.bulksave(docs)
 print(db.compact())
+
+print(db.head(docs[0]['_id']))
+
+print('')
+for _id in db:
+    print(db[_id])
