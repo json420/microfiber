@@ -3,16 +3,12 @@
 """
 
 from http.client import HTTPConnection, HTTPSConnection
-from urllib.parse import urlencode, urlparse
-from base64 import b64encode
+from urllib.parse import urlparse, urlencode
 import json
-import sys
 
 
 __version__ = '0.1.0'
 USER_AGENT = 'microfiber ' + __version__
-SERVER = 'http://localhost:5984/'
-DBNAME = '_users'
 
 
 def dumps(obj):
@@ -131,6 +127,10 @@ class Response(object):
 
 
 class CouchCore(object):
+    """
+    Base class for `Server` and `Database`.
+    """
+
     def __init__(self, url):
         self.url = (url if url.endswith('/') else url + '/')
         t = urlparse(self.url)
@@ -142,7 +142,23 @@ class CouchCore(object):
         return '%s(%r)' % (self.__class__.__name__, self.url)
 
     def path(self, *parts, **options):
-        url = self.basepath + '/'.join(parts)
+        """
+        Construct URL from base path.
+
+        For example:
+
+        >>> cc = CouchCore('http://localhost:5001/dmedia/')
+        >>> cc.path()
+        '/dmedia/'
+        >>> cc.path('_design', 'file', '_view', 'bytes')
+        '/dmedia/_design/file/_view/bytes'
+        >>> cc.path('mydoc', rev='1-3e812567', attachments=True)
+        '/dmedia/mydoc?attachments=true&rev=1-3e812567'
+
+        :param parts: path components to add to base path
+        :param options: keyword arguments from which to construct the query
+        """
+        url = (self.basepath + '/'.join(parts) if parts else self.basepath)
         if options:
             return '?'.join([url, query(**options)])
         return url
@@ -196,7 +212,7 @@ class Server(CouchCore):
         for name in sorted(self.get('_all_dbs')):
             yield name
 
-    def db(self, name):
+    def database(self, name):
         try:
             self.put(None, name)
         except PreconditionFailed:
