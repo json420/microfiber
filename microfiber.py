@@ -4,7 +4,9 @@
 
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlencode, urlparse
+from base64 import b64encode
 import json
+import sys
 
 
 __version__ = '0.1.0'
@@ -28,7 +30,24 @@ def query(**options):
     return urlencode(tuple(queryiter(**options)))
 
 
-class HTTPError(Exception):
+errors = {}
+
+
+class HTTPErrorMeta(type):
+    """
+    Metaclass to build mapping of status code to `HTTPError` subclasses.
+
+    If the class has a ``status`` attribute, it will be added to the `errors`
+    dictionary.
+    """
+    def __new__(meta, name, bases, dict):
+        cls = type.__new__(meta, name, bases, dict)
+        if isinstance(getattr(cls, 'status', None), int):
+            errors[cls.status] = cls
+        return cls
+
+
+class HTTPError(Exception, metaclass=HTTPErrorMeta):
     """
     Base class for custom `microfiber` exceptions.
     """
@@ -40,7 +59,7 @@ class HTTPError(Exception):
         self.method = method
         self.url = url
         self.data = response.read()
-        super().__init__('%r %r %r %r' %
+        super().__init__('%s %s: %s %s' %
             (response.status, response.reason, method, url)
         )
 
@@ -55,8 +74,20 @@ class BadRequest(ClientError):
     status = 400
 
 
+class Unauthorized(ClientError):
+    status = 401
+
+
+class Forbidden(ClientError):
+    status = 403
+
+
 class NotFound(ClientError):
     status = 404
+
+
+class MethodNotAllowed(ClientError):
+    status = 405
 
 
 class Conflict(ClientError):
@@ -67,9 +98,8 @@ class PreconditionFailed(ClientError):
     status = 412
 
 
-errors = dict(
-    (E.status, E) for E in [BadRequest, NotFound, Conflict, PreconditionFailed]
-)
+class UnsupportedMediaType(ClientError):
+    status = 415
 
 
 class ServerError(HTTPError):
@@ -98,18 +128,14 @@ class Response(object):
     def loads(self):
         return json.loads(self.data.decode('utf-8'))
 
+
 class CouchCore(object):
-    def __init__(self, url, **connargs):
-        if url.endswith('/'):
-            self.url = url
-        else:
-            self.url = url + '/'
-        self.connargs = connargs
+    def __init__(self, url):
+        self.url = (url if url.endswith('/') else url + '/')
         t = urlparse(self.url)
         self.basepath = t.path
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
-        self.conn = klass(t.netloc, **connargs)
-        #self.conn.set_debuglevel(1)
+        self.conn = klass(t.netloc)
 
     def __repr__(self):
         return '%s(%r)' % (self.__class__.__name__, self.url)
@@ -128,15 +154,15 @@ class CouchCore(object):
         if headers:
             h.update(headers)
         self.conn.request(method, url, body, h)
-        r = self.conn.getresponse()
-        if r.status >= 500:
-            raise ServerError(r, method, url)
-        if r.status >= 400:
-            E = errors.get(r.status, ClientError)
-            raise E(r, method, url)
-        return Response(r)
+        response = self.conn.getresponse()
+        if response.status >= 500:
+            raise ServerError(response, method, url)
+        if response.status >= 400:
+            E = errors.get(response.status, ClientError)
+            raise E(response, method, url)
+        return Response(response)
 
-    def _json(self, method, obj, *parts, **options):
+    def json(self, method, obj, *parts, **options):
         """
         Make a PUT or POST request with a JSON body.
         """
@@ -146,10 +172,10 @@ class CouchCore(object):
         return self.request(method, url, body, headers)
 
     def post(self, obj, *parts, **options):
-        return self._json('POST', obj, *parts, **options).loads()
+        return self.json('POST', obj, *parts, **options).loads()
 
     def put(self, obj, *parts, **options):
-        return self._json('PUT', obj, *parts, **options).loads()
+        return self.json('PUT', obj, *parts, **options).loads()
 
     def get(self, *parts, **options):
         return self.request('GET', self.path(*parts, **options)).loads()
@@ -162,8 +188,8 @@ class CouchCore(object):
 
 
 class Server(CouchCore):
-    def __init__(self, url='http://localhost:5984/', **connargs):
-        super().__init__(url, **connargs)
+    def __init__(self, url='http://localhost:5984/'):
+        super().__init__(url)
 
     def __iter__(self):
         for name in sorted(self.get('_all_dbs')):
@@ -174,12 +200,12 @@ class Server(CouchCore):
             self.put(None, name)
         except PreconditionFailed:
             pass
-        return Database(self.url + name, **self.connargs)
+        return Database(self.url + name)
 
 
 class Database(CouchCore):
-    def __init__(self, url='http://localhost:5984/_users/', **connargs):
-        super().__init__(url, **connargs)
+    def __init__(self, url='http://localhost:5984/_users/'):
+        super().__init__(url)
 
     def __iter__(self):
         for row in self.get('_all_docs')['rows']:
@@ -204,8 +230,10 @@ class Database(CouchCore):
             d['_rev'] = r['rev']
         return ret
 
+print(errors)
 
 s = Server()
+print(s.head('dmedia'))
 print(list(s))
 
 try:
@@ -213,15 +241,20 @@ try:
 except NotFound:
     pass
 db = s.db('dmedia_test')
-docs = [{'foo': 'bar'} for i in range(100)]
+docs = [{'foo': 'bar'} for i in range(1000)]
 db.bulksave(docs)
 for d in docs:
-    d['stuff'] = 17
+    d['_attachments'] = {
+        'stuff': {
+            'content_type': 'text/plain',
+            'data': b64encode(b'hello world').decode('ascii'),
+        }
+    }
 db.bulksave(docs)
 print(db.compact())
 
 print(db.head(docs[0]['_id']))
 
 print('')
-for _id in db:
-    print(db[_id])
+#for _id in db:
+#    print(db[_id])
