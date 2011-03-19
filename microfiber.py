@@ -11,7 +11,8 @@ import sys
 
 __version__ = '0.1.0'
 USER_AGENT = 'microfiber ' + __version__
-
+SERVER = 'http://localhost:5984/'
+DBNAME = '_users'
 
 
 def dumps(obj):
@@ -229,32 +230,3 @@ class Database(CouchCore):
             d['_id'] = r['id']
             d['_rev'] = r['rev']
         return ret
-
-print(errors)
-
-s = Server()
-print(s.head('dmedia'))
-print(list(s))
-
-try:
-    print(s.delete('dmedia_test'))
-except NotFound:
-    pass
-db = s.db('dmedia_test')
-docs = [{'foo': 'bar'} for i in range(1000)]
-db.bulksave(docs)
-for d in docs:
-    d['_attachments'] = {
-        'stuff': {
-            'content_type': 'text/plain',
-            'data': b64encode(b'hello world').decode('ascii'),
-        }
-    }
-db.bulksave(docs)
-print(db.compact())
-
-print(db.head(docs[0]['_id']))
-
-print('')
-#for _id in db:
-#    print(db[_id])
