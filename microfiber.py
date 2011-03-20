@@ -243,6 +243,7 @@ class CouchCore(object):
         }
         if headers:
             h.update(headers)
+        self.conn.close()
         self.conn.request(method, url, body, h)
         response = self.conn.getresponse()
         if response.status >= 500:
