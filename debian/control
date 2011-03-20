@@ -1,0 +1,13 @@
+Source: microfiber
+Section: python
+Priority: optional
+Maintainer: Jason Gerard DeRose <jderose@novacut.com>
+Build-Depends: debhelper (>= 8.1), python (>= 3.2)
+Standards-Version: 3.9.1
+XS-Python-Version: >= 3.2
+
+Package: python3-microfiber
+Architecture: all
+Depends: ${misc:Depends}, ${python3:Depends}
+Description: fabric for a lightweight Couch
+ FIXME.
