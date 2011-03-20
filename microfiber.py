@@ -81,8 +81,11 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
         self.method = method
         self.url = url
         self.data = response.read()
-        super().__init__(
-            '{} {}: {} {}'.format(response.status, response.reason, method, url)
+        super().__init__()
+
+    def __str__(self):
+        return '{} {}: {} {}'.format(
+            self.response.status, self.response.reason, self.method, self.url
         )
 
     def loads(self):

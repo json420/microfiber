@@ -93,16 +93,22 @@ class TestErrors(TestCase):
                 417: microfiber.ExpectationFailed,
             }
         )
+        method = 'MOST'
+        url = '/restful?and=awesome'
         for (status, klass) in microfiber.errors.items():
             self.assertEqual(klass.status, status)
             reason = b32encode(os.urandom(10))
             data = os.urandom(20)
             r = FakeResponse(status, reason, data)
-            inst = klass(r, 'MOST', '/restful?and=awesome')
+            inst = klass(r, method, url)
             self.assertIs(inst.response, r)
-            self.assertEqual(inst.method, 'MOST')
-            self.assertEqual(inst.url, '/restful?and=awesome')
+            self.assertEqual(inst.method, method)
+            self.assertEqual(inst.url, url)
             self.assertEqual(inst.data, data)
+            self.assertEqual(
+                str(inst),
+                '{} {}: {} {}'.format(status, reason, method, url)
+            )
 
 
 class TestCouchCore(TestCase):
