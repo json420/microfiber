@@ -28,6 +28,7 @@ from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
 import os
 from base64 import b32encode
+from copy import deepcopy
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -234,7 +235,8 @@ class TestDatabase(TestCase):
         self.assertEqual(repr(inst), "Database('https://localhost:5004/')")
 
 
-class TestLive(TestCase):
+
+class LiveTestCase(TestCase):
 
     def getvar(self, key):
         try:
@@ -245,14 +247,19 @@ class TestLive(TestCase):
     def setUp(self):
         self.url = self.getvar('MICROFIBER_TEST_URL')
         self.db = self.getvar('MICROFIBER_TEST_DB')
-        t = urlparse(self.url)
+        self.dburl = self.url + self.db
+        t = urlparse(self.dburl)
         conn = HTTPConnection(t.netloc)
         headers = {'Accept': 'application/json'}
-        conn.request('DELETE', self.url + self.db, None, headers)
+        conn.request('DELETE', t.path, None, headers)
         r = conn.getresponse()
         r.read()
 
-    def test_CouchCore(self):
+
+
+class TestCouchCoreLive(LiveTestCase):
+
+    def test_put_post(self):
         klass = microfiber.CouchCore
         inst = klass(self.url)
 
@@ -387,3 +394,73 @@ class TestLive(TestCase):
         self.assertEqual(inst.delete(self.db), {'ok': True})
         self.assertRaises(NotFound, inst.delete, self.db)
         self.assertRaises(NotFound, inst.get, self.db)
+
+
+class TestDatabaseLive(LiveTestCase):
+    klass = microfiber.Database
+
+    def test_save(self):
+        inst = self.klass(self.dburl)
+
+        self.assertRaises(NotFound, inst.get)
+        self.assertEqual(inst.put(None), {'ok': True})
+        self.assertEqual(inst.get()['db_name'], self.db)
+        self.assertRaises(PreconditionFailed, inst.put, None)
+
+        docs = [{'_id': random_id(), 'foo': i} for i in range(100)]
+        for d in docs:
+            c = deepcopy(d)
+            r = inst.save(d)
+            self.assertNotIn('_rev', c)
+            self.assertEqual(d['_rev'], r['rev'])
+
+        copy = deepcopy(docs)
+        for d in docs:
+            d['bar'] = random_id()
+            c = deepcopy(d)
+            r = inst.save(d)
+            self.assertLess(c['_rev'], d['_rev'])
+            self.assertEqual(d['_rev'], r['rev'])
+
+        for c in copy:
+            self.assertRaises(Conflict, inst.save, c)
+
+    def test_bulksave(self):
+        inst = self.klass(self.dburl)
+
+        self.assertRaises(NotFound, inst.get)
+        self.assertEqual(inst.put(None), {'ok': True})
+        self.assertEqual(inst.get()['db_name'], self.db)
+        self.assertRaises(PreconditionFailed, inst.put, None)
+
+        docs = [{'_id': random_id(), 'foo': i} for i in range(1000)]
+        copy = deepcopy(docs)
+        rows = inst.bulksave(copy)
+        self.assertIsInstance(rows, list)
+        for (d, c) in zip(docs, copy):
+            self.assertEqual(d['_id'], c['_id'])
+            self.assertEqual(d['foo'], c['foo'])
+        for (r, c) in zip(rows, copy):
+            self.assertEqual(r['id'], c['_id'])
+            self.assertEqual(r['rev'], c['_rev'])
+            self.assertTrue(c['_rev'].startswith('1-'))
+
+        old = docs
+        docs = copy
+        for d in docs:
+            d['bar'] = random_id()
+        copy = deepcopy(docs)
+        rows = inst.bulksave(copy)
+        for (d, c) in zip(docs, copy):
+            self.assertEqual(d['_id'], c['_id'])
+            self.assertLess(d['_rev'], c['_rev'])
+            self.assertEqual(d['foo'], c['foo'])
+            self.assertEqual(d['bar'], c['bar'])
+        for (r, c) in zip(rows, copy):
+            self.assertEqual(r['id'], c['_id'])
+            self.assertEqual(r['rev'], c['_rev'])
+            self.assertTrue(c['_rev'].startswith('2-'))
+
+        # FIXME: Is CouchDB 1.0.1 broken in this regard... shouldn't this raise
+        # ExpectationFailed?
+        inst.bulksave(old)

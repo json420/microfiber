@@ -77,8 +77,8 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
         self.method = method
         self.url = url
         self.data = response.read()
-        super().__init__('%s %s: %s %s' %
-            (response.status, response.reason, method, url)
+        super().__init__(
+            '{} {}: {} {}'.format(response.status, response.reason, method, url)
         )
 
     def loads(self):
@@ -307,6 +307,6 @@ class Database(CouchCore):
 
     def bulksave(self, docs):
         rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
-        for (r, doc) in zip(rows, docs):
+        for (doc, r) in zip(docs, rows):
             doc.update(_id=r['id'], _rev=r['rev'])
         return rows
