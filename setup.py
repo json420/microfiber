@@ -29,21 +29,44 @@ from distutils.core import setup
 from distutils.cmd import Command
 from unittest import TestLoader, TextTestRunner
 from doctest import DocTestSuite
+from urllib.parse import urlparse
+import os
+
 import microfiber
+
+
+TEST_DB = 'test_microfiber'
 
 
 class Test(Command):
     description = 'run unit tests and doc tests'
 
-    user_options = []
+    user_options = [
+        ('live', None, 'also run live tests against running CouchDB'),
+        ('url=', None,
+            'live test server URL; default is {!r}'.format(microfiber.SERVER)
+        ),
+        ('db=', None,
+            'live test database name; default is {!r}'.format(TEST_DB)
+        ),
+    ]
 
     def initialize_options(self):
-        pass
+        self.live = 0
+        self.url = microfiber.SERVER
+        self.db = TEST_DB
 
     def finalize_options(self):
-        pass
+        t = urlparse(self.url)
+        if t.scheme not in ('http', 'https') or t.netloc == '':
+            raise SystemExit('ERROR: invalid url: {!r}'.format(self.url))
 
     def run(self):
+        # Possibly set environ variables for live test:
+        if self.live:
+            os.environ['MICROFIBER_TEST_URL'] = self.url
+            os.environ['MICROFIBER_TEST_DB'] = self.db
+
         pynames = ['microfiber', 'test_microfiber']
 
         # Add unit-tests:

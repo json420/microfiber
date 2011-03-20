@@ -219,13 +219,19 @@ class TestDatabase(TestCase):
 
 class TestLive(TestCase):
 
+    def getvar(self, key):
+        try:
+            return os.environ[key]
+        except KeyError:
+            self.skipTest('{} not set'.format(key))
+
     def setUp(self):
-        self.url = 'http://localhost:5984/'
-        self.name = 'test_microfiber'
+        self.url = self.getvar('MICROFIBER_TEST_URL')
+        self.db = self.getvar('MICROFIBER_TEST_DB')
         t = urlparse(self.url)
         conn = HTTPConnection(t.netloc)
         headers = {'Accept': 'application/json'}
-        conn.request('DELETE', self.url + self.name, None, headers)
+        conn.request('DELETE', self.url + self.db, None, headers)
         r = conn.getresponse()
         r.read()
 
@@ -248,18 +254,18 @@ class TestLive(TestCase):
         # Create the database
 
         # Try to get DB when it doesn't exist:
-        self.assertRaises(NotFound, inst.get, self.name)
+        self.assertRaises(NotFound, inst.get, self.db)
 
         # Create DB:
-        d = inst.put(None, self.name)
+        d = inst.put(None, self.db)
         self.assertEqual(d, {'ok': True})
 
         # Try to create DB when it already exists:
-        self.assertRaises(PreconditionFailed, inst.put, None, self.name)
+        self.assertRaises(PreconditionFailed, inst.put, None, self.db)
 
         # Get DB info:
-        d = inst.get(self.name)
-        self.assertEqual(d['db_name'], self.name)
+        d = inst.get(self.db)
+        self.assertEqual(d['db_name'], self.db)
         self.assertEqual(d['doc_count'], 0)
 
 
@@ -268,11 +274,11 @@ class TestLive(TestCase):
         _id = random_id()
 
         # Try getting doc that doesn't exist:
-        self.assertRaises(NotFound, inst.get, self.name, _id)
+        self.assertRaises(NotFound, inst.get, self.db, _id)
 
         # Create doc with a put:
         doc = {'foo': 'bar'}
-        d = inst.put(doc, self.name, _id)
+        d = inst.put(doc, self.db, _id)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['ok'], True)
         self.assertEqual(d['id'], _id)
@@ -280,31 +286,31 @@ class TestLive(TestCase):
         doc['_id'] = _id
 
         # get the doc:
-        self.assertEqual(inst.get(self.name, _id), doc)
+        self.assertEqual(inst.get(self.db, _id), doc)
 
         # Try creating doc that already exists with put:
-        self.assertRaises(Conflict, inst.put, {'no': 'way'}, self.name, _id)
+        self.assertRaises(Conflict, inst.put, {'no': 'way'}, self.db, _id)
 
         # Try deleting the doc with *no* revision supplied:
-        self.assertRaises(Conflict, inst.delete, self.name, _id)
+        self.assertRaises(Conflict, inst.delete, self.db, _id)
 
         # Try deleting the doc with the wrong revision supplied:
         old = doc['_rev']
         doc['stuff'] = 'junk'
-        d = inst.put(doc, self.name, _id)
-        self.assertRaises(Conflict, inst.delete, self.name, _id, rev=old)
+        d = inst.put(doc, self.db, _id)
+        self.assertRaises(Conflict, inst.delete, self.db, _id, rev=old)
 
         # Delete the doc
         cur = d['rev']
-        d = inst.delete(self.name, _id, rev=cur)
+        d = inst.delete(self.db, _id, rev=cur)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['id'], _id)
         self.assertIs(d['ok'], True)
         self.assertGreater(d['rev'], cur)
 
         # Try deleting doc that has already been deleted
-        self.assertRaises(NotFound, inst.delete, self.name, _id, rev=d['rev'])
-        self.assertRaises(NotFound, inst.get, self.name, _id)
+        self.assertRaises(NotFound, inst.delete, self.db, _id, rev=d['rev'])
+        self.assertRaises(NotFound, inst.get, self.db, _id)
 
 
         ###############################
@@ -316,51 +322,51 @@ class TestLive(TestCase):
         }
 
         # Try getting doc that doesn't exist:
-        self.assertRaises(NotFound, inst.get, self.name, _id)
+        self.assertRaises(NotFound, inst.get, self.db, _id)
 
         # Create doc with a post:
-        d = inst.post(doc, self.name)
+        d = inst.post(doc, self.db)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['ok'], True)
         self.assertEqual(d['id'], _id)
         doc['_rev'] = d['rev']
 
         # get the doc:
-        self.assertEqual(inst.get(self.name, _id), doc)
+        self.assertEqual(inst.get(self.db, _id), doc)
 
         # Try creating doc that already exists with a post:
         nope = {'_id': _id, 'no': 'way'}
-        self.assertRaises(Conflict, inst.post, nope, self.name)
+        self.assertRaises(Conflict, inst.post, nope, self.db)
 
         # Try deleting the doc with *no* revision supplied:
-        self.assertRaises(Conflict, inst.delete, self.name, _id)
+        self.assertRaises(Conflict, inst.delete, self.db, _id)
 
         # Update the doc:
         old = doc['_rev']
         doc['touch'] = 'bad'
-        d = inst.post(doc, self.name)
+        d = inst.post(doc, self.db)
 
         # Try updating with wrong revision:
-        self.assertRaises(Conflict, inst.post, doc, self.name)
+        self.assertRaises(Conflict, inst.post, doc, self.db)
 
         # Try deleting the doc with the wrong revision supplied:
-        self.assertRaises(Conflict, inst.delete, self.name, _id, rev=old)
+        self.assertRaises(Conflict, inst.delete, self.db, _id, rev=old)
 
         # Delete the doc
         cur = d['rev']
-        d = inst.delete(self.name, _id, rev=cur)
+        d = inst.delete(self.db, _id, rev=cur)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['id'], _id)
         self.assertIs(d['ok'], True)
         self.assertGreater(d['rev'], cur)
 
         # Try deleting doc that has already been deleted
-        self.assertRaises(NotFound, inst.delete, self.name, _id, rev=cur)
-        self.assertRaises(NotFound, inst.get, self.name, _id)
+        self.assertRaises(NotFound, inst.delete, self.db, _id, rev=cur)
+        self.assertRaises(NotFound, inst.get, self.db, _id)
 
 
         #####################
         # Delete the database
-        self.assertEqual(inst.delete(self.name), {'ok': True})
-        self.assertRaises(NotFound, inst.delete, self.name)
-        self.assertRaises(NotFound, inst.get, self.name)
+        self.assertEqual(inst.delete(self.db), {'ok': True})
+        self.assertRaises(NotFound, inst.delete, self.db)
+        self.assertRaises(NotFound, inst.get, self.db)

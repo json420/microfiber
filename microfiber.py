@@ -30,6 +30,8 @@ import json
 
 __version__ = '0.0.1'
 USER_AGENT = 'microfiber ' + __version__
+SERVER = 'http://localhost:5984/'
+DATABASE = SERVER + '_users/'
 
 
 def dumps(obj):
@@ -276,7 +278,7 @@ class CouchCore(object):
 
 
 class Server(CouchCore):
-    def __init__(self, url='http://localhost:5984/'):
+    def __init__(self, url=SERVER):
         super().__init__(url)
 
     def __iter__(self):
@@ -292,7 +294,7 @@ class Server(CouchCore):
 
 
 class Database(CouchCore):
-    def __init__(self, url='http://localhost:5984/_users/'):
+    def __init__(self, url=DATABASE):
         super().__init__(url)
 
     def __iter__(self):
