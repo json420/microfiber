@@ -108,6 +108,32 @@ class TestCouchCore(TestCase):
     klass = microfiber.CouchCore
 
     def test_init(self):
+        bad = 'sftp://localhost:5984/'
+        with self.assertRaises(ValueError) as cm:
+            inst = self.klass(bad)
+        self.assertEqual(
+            str(cm.exception),
+            'url scheme must be http or https: {!r}'.format(bad)
+        )
+
+        bad = 'http:localhost:5984/foo/bar'
+        with self.assertRaises(ValueError) as cm:
+            inst = self.klass(bad)
+        self.assertEqual(
+            str(cm.exception),
+            'bad url: {!r}'.format(bad)
+        )
+
+        inst = self.klass('https://localhost:5984/db?foo=bar/')
+        self.assertEqual(inst.url, 'https://localhost:5984/db/')
+        self.assertEqual(inst.basepath, '/db/')
+        self.assertIsInstance(inst.conn, HTTPSConnection)
+
+        inst = self.klass('http://localhost:5984?/')
+        self.assertEqual(inst.url, 'http://localhost:5984/')
+        self.assertEqual(inst.basepath, '/')
+        self.assertIsInstance(inst.conn, HTTPConnection)
+
         inst = self.klass('http://localhost:5001/')
         self.assertEqual(inst.url, 'http://localhost:5001/')
         self.assertIsInstance(inst.conn, HTTPConnection)
@@ -118,11 +144,11 @@ class TestCouchCore(TestCase):
 
         inst = self.klass('https://localhost:5003/')
         self.assertEqual(inst.url, 'https://localhost:5003/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsInstance(inst.conn, HTTPSConnection)
 
         inst = self.klass('https://localhost:5004')
         self.assertEqual(inst.url, 'https://localhost:5004/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsInstance(inst.conn, HTTPSConnection)
 
     def test_repr(self):
         inst = self.klass('http://localhost:5001/')
@@ -193,15 +219,6 @@ class TestServer(TestCase):
 
 class TestDatabase(TestCase):
     klass = microfiber.Database
-
-    def test_init(self):
-        inst = self.klass()
-        self.assertEqual(inst.url, 'http://localhost:5984/_users/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
-
-        inst = self.klass('https://localhost:5984/dmedia')
-        self.assertEqual(inst.url, 'https://localhost:5984/dmedia/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
 
     def test_repr(self):
         inst = self.klass('http://localhost:5001/')

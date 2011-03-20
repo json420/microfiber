@@ -204,10 +204,16 @@ class CouchCore(object):
     Base class for `Server` and `Database`.
     """
 
-    def __init__(self, url):
-        self.url = (url if url.endswith('/') else url + '/')
-        t = urlparse(self.url)
-        self.basepath = t.path
+    def __init__(self, url=SERVER):
+        t = urlparse(url)
+        if t.scheme not in ('http', 'https'):
+            raise ValueError(
+                'url scheme must be http or https: {!r}'.format(url)
+            )
+        if not t.netloc:
+            raise ValueError('bad url: {!r}'.format(url))
+        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
+        self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
@@ -279,44 +285,28 @@ class CouchCore(object):
 
 
 class Server(CouchCore):
-    def __init__(self, url=SERVER):
-        super().__init__(url)
 
-    def __iter__(self):
-        for name in sorted(self.get('_all_dbs')):
-            yield name
-
-    def database(self, name):
-        try:
-            self.put(None, name)
-        except PreconditionFailed:
-            pass
+    def database(self, name, check=True):
+        if check:
+            try:
+                self.put(None, name)
+            except PreconditionFailed:
+                pass
         return Database(self.url + name)
 
 
 class Database(CouchCore):
+
     def __init__(self, url=DATABASE):
         super().__init__(url)
 
-    def __iter__(self):
-        for row in self.get('_all_docs')['rows']:
-            yield row['id']
-
-    def __getitem__(self, _id):
-        return self.get(_id, attachments=True)
-
-    def compact(self):
-        return self.post(None, '_compact')
-
     def save(self, doc):
-        ret = self.post(doc)
-        doc['_id'] = ret['id']
-        doc['_rev'] = ret['rev']
-        return ret
+        r = self.post(doc)
+        doc.update(_id=r['id'], _rev=r['rev'])
+        return r
 
     def bulksave(self, docs):
-        ret = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
-        for (r, d) in zip(ret, docs):
-            d['_id'] = r['id']
-            d['_rev'] = r['rev']
-        return ret
+        rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
+        for (r, doc) in zip(rows, docs):
+            doc.update(_id=r['id'], _rev=r['rev'])
+        return rows
