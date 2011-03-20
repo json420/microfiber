@@ -79,6 +79,9 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
             (response.status, response.reason, method, url)
         )
 
+    def loads(self):
+        return json.loads(self.data.decode('utf-8'))
+
 
 class ClientError(HTTPError):
     """
