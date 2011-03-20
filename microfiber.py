@@ -275,6 +275,16 @@ class CouchCore(object):
         response.read()
         return dict(response.getheaders())
 
+    def put_att(self, mime, body, *parts, **options):
+        url = self.path(*parts, **options)
+        headers = {'Content-Type': mime}
+        response = self.request('PUT', url, body, headers)
+        return loads(response.read())
+
+    def get_att(self, *parts, **options):
+        response = self.request('GET', self.path(*parts, **options))
+        return (response.getheader('Content-Type'), response.read())
+
 
 class Server(CouchCore):
 
