@@ -28,7 +28,7 @@ from urllib.parse import urlparse, urlencode
 import json
 
 
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 DATABASE = SERVER + '_users/'
