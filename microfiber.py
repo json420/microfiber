@@ -38,6 +38,10 @@ def dumps(obj):
     return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
+def loads(data):
+    return json.loads(data.decode('utf-8'))
+
+
 def queryiter(**options):
     for key in sorted(options):
         value = options[key]
@@ -82,7 +86,7 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
         )
 
     def loads(self):
-        return json.loads(self.data.decode('utf-8'))
+        return loads(self.data)
 
 
 class ClientError(HTTPError):
@@ -178,27 +182,6 @@ class ServerError(HTTPError):
     """
 
 
-class Response(object):
-    __slots__ = ('response', '_data')
-
-    def __init__(self, response):
-        self.response = response
-        self._data = None
-
-    @property
-    def data(self):
-        if self._data is None:
-            self._data = self.response.read()
-        return self._data
-
-    def head(self):
-        self.data
-        return dict(self.response.getheaders())
-
-    def loads(self):
-        return json.loads(self.data.decode('utf-8'))
-
-
 class CouchCore(object):
     """
     Base class for `Server` and `Database`.
@@ -257,7 +240,7 @@ class CouchCore(object):
         if response.status >= 400:
             E = errors.get(response.status, ClientError)
             raise E(response, method, url)
-        return Response(response)
+        return response
 
     def json(self, method, obj, *parts, **options):
         """
@@ -269,19 +252,25 @@ class CouchCore(object):
         return self.request(method, url, body, headers)
 
     def post(self, obj, *parts, **options):
-        return self.json('POST', obj, *parts, **options).loads()
+        response = self.json('POST', obj, *parts, **options)
+        return loads(response.read())
 
     def put(self, obj, *parts, **options):
-        return self.json('PUT', obj, *parts, **options).loads()
+        response = self.json('PUT', obj, *parts, **options)
+        return loads(response.read())
 
     def get(self, *parts, **options):
-        return self.request('GET', self.path(*parts, **options)).loads()
+        response = self.request('GET', self.path(*parts, **options))
+        return loads(response.read())
 
     def delete(self, *parts, **options):
-        return self.request('DELETE', self.path(*parts, **options)).loads()
+        response = self.request('DELETE', self.path(*parts, **options))
+        return loads(response.read())
 
     def head(self, *parts, **options):
-        return self.request('HEAD', self.path(*parts, **options)).head()
+        response = self.request('HEAD', self.path(*parts, **options))
+        response.read()
+        return dict(response.getheaders())
 
 
 class Server(CouchCore):
