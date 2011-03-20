@@ -2,7 +2,7 @@ Source: microfiber
 Section: python
 Priority: optional
 Maintainer: Jason Gerard DeRose <jderose@novacut.com>
-Build-Depends: debhelper (>= 8.1), python (>= 3.2)
+Build-Depends: debhelper (>= 8.1), python3 (>= 3.2~)
 Standards-Version: 3.9.1
 XS-Python-Version: >= 3.2
 
