@@ -218,7 +218,7 @@ class CouchCore(object):
         self.conn = klass(t.netloc)
 
     def __repr__(self):
-        return '%s(%r)' % (self.__class__.__name__, self.url)
+        return '{}({!r})'.format(self.__class__.__name__, self.url)
 
     def path(self, *parts, **options):
         """
