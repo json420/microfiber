@@ -4,8 +4,54 @@ Unit tests for `microfiber` module.
 
 from unittest import TestCase
 from http.client import HTTPConnection, HTTPSConnection
+import os
+from base64 import b32encode
 
 import microfiber
+
+
+class FakeResponse(object):
+    def __init__(self, status, reason, data):
+        self.status = status
+        self.reason = reason
+        self.__data = data
+
+    def read(self):
+        return self.__data
+
+
+class TestFunctions(TestCase):
+    pass
+
+
+class TestErrors(TestCase):
+    def test_errors(self):
+        self.assertEqual(
+            microfiber.errors,
+            {
+                400: microfiber.BadRequest,
+                401: microfiber.Unauthorized,
+                403: microfiber.Forbidden,
+                404: microfiber.NotFound,
+                405: microfiber.MethodNotAllowed,
+                406: microfiber.NotAcceptable,
+                409: microfiber.Conflict,
+                412: microfiber.PreconditionFailed,
+                415: microfiber.BadContentType,
+                416: microfiber.BadRangeRequest,
+                417: microfiber.ExpectationFailed,
+            }
+        )
+        for (status, klass) in microfiber.errors.items():
+            self.assertEqual(klass.status, status)
+            reason = b32encode(os.urandom(10))
+            data = os.urandom(20)
+            r = FakeResponse(status, reason, data)
+            inst = klass(r, 'MOST', '/restful?and=awesome')
+            self.assertIs(inst.response, r)
+            self.assertEqual(inst.method, 'MOST')
+            self.assertEqual(inst.url, '/restful?and=awesome')
+            self.assertEqual(inst.data, data)
 
 
 class TestCouchCore(TestCase):

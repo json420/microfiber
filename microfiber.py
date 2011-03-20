@@ -49,8 +49,6 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
     Base class for custom `microfiber` exceptions.
     """
 
-    __slots__ = ('response', 'method', 'url', 'data')
-
     def __init__(self, response, method, url):
         self.response = response
         self.method = method
@@ -63,45 +61,94 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
 
 class ClientError(HTTPError):
     """
-    Base class for 4xx Client Error exceptions.
+    Base class for all 4xx Client Error exceptions.
     """
 
 
 class BadRequest(ClientError):
+    """
+    400 Bad Request.
+    """
     status = 400
 
 
 class Unauthorized(ClientError):
+    """
+    401 Unauthorized.
+    """
     status = 401
 
 
 class Forbidden(ClientError):
+    """
+    403 Forbidden.
+    """
     status = 403
 
 
 class NotFound(ClientError):
+    """
+    404 Not Found.
+    """
     status = 404
 
 
 class MethodNotAllowed(ClientError):
+    """
+    405 Method Not Allowed.
+    """
     status = 405
 
 
+class NotAcceptable(ClientError):
+    """
+    406 Not Acceptable.
+    """
+    status = 406
+
+
 class Conflict(ClientError):
+    """
+    409 Conflict.
+
+    Raised when the request resulted in an update conflict.
+    """
     status = 409
 
 
 class PreconditionFailed(ClientError):
+    """
+    412 Precondition Failed.
+    """
     status = 412
 
 
-class UnsupportedMediaType(ClientError):
+class BadContentType(ClientError):
+    """
+    415 Unsupported Media Type.
+    """
     status = 415
+
+
+class BadRangeRequest(ClientError):
+    """
+    416 Requested Range Not Satisfiable.
+    """
+    status = 416
+
+
+class ExpectationFailed(ClientError):
+    """
+    417 Expectation Failed.
+
+    Raised when a bulk operation failed.
+    """
+    status = 417
 
 
 class ServerError(HTTPError):
     """
-    Used to raise exceptions for all 5xx Server Errors.
+    Used to raise exceptions for any 5xx Server Errors.
     """
 
 
