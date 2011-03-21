@@ -288,19 +288,31 @@ class CouchBase(object):
 
 class Server(CouchBase):
 
-    def database(self, name, check=True):
-        if check:
-            try:
-                self.put(None, name)
-            except PreconditionFailed:
-                pass
-        return Database(self.url + name)
+    def database(self, name, ensure=True):
+        return Database(self.url + name, ensure)
 
 
 class Database(CouchBase):
 
-    def __init__(self, url=DATABASE):
+    def __init__(self, url=DATABASE, ensure=False):
         super().__init__(url)
+        if ensure:
+            self.ensure()
+
+    def ensure(self):
+        """
+        Ensure the database exists.
+
+        This method will attempt to create the database, and will handle the
+        `PreconditionFailed` exception raised if the database already exists.
+
+        Higher level code can safely call this method at any time, and it only
+        results in a single PUT /db request being made.
+        """
+        try:
+            self.put(None)
+        except PreconditionFailed:
+            pass
 
     def save(self, doc):
         r = self.post(doc)

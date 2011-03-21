@@ -405,6 +405,19 @@ class TestCouchBaseLive(LiveTestCase):
 class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
+    def test_ensure(self):
+        inst = self.klass(self.dburl, ensure=False)
+        self.assertRaises(NotFound, inst.get)
+        self.assertIsNone(inst.ensure())
+        self.assertEqual(inst.get()['db_name'], self.db)
+        self.assertIsNone(inst.ensure())
+        self.assertEqual(inst.delete(), {'ok': True})
+        self.assertRaises(NotFound, inst.get)
+
+        inst = self.klass(self.dburl, ensure=True)
+        self.assertEqual(inst.get()['db_name'], self.db)
+        self.assertIsNone(inst.ensure())
+
     def test_save(self):
         inst = self.klass(self.dburl)
 
