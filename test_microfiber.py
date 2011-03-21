@@ -111,8 +111,8 @@ class TestErrors(TestCase):
             )
 
 
-class TestCouchCore(TestCase):
-    klass = microfiber.CouchCore
+class TestCouchBase(TestCase):
+    klass = microfiber.CouchBase
 
     def test_init(self):
         bad = 'sftp://localhost:5984/'
@@ -159,16 +159,16 @@ class TestCouchCore(TestCase):
 
     def test_repr(self):
         inst = self.klass('http://localhost:5001/')
-        self.assertEqual(repr(inst), "CouchCore('http://localhost:5001/')")
+        self.assertEqual(repr(inst), "CouchBase('http://localhost:5001/')")
 
         inst = self.klass('http://localhost:5002')
-        self.assertEqual(repr(inst), "CouchCore('http://localhost:5002/')")
+        self.assertEqual(repr(inst), "CouchBase('http://localhost:5002/')")
 
         inst = self.klass('https://localhost:5003/')
-        self.assertEqual(repr(inst), "CouchCore('https://localhost:5003/')")
+        self.assertEqual(repr(inst), "CouchBase('https://localhost:5003/')")
 
         inst = self.klass('https://localhost:5004')
-        self.assertEqual(repr(inst), "CouchCore('https://localhost:5004/')")
+        self.assertEqual(repr(inst), "CouchBase('https://localhost:5004/')")
 
     def test_path(self):
         options = dict(
@@ -263,10 +263,10 @@ class LiveTestCase(TestCase):
 
 
 
-class TestCouchCoreLive(LiveTestCase):
+class TestCouchBaseLive(LiveTestCase):
 
     def test_put_post(self):
-        klass = microfiber.CouchCore
+        klass = microfiber.CouchBase
         inst = klass(self.url)
 
         ####################

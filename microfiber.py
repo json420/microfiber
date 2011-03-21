@@ -185,7 +185,7 @@ class ServerError(HTTPError):
     """
 
 
-class CouchCore(object):
+class CouchBase(object):
     """
     Base class for `Server` and `Database`.
     """
@@ -212,7 +212,7 @@ class CouchCore(object):
 
         For example:
 
-        >>> cc = CouchCore('http://localhost:5001/dmedia/')
+        >>> cc = CouchBase('http://localhost:5001/dmedia/')
         >>> cc.path()
         '/dmedia/'
         >>> cc.path('_design', 'file', '_view', 'bytes')
@@ -286,7 +286,7 @@ class CouchCore(object):
         return (response.getheader('Content-Type'), response.read())
 
 
-class Server(CouchCore):
+class Server(CouchBase):
 
     def database(self, name, check=True):
         if check:
@@ -297,7 +297,7 @@ class Server(CouchCore):
         return Database(self.url + name)
 
 
-class Database(CouchCore):
+class Database(CouchBase):
 
     def __init__(self, url=DATABASE):
         super().__init__(url)
