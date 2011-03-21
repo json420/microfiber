@@ -27,11 +27,28 @@ from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse, urlencode
 import json
 
+__all__ = (
+    'Server',
+    'Database',
+    'BadRequest',
+    'Unauthorized',
+    'Forbidden',
+    'NotFound',
+    'MethodNotAllowed',
+    'NotAcceptable',
+    'Conflict',
+    'PreconditionFailed',
+    'BadContentType',
+    'BadRangeRequest',
+    'ExpectationFailed',
+)
+
 
 __version__ = '0.0.2'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 DATABASE = SERVER + '_users/'
+errors = {}
 
 
 def dumps(obj):
@@ -52,9 +69,6 @@ def queryiter(**options):
 
 def query(**options):
     return urlencode(tuple(queryiter(**options)))
-
-
-errors = {}
 
 
 class HTTPErrorMeta(type):
@@ -202,7 +216,6 @@ class CouchBase(object):
         self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
-        #self.conn.setdebuglevel(1)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -221,8 +234,8 @@ class CouchBase(object):
         >>> cc.path('mydoc', rev='1-3e812567', attachments=True)
         '/dmedia/mydoc?attachments=true&rev=1-3e812567'
 
-        :param parts: path components to add to base path
-        :param options: keyword arguments from which to construct the query
+        :param parts: path components to construct URL relative to base path
+        :param options: optional keyword arguments to include in query
         """
         url = (self.basepath + '/'.join(parts) if parts else self.basepath)
         if options:
