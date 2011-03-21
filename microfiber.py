@@ -21,6 +21,34 @@
 
 """
 `microfiber` - fabric for a lightweight Couch.
+
+The microfiber API is the CouchDB REST API, and nothing more.  For example:
+
+>>> from microfiber import Server
+>>> s = Server()
+>>> s
+Server('http://localhost:5984/')
+
+Create a database:
+
+>>> s.put(None, 'mydb')  #doctest: +SKIP
+{'ok': True}
+
+Create a doc:
+
+>>> s.post({'_id': 'foo'}, 'mydb')  #doctest: +SKIP
+{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'foo'}
+
+Also create a doc:
+
+>>> s.put({}, 'mydb', 'bar')  #doctest: +SKIP
+{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+
+Upload attachment:
+
+>>> s.put_att('image/png', b'da picture', 'mydb', 'baz', 'pic')  #doctest: +SKIP
+{'rev': '1-7c17d20f43962e360062659b4bcd8aea', 'ok': True, 'id': 'baz'}
+
 """
 
 from http.client import HTTPConnection, HTTPSConnection
@@ -62,6 +90,12 @@ def dumps(obj):
 
 
 def loads(data):
+    """
+    Decode object from JSON bytes *data*.
+
+    :param data: a ``bytes`` instance containing a UTF-8 encoded, JSON
+        serialized object
+    """
     return json.loads(data.decode('utf-8'))
 
 
@@ -74,6 +108,21 @@ def queryiter(**options):
 
 
 def query(**options):
+    """
+    Transform keyword arguments into the query portion of a request URL.
+
+    For example:
+
+    >>> query(attachments=True)
+    'attachments=true'
+    >>> query(limit=1000, endkey='foo+bar', group=True)
+    'endkey=foo%2Bbar&group=true&limit=1000'
+    >>> query(json=None)
+    'json=null'
+
+    Notice that ``True``, ``False``, and ``None`` are transformed into their
+    JSON-equivalents.
+    """
     return urlencode(tuple(queryiter(**options)))
 
 
@@ -299,6 +348,9 @@ class CouchBase(object):
         """
         PUT an attachment.
 
+        Note that you don't need any attachment-specific method for DELETE -
+        just use `CouchBase.delete()`.
+
         :param mime: The Content-Type, eg ``'image/jpeg'``
         :param data: a ``bytes`` instance or an open file, passed directly to
             HTTPConnection.request()
@@ -316,6 +368,9 @@ class CouchBase(object):
 
         Returns a (mime, data) tuple with the attachment's Content-Type and
         data.
+
+        Note that you don't need any attachment-specific method for DELETE -
+        just use `CouchBase.delete()`.
 
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
