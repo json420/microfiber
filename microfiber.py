@@ -202,6 +202,7 @@ class CouchBase(object):
         self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
+        #self.conn.setdebuglevel(1)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -275,13 +276,31 @@ class CouchBase(object):
         response.read()
         return dict(response.getheaders())
 
-    def put_att(self, mime, body, *parts, **options):
+    def put_att(self, mime, date, *parts, **options):
+        """
+        PUT an attachment.
+
+        :param mime: The Content-Type, eg ``'image/jpeg'``
+        :param data: a ``bytes`` instance or an open file, passed directly to
+            HTTPConnection.request()
+        :param parts: path components to construct URL relative to base path
+        :param options: optional keyword arguments to include in query
+        """
         url = self.path(*parts, **options)
         headers = {'Content-Type': mime}
-        response = self.request('PUT', url, body, headers)
+        response = self.request('PUT', url, date, headers)
         return loads(response.read())
 
     def get_att(self, *parts, **options):
+        """
+        GET an attachment.
+
+        Returns a (mime, data) tuple with the attachment's Content-Type and
+        data.
+
+        :param parts: path components to construct URL relative to base path
+        :param options: optional keyword arguments to include in query
+        """
         response = self.request('GET', self.path(*parts, **options))
         return (response.getheader('Content-Type'), response.read())
 

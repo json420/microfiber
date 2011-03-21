@@ -27,7 +27,7 @@ from unittest import TestCase
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
 import os
-from base64 import b32encode
+from base64 import b64encode, b64decode, b32encode
 from copy import deepcopy
 
 import microfiber
@@ -262,8 +262,86 @@ class LiveTestCase(TestCase):
         r.read()
 
 
-
 class TestCouchBaseLive(LiveTestCase):
+    klass = microfiber.CouchBase
+
+    def test_put_att(self):
+        inst = self.klass(self.url)
+
+        # Create database
+        self.assertEqual(inst.put(None, self.db), {'ok': True})
+
+        mime = 'image/jpeg'
+        data = os.urandom(2001)
+
+        # Try to GET attachment that doesn't exist:
+        self.assertRaises(NotFound, inst.get_att, self.db, 'doc1', 'att')
+
+        # PUT an attachment
+        r = inst.put_att(mime, data, self.db, 'doc1', 'att')
+        self.assertEqual(set(r), set(['id', 'rev', 'ok']))
+        self.assertEqual(r['id'], 'doc1')
+        self.assertEqual(r['ok'], True)
+
+        # GET the doc with attachments=True
+        doc = inst.get(self.db, 'doc1', attachments=True)
+        self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
+        self.assertEqual(doc['_id'], 'doc1')
+        self.assertEqual(doc['_rev'], r['rev'])
+        self.assertEqual(
+            doc['_attachments'],
+            {
+                'att': {
+                    'content_type': mime,
+                    'data': b64encode(data).decode('ascii'),
+                    'revpos': 1,
+                },
+            }
+        )
+
+        # GET the attachment
+        self.assertEqual(
+            inst.get_att(self.db, 'doc1', 'att'),
+            (mime, data)
+        )
+
+        # Create new doc with inline attachment:
+        new = {
+            '_id': 'doc2',
+            '_attachments': {
+                'att': {
+                    'content_type': mime,
+                    'data': b64encode(data).decode('ascii'),
+                },
+            },
+        }
+        r = inst.post(new, self.db)
+
+        self.assertEqual(set(r), set(['id', 'rev', 'ok']))
+        self.assertEqual(r['id'], 'doc2')
+        self.assertEqual(r['ok'], True)
+
+        # GET the doc with attachments=true
+        doc = inst.get(self.db, 'doc2', attachments=True)
+        self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
+        self.assertEqual(doc['_id'], 'doc2')
+        self.assertEqual(doc['_rev'], r['rev'])
+        self.assertEqual(
+            doc['_attachments'],
+            {
+                'att': {
+                    'content_type': mime,
+                    'data': b64encode(data).decode('ascii'),
+                    'revpos': 1,
+                },
+            }
+        )
+
+        # GET the attachment:
+        self.assertEqual(
+            inst.get_att(self.db, 'doc2', 'att'),
+            (mime, data)
+        )
 
     def test_put_post(self):
         klass = microfiber.CouchBase
