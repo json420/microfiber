@@ -29,6 +29,7 @@ from urllib.parse import urlparse
 import os
 from base64 import b64encode, b64decode, b32encode
 from copy import deepcopy
+import json
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -49,6 +50,38 @@ class FakeResponse(object):
 
 
 class TestFunctions(TestCase):
+    def test_dumps(self):
+        obj = [
+            {
+                '_id': random_id(),
+                '_rev': random_id(),
+                'foo': True,
+                'bar': None,
+                'hello': 17,
+                'world': 18.5,
+                'index': i,
+            }
+            for i in range(100)
+        ]
+        s = json.dumps(obj, sort_keys=True, separators=(',', ':'))
+        self.assertEqual(microfiber.dumps(obj), s.encode('UTF-8'))
+
+    def test_loads(self):
+        obj = [
+            {
+                '_id': random_id(),
+                '_rev': random_id(),
+                'foo': True,
+                'bar': None,
+                'hello': 17,
+                'world': 18.5,
+                'index': i,
+            }
+            for i in range(100)
+        ]
+        b = json.dumps(obj).encode('utf-8')
+        self.assertEqual(microfiber.loads(b), obj)
+
     def test_queryiter(self):
         f = microfiber.queryiter
         self.assertEqual(

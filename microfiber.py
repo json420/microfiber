@@ -43,7 +43,6 @@ __all__ = (
     'ExpectationFailed',
 )
 
-
 __version__ = '0.0.2'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
@@ -52,6 +51,13 @@ errors = {}
 
 
 def dumps(obj):
+    """
+    JSON encode *obj*.
+
+    Returns a ``bytes`` instance with a compact JSON encoding of *obj*.
+
+    :param obj: a JSON serialize-able object, likely a ``dict`` or ``list``
+    """
     return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
