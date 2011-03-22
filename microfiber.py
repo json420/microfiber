@@ -257,6 +257,28 @@ class ServerError(HTTPError):
 class CouchBase(object):
     """
     Base class for `Server` and `Database`.
+
+    This class is a simple a adapter to make it easy to call a JSON loving REST
+    API similar to CouchDB (especially if it happens to be CouchDB).  To
+    simplify things, there are some assumptions we can make:
+
+        * Request bodies are empty or JSON, except when you PUT an attachment
+
+        * Response bodies are JSON, except when you GET an attachment or make a
+          HEAD request
+
+    With just 7 methods you can access the entire CouchDB API quite elegantly:
+
+        * `CouchBase.post()`
+        * `CouchBase.put()`
+        * `CouchBase.get()`
+        * `CouchBase.delete()`
+        * `CouchBase.head()`
+        * `CouchBase.put_att()`
+        * `CouchBase.get_att()`
+
+    The goal of `microfiber` is to be as simple as possible and not require
+    constant API work to stay up to date with CouchDB API changes.
     """
 
     def __init__(self, url=SERVER):
