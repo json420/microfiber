@@ -366,7 +366,7 @@ class CouchBase(object):
         response.read()
         return dict(response.getheaders())
 
-    def put_att(self, mime, date, *parts, **options):
+    def put_att(self, mime, data, *parts, **options):
         """
         PUT an attachment.
 
@@ -381,7 +381,7 @@ class CouchBase(object):
         """
         url = self.path(*parts, **options)
         headers = {'Content-Type': mime}
-        response = self.request('PUT', url, date, headers)
+        response = self.request('PUT', url, data, headers)
         return loads(response.read())
 
     def get_att(self, *parts, **options):
