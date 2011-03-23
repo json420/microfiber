@@ -323,6 +323,10 @@ class CouchBase(object):
 
     The goal of `microfiber` is to be as simple as possible and not require
     constant API work to stay up to date with CouchDB API changes.
+
+    This class is called "CouchBase" because I think it's a really cool name.
+    Seriously, someone should start like a band or a company and call it
+    "CouchBase".
     """
 
     def __init__(self, url=SERVER):
@@ -347,7 +351,7 @@ class CouchBase(object):
 
         For example:
 
-        >>> cc = CouchBase('http://localhost:5001/dmedia/')
+        >>> cc = CouchBase('http://localhost:55506/dmedia/')
         >>> cc.path()
         '/dmedia/'
         >>> cc.path('_design', 'file', '_view', 'bytes')
@@ -390,22 +394,87 @@ class CouchBase(object):
         return self.request(method, url, body, headers)
 
     def post(self, obj, *parts, **options):
+        """
+        POST *obj*.
+
+        For example, to create the doc "bar" in the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.post({'_id': 'bar'}, 'foo')  #doctest: +SKIP
+        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+
+        Or to compact the database "foo":
+
+        >>> cb.post(None, 'foo', '_compact')  #doctest: +SKIP
+        {'ok': True}
+
+        """
         response = self.json('POST', obj, *parts, **options)
         return loads(response.read())
 
     def put(self, obj, *parts, **options):
+        """
+        PUT *obj*.
+
+        For example, to create the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.put(None, 'foo')  #doctest: +SKIP
+        {'ok': True}
+
+        Or to create the doc "bar" in the database "foo":
+
+        >>> cb.put({'micro': 'fiber'}, 'foo', 'bar')  #doctest: +SKIP
+        {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
+
+        """
         response = self.json('PUT', obj, *parts, **options)
         return loads(response.read())
 
     def get(self, *parts, **options):
+        """
+        Make a GET request.
+
+        For example, to get the welcome info from CouchDB:
+
+        >>> cb.get()  #doctest: +SKIP
+        {'couchdb': 'Welcome', 'version': '1.0.1'}
+
+        Or to request the doc "bar" from the database "foo", including any
+        attachments:
+
+        >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
+        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
+        """
         response = self.request('GET', self.path(*parts, **options))
         return loads(response.read())
 
     def delete(self, *parts, **options):
+        """
+        Make a DELETE request.
+
+        For example, to delete the doc "bar" in the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.delete('foo', 'bar', rev='1-fae0708c46b4a6c9c497c3a687170ad6')  #doctest: +SKIP
+        {'rev': '2-18995243f0ebd1066fcb191a28d1222a', 'ok': True, 'id': 'bar'}
+
+        Or to delete the database "foo":
+
+        >>> cb.delete('foo')  #doctest: +SKIP
+        {'ok': True}
+
+        """
         response = self.request('DELETE', self.path(*parts, **options))
         return loads(response.read())
 
     def head(self, *parts, **options):
+        """
+        Make a HEAD request.
+
+        Returns a ``dict`` containing the response headers from the HEAD
+        request.
+        """
         response = self.request('HEAD', self.path(*parts, **options))
         response.read()
         return dict(response.getheaders())
@@ -413,6 +482,13 @@ class CouchBase(object):
     def put_att(self, mime, data, *parts, **options):
         """
         PUT an attachment.
+
+        For example, to upload the attachment "baz" for the doc "bar" in the
+        database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.put_att('image/png', b'da pic', 'foo', 'bar', 'baz')  #doctest: +SKIP
+        {'rev': '1-f759cc40458cdd5bd8ae379174bc53d9', 'ok': True, 'id': 'bar'}
 
         Note that you don't need any attachment-specific method for DELETE -
         just use `CouchBase.delete()`.
@@ -433,7 +509,12 @@ class CouchBase(object):
         GET an attachment.
 
         Returns a (mime, data) tuple with the attachment's Content-Type and
-        data.
+        data.  For example, to download the attachment "baz" for the doc "bar"
+        in the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.get_att('foo', 'bar', 'baz')  #doctest: +SKIP
+        ('image/png', b'da pic')
 
         Note that you don't need any attachment-specific method for DELETE -
         just use `CouchBase.delete()`.
