@@ -128,6 +128,11 @@ def dumps(obj):
 
     Returns a ``bytes`` instance with a compact JSON encoding of *obj*.
 
+    For example:
+
+    >>> dumps({'micro': 'fiber', '_id': 'python'})
+    b'{"_id":"python","micro":"fiber"}'
+
     :param obj: a JSON serialize-able object, likely a ``dict`` or ``list``
     """
     return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
@@ -136,6 +141,12 @@ def dumps(obj):
 def loads(data):
     """
     Decode object from JSON bytes *data*.
+
+    For example:
+
+    >>> loads(b'{"_id":"python","micro":"fiber"}')
+    {'micro': 'fiber', '_id': 'python'}
+
 
     :param data: a ``bytes`` instance containing a UTF-8 encoded, JSON
         serialized object
@@ -527,13 +538,27 @@ class CouchBase(object):
 
 
 class Server(CouchBase):
+    """
+    All the `CouchBase` methods plus `Server.database()`.
+    """
 
     def database(self, name, ensure=True):
+        """
+        Return a new `Database` instance for the database *name*.
+        """
         return Database(self.url + name, ensure)
 
 
 class Database(CouchBase):
+    """
+    All the `CouchBase` methods plus some database-specific niceties.
 
+    Niceties:
+
+        * `Database.ensure()` - ensure the database exists
+        * `Database.save(doc)` - save to CouchDB, update doc _id & _rev in place
+        * `Database.bulksave(docs)` - as above, but with a list of docs
+    """
     def __init__(self, url=DATABASE, ensure=False):
         super().__init__(url)
         if ensure:
@@ -555,11 +580,39 @@ class Database(CouchBase):
             pass
 
     def save(self, doc):
+        """
+        POST doc to CouchDB, update doc _id & _rev in place.
+
+        For example:
+
+        >>> db = Database('http://localhost:5984/foo/')
+        >>> doc = {'_id': 'bar'}
+        >>> db.save(doc)  #doctest: +SKIP
+        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+        >>> doc  #doctest: +SKIP
+        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
+        >>> doc['hello'] = 'world'
+        >>> db.save(doc)  #doctest: +SKIP
+        {'rev': '2-0a8fff77f08f178bd1e2905f7dfb54b2', 'ok': True, 'id': 'bar'}
+        >>> doc  #doctest: +SKIP
+        {'_rev': '2-0a8fff77f08f178bd1e2905f7dfb54b2', '_id': 'bar', 'hello': 'world'}
+
+        This method is inspired by the identical (and highly useful) method in
+        python-couchdb:
+
+            http://packages.python.org/CouchDB/client.html#database
+        """
         r = self.post(doc)
         doc.update(_id=r['id'], _rev=r['rev'])
         return r
 
     def bulksave(self, docs):
+        """
+        POST a list of docs to _bulk_docs, update all _id and _rev in place.
+
+        This method works just like `Database.save()`, except on a whole list
+        of docs all at once.
+        """
         rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
         for (doc, r) in zip(docs, rows):
             doc.update(_id=r['id'], _rev=r['rev'])
