@@ -10,4 +10,9 @@ Package: python3-microfiber
 Architecture: all
 Depends: ${misc:Depends}, ${python3:Depends}
 Description: fabric for a lightweight Couch
- FIXME.
+ microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON
+ loving REST API like CouchDB.  Rather than wrapping the API in a bunch of
+ one-off methods, microfiber just makes it super easy to call any part of the
+ CouchDB REST API, current or future.  This approach allows microfiber to be
+ very simple and basically maintenance free as it requires no changes to support
+ new additions to the CouchDB API.
