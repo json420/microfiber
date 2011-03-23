@@ -30,6 +30,7 @@ import os
 from base64 import b64encode, b64decode, b32encode
 from copy import deepcopy
 import json
+import time
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -594,3 +595,13 @@ class TestDatabaseLive(LiveTestCase):
         # FIXME: Is CouchDB 1.0.1 broken in this regard... shouldn't this raise
         # ExpectationFailed?
         inst.bulksave(old)
+
+        # Test compacting the db
+        oldsize = inst.get()['disk_size']
+        self.assertEqual(inst.post(None, '_compact'), {'ok': True})
+        while True:
+            time.sleep(1)
+            if inst.get()['compact_running'] is False:
+                break
+        newsize = inst.get()['disk_size']
+        self.assertLess(newsize, oldsize)
