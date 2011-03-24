@@ -28,7 +28,7 @@ master = dict(
     ('a' * i, 'b' * i) for i in range(1, 50)
 )
 
-print('*** Benchmarking python-couchdb ***')
+print('*** Benchmarking microfiber ***')
 print('Python: {}, {}, {}'.format(
     platform.python_version(), platform.machine(), platform.system())
 )
