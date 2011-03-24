@@ -155,9 +155,15 @@ def loads(data):
 
 
 def queryiter(**options):
+    """
+    Return appropriately encoded (key, value) pairs sorted by key.
+
+    We JSON encode the value if the key is "key", "startkey", or "endkey", or
+    if the value is not an ``str``.
+    """
     for key in sorted(options):
         value = options[key]
-        if isinstance(value, bool) or value is None:
+        if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
             value = json.dumps(value)
         yield (key, value)
 
@@ -171,7 +177,7 @@ def query(**options):
     >>> query(attachments=True)
     'attachments=true'
     >>> query(limit=1000, endkey='foo+bar', group=True)
-    'endkey=foo%2Bbar&group=true&limit=1000'
+    'endkey=%22foo%2Bbar%22&group=true&limit=1000'
     >>> query(json=None)
     'json=null'
 

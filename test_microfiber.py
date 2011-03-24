@@ -88,12 +88,49 @@ class TestFunctions(TestCase):
         self.assertEqual(
             list(f(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')),
             [
-                ('aye', 10),
+                ('aye', '10'),
                 ('bar', 'false'),
                 ('baz', 'null'),
                 ('foo', 'true'),
-                ('key', 'app'),
-                ('zee', 17.5),
+                ('key', '"app"'),
+                ('zee', '17.5'),
+            ]
+        )
+        options = dict(
+            rev='2-dedd68efea922add7ae9b22ed5694a73',
+            key='foo',
+            startkey='bar',
+            endkey='baz',
+            endkey_docid='V5XXVMUJHR3WKHLLJ4W2UMTL',
+            startkey_docid='6BLRBJKV2J3COTUPJCU57UNA',
+            group=True,
+            group_level=6,
+            include_docs=True,
+            inclusive_end=False,
+            limit=666,
+            reduce=False,
+            skip=69,
+            stale='ok',
+            update_seq=True,
+        )
+        self.assertEqual(
+            list(f(**options)),
+            [
+                ('endkey', '"baz"'),
+                ('endkey_docid', 'V5XXVMUJHR3WKHLLJ4W2UMTL'),
+                ('group', 'true'),
+                ('group_level', '6'),
+                ('include_docs', 'true'),
+                ('inclusive_end', 'false'),
+                ('key', '"foo"'),
+                ('limit', '666'),
+                ('reduce', 'false'),
+                ('rev', '2-dedd68efea922add7ae9b22ed5694a73'),
+                ('skip', '69'),
+                ('stale', 'ok'),
+                ('startkey', '"bar"'),
+                ('startkey_docid', '6BLRBJKV2J3COTUPJCU57UNA'),
+                ('update_seq', 'true'),
             ]
         )
 
@@ -101,7 +138,7 @@ class TestFunctions(TestCase):
         f = microfiber.query
         self.assertEqual(
             f(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app'),
-            'aye=10&bar=false&baz=null&foo=true&key=app&zee=17.5'
+            'aye=10&bar=false&baz=null&foo=true&key=%22app%22&zee=17.5'
         )
         self.assertEqual(
             f(need='some space', bad='and+how', nauhty='you&you&you'),
