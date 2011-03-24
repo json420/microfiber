@@ -49,9 +49,9 @@ python-couchdb.
 However, if you know the CouchDB REST API or want to learn it, you will find
 microfiber a more harmonious experience.  Also, microfiber is *very* lightweight
 (1 Python file), fast, and memory efficient.  Unlike python-couchdb, microfiber
-doesn't use any wrapper objects in the results in returns from CouchDB, so it's
-less prone to high memory usage and memory fragmentation problems in, say, a
-long running server process.
+doesn't use any wrappers around the results returned from CouchDB, so it's less
+prone to high memory usage and memory fragmentation problems in, say, a long
+running server process.
 
 Long story short, the microfiber API is the CouchDB REST API, and nothing more.
 For example:
