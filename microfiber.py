@@ -623,3 +623,6 @@ class Database(CouchBase):
         for (doc, r) in zip(docs, rows):
             doc.update(_id=r['id'], _rev=r['rev'])
         return rows
+
+    def view(self, design, view, **options):
+        return self.get('_design', design, '_view', view, **options)
