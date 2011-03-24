@@ -16,7 +16,6 @@ try:
     s.delete(name)
 except couchdb.ResourceNotFound:
     pass
-
 db = s.create(name)
 
 

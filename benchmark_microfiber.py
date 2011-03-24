@@ -15,9 +15,7 @@ try:
     s.delete(name)
 except microfiber.NotFound:
     pass
-
 db = s.database(name)
-
 
 
 def random_id():
