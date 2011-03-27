@@ -391,9 +391,12 @@ class CouchBase(object):
         }
         if headers:
             h.update(headers)
-        self.conn.close()
-        self.conn.request(method, url, body, h)
-        response = self.conn.getresponse()
+        try:
+            self.conn.request(method, url, body, h)
+            response = self.conn.getresponse()
+        except Exception as e:
+            self.conn.close()
+            raise e
         if response.status >= 500:
             raise ServerError(response, method, url)
         if response.status >= 400:
