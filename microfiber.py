@@ -461,6 +461,7 @@ class CouchBase(object):
 
         For example, to get the welcome info from CouchDB:
 
+        >>> cb = CouchBase()
         >>> cb.get()  #doctest: +SKIP
         {'couchdb': 'Welcome', 'version': '1.0.1'}
 
