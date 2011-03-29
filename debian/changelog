@@ -1,5 +1,5 @@
-microfiber (0.1.0-0~natty) natty; urgency=low
+microfiber (0.2.0-0~natty) natty; urgency=low
 
-  * Upstream 0.1.0 release
+  * Upstream 0.2.0 pre-release
 
- -- Jason Gerard DeRose <jderose@novacut.com>  Sun, 20 Mar 2011 01:43:05 +0000
+ -- Jason Gerard DeRose <jderose@novacut.com>  Tue, 29 Mar 2011 20:55:12 +0000
