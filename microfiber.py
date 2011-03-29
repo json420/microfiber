@@ -576,6 +576,7 @@ class Database(CouchBase):
         * `Database.ensure()` - ensure the database exists
         * `Database.save(doc)` - save to CouchDB, update doc _id & _rev in place
         * `Database.bulksave(docs)` - as above, but with a list of docs
+        * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, url=SERVER, ensure=False):
         super().__init__(name, url)
@@ -638,4 +639,16 @@ class Database(CouchBase):
         return rows
 
     def view(self, design, view, **options):
+        """
+        Shortcut for making a GET request to a view.
+
+        No magic here, just saves you having to type "_design" and "_view" over
+        and over.  This:
+
+            ``Database.view(design, view, **options)``
+
+        Is just a shortcut for:
+
+            ``Database.get('_design', design, '_view', view, **options)``
+        """
         return self.get('_design', design, '_view', view, **options)
