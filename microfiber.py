@@ -206,11 +206,11 @@ class HTTPError(Exception, metaclass=HTTPErrorMeta):
     Base class for custom `microfiber` exceptions.
     """
 
-    def __init__(self, response, method, url):
+    def __init__(self, response, data, method, url):
         self.response = response
+        self.data = data
         self.method = method
         self.url = url
-        self.data = response.read()
         super().__init__()
 
     def __str__(self):
@@ -394,15 +394,16 @@ class CouchBase(object):
         try:
             self.conn.request(method, url, body, h)
             response = self.conn.getresponse()
+            data = response.read()
         except Exception as e:
             self.conn.close()
             raise e
         if response.status >= 500:
-            raise ServerError(response, method, url)
+            raise ServerError(response, data, method, url)
         if response.status >= 400:
             E = errors.get(response.status, ClientError)
-            raise E(response, method, url)
-        return response
+            raise E(response, data, method, url)
+        return (response, data)
 
     def json(self, method, obj, *parts, **options):
         """
@@ -429,8 +430,8 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        response = self.json('POST', obj, *parts, **options)
-        return loads(response.read())
+        (response, data) = self.json('POST', obj, *parts, **options)
+        return loads(data)
 
     def put(self, obj, *parts, **options):
         """
@@ -448,8 +449,8 @@ class CouchBase(object):
         {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
 
         """
-        response = self.json('PUT', obj, *parts, **options)
-        return loads(response.read())
+        (response, data) = self.json('PUT', obj, *parts, **options)
+        return loads(data)
 
     def get(self, *parts, **options):
         """
@@ -466,8 +467,8 @@ class CouchBase(object):
         >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
-        response = self.request('GET', self.path(*parts, **options))
-        return loads(response.read())
+        (response, data) = self.request('GET', self.path(*parts, **options))
+        return loads(data)
 
     def delete(self, *parts, **options):
         """
@@ -485,8 +486,8 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        response = self.request('DELETE', self.path(*parts, **options))
-        return loads(response.read())
+        (response, data) = self.request('DELETE', self.path(*parts, **options))
+        return loads(data)
 
     def head(self, *parts, **options):
         """
@@ -495,8 +496,7 @@ class CouchBase(object):
         Returns a ``dict`` containing the response headers from the HEAD
         request.
         """
-        response = self.request('HEAD', self.path(*parts, **options))
-        response.read()
+        (response, data) = self.request('HEAD', self.path(*parts, **options))
         return dict(response.getheaders())
 
     def put_att(self, mime, data, *parts, **options):
@@ -521,8 +521,8 @@ class CouchBase(object):
         """
         url = self.path(*parts, **options)
         headers = {'Content-Type': mime}
-        response = self.request('PUT', url, data, headers)
-        return loads(response.read())
+        (response, data) = self.request('PUT', url, data, headers)
+        return loads(data)
 
     def get_att(self, *parts, **options):
         """
@@ -542,8 +542,8 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        response = self.request('GET', self.path(*parts, **options))
-        return (response.getheader('Content-Type'), response.read())
+        (response, data) = self.request('GET', self.path(*parts, **options))
+        return (response.getheader('Content-Type'), data)
 
 
 class Server(CouchBase):

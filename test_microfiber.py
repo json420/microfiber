@@ -41,13 +41,9 @@ def random_id():
 
 
 class FakeResponse(object):
-    def __init__(self, status, reason, data):
+    def __init__(self, status, reason):
         self.status = status
         self.reason = reason
-        self.__data = data
-
-    def read(self):
-        return self.__data
 
 
 class TestFunctions(TestCase):
@@ -170,8 +166,8 @@ class TestErrors(TestCase):
             self.assertEqual(klass.status, status)
             reason = b32encode(os.urandom(10))
             data = os.urandom(20)
-            r = FakeResponse(status, reason, data)
-            inst = klass(r, method, url)
+            r = FakeResponse(status, reason)
+            inst = klass(r, data, method, url)
             self.assertIs(inst.response, r)
             self.assertEqual(inst.method, method)
             self.assertEqual(inst.url, url)
