@@ -118,7 +118,6 @@ __all__ = (
 __version__ = '0.0.2'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
-DATABASE = SERVER + '_users/'
 errors = {}
 
 
@@ -325,8 +324,7 @@ class CouchBase(object):
 
         * Request bodies are empty or JSON, except when you PUT an attachment
 
-        * Response bodies are JSON, except when you GET an attachment or make a
-          HEAD request
+        * Response bodies are JSON, except when you GET an attachment
 
     With just 7 methods you can access the entire CouchDB API quite elegantly:
 
@@ -346,7 +344,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, url=SERVER):
+    def __init__(self, name=None, url=SERVER):
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -356,11 +354,16 @@ class CouchBase(object):
             raise ValueError('bad url: {!r}'.format(url))
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
         self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
+        self.name = name
+        if name:
+            self.basepath += (name + '/')
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
     def __repr__(self):
-        return '{}({!r})'.format(self.__class__.__name__, self.url)
+        return '{}({!r}, {!r})'.format(
+            self.__class__.__name__, self.name, self.url
+        )
 
     def path(self, *parts, **options):
         """
@@ -368,7 +371,7 @@ class CouchBase(object):
 
         For example:
 
-        >>> cc = CouchBase('http://localhost:55506/dmedia/')
+        >>> cc = CouchBase('dmedia', 'http://localhost:55506/')
         >>> cc.path()
         '/dmedia/'
         >>> cc.path('_design', 'file', '_view', 'bytes')
@@ -551,11 +554,17 @@ class Server(CouchBase):
     All the `CouchBase` methods plus `Server.database()`.
     """
 
+    def __init__(self, url=SERVER):
+        super().__init__(url=url)
+
+    def __repr__(self):
+        return '{}({!r})'.format(self.__class__.__name__, self.url)
+
     def database(self, name, ensure=True):
         """
         Return a new `Database` instance for the database *name*.
         """
-        return Database(self.url + name, ensure)
+        return Database(name, self.url, ensure)
 
 
 class Database(CouchBase):
@@ -568,8 +577,9 @@ class Database(CouchBase):
         * `Database.save(doc)` - save to CouchDB, update doc _id & _rev in place
         * `Database.bulksave(docs)` - as above, but with a list of docs
     """
-    def __init__(self, url=DATABASE, ensure=False):
-        super().__init__(url)
+    def __init__(self, name, url=SERVER, ensure=False):
+        super().__init__(name, url)
+        self.name = name
         if ensure:
             self.ensure()
 

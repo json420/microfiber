@@ -184,7 +184,7 @@ class TestCouchBase(TestCase):
     def test_init(self):
         bad = 'sftp://localhost:5984/'
         with self.assertRaises(ValueError) as cm:
-            inst = self.klass(bad)
+            inst = self.klass(url=bad)
         self.assertEqual(
             str(cm.exception),
             'url scheme must be http or https: {!r}'.format(bad)
@@ -192,50 +192,62 @@ class TestCouchBase(TestCase):
 
         bad = 'http:localhost:5984/foo/bar'
         with self.assertRaises(ValueError) as cm:
-            inst = self.klass(bad)
+            inst = self.klass(url=bad)
         self.assertEqual(
             str(cm.exception),
             'bad url: {!r}'.format(bad)
         )
 
-        inst = self.klass('https://localhost:5984/db?foo=bar/')
-        self.assertEqual(inst.url, 'https://localhost:5984/db/')
-        self.assertEqual(inst.basepath, '/db/')
+        inst = self.klass(url='https://localhost:5984/couch?foo=bar/')
+        self.assertEqual(inst.url, 'https://localhost:5984/couch/')
+        self.assertEqual(inst.basepath, '/couch/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
-        inst = self.klass('http://localhost:5984?/')
+        inst = self.klass(url='http://localhost:5984?/')
         self.assertEqual(inst.url, 'http://localhost:5984/')
         self.assertEqual(inst.basepath, '/')
         self.assertIsInstance(inst.conn, HTTPConnection)
 
-        inst = self.klass('http://localhost:5001/')
+        inst = self.klass(url='http://localhost:5001/')
         self.assertEqual(inst.url, 'http://localhost:5001/')
         self.assertIsInstance(inst.conn, HTTPConnection)
 
-        inst = self.klass('http://localhost:5002')
+        inst = self.klass(url='http://localhost:5002')
         self.assertEqual(inst.url, 'http://localhost:5002/')
         self.assertIsInstance(inst.conn, HTTPConnection)
 
-        inst = self.klass('https://localhost:5003/')
+        inst = self.klass(url='https://localhost:5003/')
         self.assertEqual(inst.url, 'https://localhost:5003/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
-        inst = self.klass('https://localhost:5004')
+        inst = self.klass(url='https://localhost:5004')
         self.assertEqual(inst.url, 'https://localhost:5004/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
     def test_repr(self):
-        inst = self.klass('http://localhost:5001/')
-        self.assertEqual(repr(inst), "CouchBase('http://localhost:5001/')")
+        inst = self.klass()
+        self.assertEqual(
+            repr(inst),
+            "CouchBase(None, 'http://localhost:5984/')"
+        )
 
-        inst = self.klass('http://localhost:5002')
-        self.assertEqual(repr(inst), "CouchBase('http://localhost:5002/')")
+        inst = self.klass('dmedia')
+        self.assertEqual(
+            repr(inst),
+            "CouchBase('dmedia', 'http://localhost:5984/')"
+        )
 
-        inst = self.klass('https://localhost:5003/')
-        self.assertEqual(repr(inst), "CouchBase('https://localhost:5003/')")
+        inst = self.klass(url='https://localhost:5004/')
+        self.assertEqual(
+            repr(inst),
+            "CouchBase(None, 'https://localhost:5004/')"
+        )
 
-        inst = self.klass('https://localhost:5004')
-        self.assertEqual(repr(inst), "CouchBase('https://localhost:5004/')")
+        inst = self.klass('dmedia', 'https://localhost:5004/')
+        self.assertEqual(
+            repr(inst),
+            "CouchBase('dmedia', 'https://localhost:5004/')"
+        )
 
     def test_path(self):
         options = dict(
@@ -243,7 +255,7 @@ class TestCouchBase(TestCase):
             foo=True,
             bar=None,
         )
-        inst = self.klass('http://localhost:5001/')
+        inst = self.klass(url='http://localhost:5001/')
 
         self.assertEqual(inst.path(), '/')
         self.assertEqual(
@@ -262,7 +274,6 @@ class TestCouchBase(TestCase):
             inst.path('db/doc/att', **options),
             '/db/doc/att?bar=null&foo=true&rev=1-3e812567'
         )
-
 
 
 class TestServer(TestCase):
@@ -295,18 +306,17 @@ class TestDatabase(TestCase):
     klass = microfiber.Database
 
     def test_repr(self):
-        inst = self.klass('http://localhost:5001/')
-        self.assertEqual(repr(inst), "Database('http://localhost:5001/')")
+        inst = self.klass('dmedia')
+        self.assertEqual(
+            repr(inst),
+            "Database('dmedia', 'http://localhost:5984/')"
+        )
 
-        inst = self.klass('http://localhost:5002')
-        self.assertEqual(repr(inst), "Database('http://localhost:5002/')")
-
-        inst = self.klass('https://localhost:5003/')
-        self.assertEqual(repr(inst), "Database('https://localhost:5003/')")
-
-        inst = self.klass('https://localhost:5004')
-        self.assertEqual(repr(inst), "Database('https://localhost:5004/')")
-
+        inst = self.klass('novacut', 'https://localhost:5004/')
+        self.assertEqual(
+            repr(inst),
+            "Database('novacut', 'https://localhost:5004/')"
+        )
 
 
 class LiveTestCase(TestCase):
@@ -333,7 +343,7 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_put_att(self):
-        inst = self.klass(self.url)
+        inst = self.klass(url=self.url)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -411,8 +421,7 @@ class TestCouchBaseLive(LiveTestCase):
         )
 
     def test_put_post(self):
-        klass = microfiber.CouchBase
-        inst = klass(self.url)
+        inst = self.klass(url=self.url)
 
         ####################
         # Test requests to /
@@ -551,7 +560,7 @@ class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
-        inst = self.klass(self.dburl, ensure=False)
+        inst = self.klass(self.db, self.url, ensure=False)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
@@ -559,12 +568,12 @@ class TestDatabaseLive(LiveTestCase):
         self.assertEqual(inst.delete(), {'ok': True})
         self.assertRaises(NotFound, inst.get)
 
-        inst = self.klass(self.dburl, ensure=True)
+        inst = self.klass(self.db, self.url, ensure=True)
         self.assertEqual(inst.get()['db_name'], self.db)
         self.assertIsNone(inst.ensure())
 
     def test_save(self):
-        inst = self.klass(self.dburl)
+        inst = self.klass(self.db, self.url)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -590,7 +599,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertRaises(Conflict, inst.save, c)
 
     def test_bulksave(self):
-        inst = self.klass(self.dburl)
+        inst = self.klass(self.db, self.url)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
