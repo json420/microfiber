@@ -115,7 +115,7 @@ __all__ = (
     'ExpectationFailed',
 )
 
-__version__ = '0.0.2'
+__version__ = '0.1.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 errors = {}
