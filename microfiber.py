@@ -606,7 +606,7 @@ class Database(CouchBase):
 
         For example:
 
-        >>> db = Database('http://localhost:5984/foo/')
+        >>> db = Database('foo')
         >>> doc = {'_id': 'bar'}
         >>> db.save(doc)  #doctest: +SKIP
         {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
