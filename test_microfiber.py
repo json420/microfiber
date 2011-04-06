@@ -31,6 +31,7 @@ from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
 import time
+import io
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -282,6 +283,75 @@ class TestCouchBase(TestCase):
             inst.path('db/doc/att', **options),
             '/db/doc/att?bar=null&foo=true&rev=1-3e812567'
         )
+
+    def test_json(self):
+        class Subclass(self.klass):
+            def request(self, *args):
+                self._args = args
+                return 'fake response'
+
+        inst = Subclass()
+
+        headers = {'Content-Type': 'application/json'}
+        doc = {
+            '_id': 'foo',
+            'bar': 'baz',
+            'hello': 'world',
+        }
+        json_str = json.dumps(doc, sort_keys=True, separators=(',',':'))
+        json_bytes = json_str.encode('utf-8')
+
+        # Test with obj=None
+        self.assertEqual(
+            inst.json('PUT', None, 'foo', 'bar', okay=True),
+            'fake response'
+        )
+        self.assertEqual(
+            inst._args,
+            ('PUT', '/foo/bar?okay=true', None, headers)
+        )
+
+        # Test when obj is a dict:
+        self.assertEqual(
+            inst.json('PUT', doc, 'foo', 'bar', okay=True),
+            'fake response'
+        )
+        self.assertEqual(
+            inst._args,
+            ('PUT', '/foo/bar?okay=true', json_bytes, headers)
+        )
+
+        # Test when obj is a pre-encoded str
+        self.assertEqual(
+            inst.json('PUT', json_str, 'foo', 'bar', okay=True),
+            'fake response'
+        )
+        self.assertEqual(
+            inst._args,
+            ('PUT', '/foo/bar?okay=true', json_bytes, headers)
+        )
+
+        # Test when obj is pre-encoded bytes
+        self.assertEqual(
+            inst.json('PUT', json_bytes, 'foo', 'bar', okay=True),
+            'fake response'
+        )
+        self.assertEqual(
+            inst._args,
+            ('PUT', '/foo/bar?okay=true', json_bytes, headers)
+        )
+
+        # Test when obj is an io.BytesIO
+        obj = io.BytesIO(json_bytes)
+        self.assertEqual(
+            inst.json('PUT', obj, 'foo', 'bar', okay=True),
+            'fake response'
+        )
+        self.assertEqual(
+            inst._args,
+            ('PUT', '/foo/bar?okay=true', obj, headers)
+        )
+
 
 
 class TestServer(TestCase):

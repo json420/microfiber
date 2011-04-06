@@ -430,9 +430,13 @@ class CouchBase(object):
         Make a PUT or POST request with a JSON body.
         """
         url = self.path(*parts, **options)
-        body = (None if obj is None else dumps(obj))
-        headers = {'Content-Type': 'application/json'}
-        return self.request(method, url, body, headers)
+        if isinstance(obj, dict):
+            obj = dumps(obj)
+        elif isinstance(obj, str):
+            obj = obj.encode('utf-8')
+        return self.request(method, url, obj,
+            {'Content-Type': 'application/json'}
+        )
 
     def post(self, obj, *parts, **options):
         """
