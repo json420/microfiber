@@ -619,7 +619,7 @@ class Database(CouchBase):
 
     def save(self, doc):
         """
-        POST doc to CouchDB, update doc _id & _rev in place.
+        POST doc to CouchDB, update doc _rev in place.
 
         For example:
 
@@ -651,7 +651,7 @@ class Database(CouchBase):
 
     def bulksave(self, docs):
         """
-        POST a list of docs to _bulk_docs, update all _id and _rev in place.
+        POST a list of docs to _bulk_docs, update all _rev in place.
 
         This method works just like `Database.save()`, except on a whole list
         of docs all at once.
