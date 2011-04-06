@@ -361,7 +361,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, name=None, url=SERVER):
+    def __init__(self, url=SERVER):
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -371,16 +371,8 @@ class CouchBase(object):
             raise ValueError('bad url: {!r}'.format(url))
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
         self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
-        self.name = name
-        if name:
-            self.basepath += (name + '/')
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
-
-    def __repr__(self):
-        return '{}({!r}, {!r})'.format(
-            self.__class__.__name__, self.name, self.url
-        )
 
     def path(self, *parts, **options):
         """
@@ -388,7 +380,7 @@ class CouchBase(object):
 
         For example:
 
-        >>> cc = CouchBase('dmedia', 'http://localhost:55506/')
+        >>> cc = CouchBase('http://localhost:55506/dmedia/')
         >>> cc.path()
         '/dmedia/'
         >>> cc.path('_design', 'file', '_view', 'bytes')
@@ -573,7 +565,22 @@ class CouchBase(object):
 
 class Server(CouchBase):
     """
-    All the `CouchBase` methods plus `Server.database()`.
+    All the `CouchBase` methods plus some server-specific niceties.
+
+    For example:
+
+    >>> s = Server('http://localhost:5984/')
+    >>> s
+    Server('http://localhost:5984/')
+    >>> s.url
+    'http://localhost:5984/'
+    >>> s.basepath
+    '/'
+
+
+    Niceties:
+
+        * Server.database(name) - return a Database instance with server URL
     """
 
     def __init__(self, url=SERVER):
@@ -593,6 +600,19 @@ class Database(CouchBase):
     """
     All the `CouchBase` methods plus some database-specific niceties.
 
+    For example:
+
+    >>> db = Database('dmedia', 'http://localhost:5984/')
+    >>> db
+    Database('dmedia', 'http://localhost:5984/')
+    >>> db.name
+    'dmedia'
+    >>> db.url
+    'http://localhost:5984/'
+    >>> db.basepath
+    '/dmedia/'
+
+
     Niceties:
 
         * `Database.ensure()` - ensure the database exists
@@ -601,10 +621,16 @@ class Database(CouchBase):
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, url=SERVER, ensure=False):
-        super().__init__(name, url)
+        super().__init__(url)
         self.name = name
+        self.basepath += (name + '/')
         if ensure:
             self.ensure()
+
+    def __repr__(self):
+        return '{}({!r}, {!r})'.format(
+            self.__class__.__name__, self.name, self.url
+        )
 
     def ensure(self):
         """

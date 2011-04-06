@@ -233,31 +233,6 @@ class TestCouchBase(TestCase):
         self.assertEqual(inst.url, 'https://localhost:5004/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
-    def test_repr(self):
-        inst = self.klass()
-        self.assertEqual(
-            repr(inst),
-            "CouchBase(None, 'http://localhost:5984/')"
-        )
-
-        inst = self.klass('dmedia')
-        self.assertEqual(
-            repr(inst),
-            "CouchBase('dmedia', 'http://localhost:5984/')"
-        )
-
-        inst = self.klass(url='https://localhost:5004/')
-        self.assertEqual(
-            repr(inst),
-            "CouchBase(None, 'https://localhost:5004/')"
-        )
-
-        inst = self.klass('dmedia', 'https://localhost:5004/')
-        self.assertEqual(
-            repr(inst),
-            "CouchBase('dmedia', 'https://localhost:5004/')"
-        )
-
     def test_path(self):
         options = dict(
             rev='1-3e812567',
@@ -360,10 +335,24 @@ class TestServer(TestCase):
     def test_init(self):
         inst = self.klass()
         self.assertEqual(inst.url, 'http://localhost:5984/')
+        self.assertEqual(inst.basepath, '/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertNotIsInstance(inst.conn, HTTPSConnection)
 
         inst = self.klass('https://localhost:6000')
         self.assertEqual(inst.url, 'https://localhost:6000/')
+        self.assertEqual(inst.basepath, '/')
+        self.assertIsInstance(inst.conn, HTTPSConnection)
+
+        inst = self.klass('http://example.com/foo')
+        self.assertEqual(inst.url, 'http://example.com/foo/')
+        self.assertEqual(inst.basepath, '/foo/')
+        self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertNotIsInstance(inst.conn, HTTPSConnection)
+
+        inst = self.klass('https://example.com/bar')
+        self.assertEqual(inst.url, 'https://example.com/bar/')
+        self.assertEqual(inst.basepath, '/bar/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
     def test_repr(self):
@@ -382,6 +371,17 @@ class TestServer(TestCase):
 
 class TestDatabase(TestCase):
     klass = microfiber.Database
+
+    def test_init(self):
+        inst = self.klass('foo')
+        self.assertEqual(inst.name, 'foo')
+        self.assertEqual(inst.url, 'http://localhost:5984/')
+        self.assertEqual(inst.basepath, '/foo/')
+
+        inst = self.klass('baz', 'https://example.com/bar')
+        self.assertEqual(inst.name, 'baz')
+        self.assertEqual(inst.url, 'https://example.com/bar/')
+        self.assertEqual(inst.basepath, '/bar/baz/')
 
     def test_repr(self):
         inst = self.klass('dmedia')
