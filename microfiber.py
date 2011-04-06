@@ -95,6 +95,8 @@ For python-couchdb documentation, see:
     http://packages.python.org/CouchDB/
 """
 
+from os import urandom
+from base64 import b32encode
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse, urlencode
 import json
@@ -119,6 +121,21 @@ __version__ = '0.2.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 errors = {}
+
+
+def random_id():
+    """
+    Returns a 120-bit base32-encoded random ID.
+
+    The ID will be 24-characters long, URL and filesystem safe.  For example:
+
+    >>> random_id()  #doctest: +SKIP
+    'OVRHK3TUOUQCWIDMNFXGC4TP'
+
+    This is how dmedia/Novacut random IDs are created, so this is "Jason
+    approved", for what that's worth.
+    """
+    return b32encode(urandom(15)).decode('ascii')
 
 
 def dumps(obj):

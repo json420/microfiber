@@ -27,7 +27,7 @@ from unittest import TestCase
 from http.client import HTTPConnection, HTTPSConnection
 from urllib.parse import urlparse
 import os
-from base64 import b64encode, b64decode, b32encode
+from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
 import time
@@ -47,6 +47,14 @@ class FakeResponse(object):
 
 
 class TestFunctions(TestCase):
+    def test_random_id(self):
+        _id = microfiber.random_id()
+        self.assertIsInstance(_id, str)
+        self.assertEqual(len(_id), 24)
+        b = b32decode(_id.encode('ascii'))
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(len(b) * 8, 120)
+
     def test_dumps(self):
         obj = [
             {
