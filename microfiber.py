@@ -629,19 +629,24 @@ class Database(CouchBase):
         {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
         >>> doc  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
-        >>> doc['hello'] = 'world'
+        >>> doc['a'] = 1  #doctest: +SKIP
         >>> db.save(doc)  #doctest: +SKIP
-        {'rev': '2-0a8fff77f08f178bd1e2905f7dfb54b2', 'ok': True, 'id': 'bar'}
+        {'rev': '2-4f54ab3740f3104eec1cf2ec2b0327ed', 'ok': True, 'id': 'bar'}
         >>> doc  #doctest: +SKIP
-        {'_rev': '2-0a8fff77f08f178bd1e2905f7dfb54b2', '_id': 'bar', 'hello': 'world'}
+        {'a': 1, '_rev': '2-4f54ab3740f3104eec1cf2ec2b0327ed', '_id': 'bar'}
+
+        If *doc* has no _id, one generated using `random_id()` and added to
+        *doc* in-place prior to making the request to CouchDB.
 
         This method is inspired by the identical (and highly useful) method in
         python-couchdb:
 
             http://packages.python.org/CouchDB/client.html#database
         """
+        if '_id' not in doc:
+            doc['_id'] = random_id()
         r = self.post(doc)
-        doc.update(_id=r['id'], _rev=r['rev'])
+        doc.update(_rev=r['rev'])
         return r
 
     def bulksave(self, docs):
