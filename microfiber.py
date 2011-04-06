@@ -646,7 +646,7 @@ class Database(CouchBase):
         if '_id' not in doc:
             doc['_id'] = random_id()
         r = self.post(doc)
-        doc.update(_rev=r['rev'])
+        doc['_rev'] = r['rev']
         return r
 
     def bulksave(self, docs):
@@ -656,9 +656,11 @@ class Database(CouchBase):
         This method works just like `Database.save()`, except on a whole list
         of docs all at once.
         """
+        for doc in filter(lambda d: '_id' not in d, docs):
+            doc['_id'] = random_id()
         rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
-        for (doc, r) in zip(docs, rows):
-            doc.update(_id=r['id'], _rev=r['rev'])
+        for (doc, row) in zip(docs, rows):
+            doc['_rev'] = row['rev']
         return rows
 
     def view(self, design, view, **options):

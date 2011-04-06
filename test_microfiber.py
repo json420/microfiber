@@ -606,6 +606,17 @@ class TestDatabaseLive(LiveTestCase):
         for c in copy:
             self.assertRaises(Conflict, inst.save, c)
 
+        # Test that _id is generated if missing:
+        docs = [{'n': i} for i in range(100)]
+        for (i, d) in enumerate(docs):
+            r = inst.save(d)
+            self.assertEqual(set(d), set(['_id', '_rev', 'n']))
+            self.assertEqual(d['_id'], r['id'])
+            self.assertEqual(len(d['_id']), 24)
+            self.assertEqual(d['_rev'], r['rev'])
+            self.assertTrue(d['_rev'].startswith('1-'))
+            self.assertEqual(d['n'], i)
+
     def test_bulksave(self):
         inst = self.klass(self.db, self.url)
 
@@ -655,3 +666,16 @@ class TestDatabaseLive(LiveTestCase):
                 break
         newsize = inst.get()['disk_size']
         self.assertLess(newsize, oldsize)
+
+        # Test that _id is generated if missing:
+        docs = [{'n': i} for i in range(1000)]
+        rows = inst.bulksave(docs)
+        i = 0
+        for (d, r) in zip(docs, rows):
+            self.assertEqual(set(d), set(['_id', '_rev', 'n']))
+            self.assertEqual(d['_id'], r['id'])
+            self.assertEqual(len(d['_id']), 24)
+            self.assertEqual(d['_rev'], r['rev'])
+            self.assertTrue(d['_rev'].startswith('1-'))
+            self.assertEqual(d['n'], i)
+            i += 1
