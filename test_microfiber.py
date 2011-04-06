@@ -637,6 +637,19 @@ class TestCouchBaseLive(LiveTestCase):
 class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
+    def test_server(self):
+        inst = self.klass('foo')
+        s = inst.server()
+        self.assertIsInstance(s, microfiber.Server)
+        self.assertEqual(s.url, 'http://localhost:5984/')
+        self.assertEqual(s.basepath, '/')
+
+        inst = self.klass('baz', 'https://example.com/bar')
+        s = inst.server()
+        self.assertIsInstance(s, microfiber.Server)
+        self.assertEqual(s.url, 'https://example.com/bar/')
+        self.assertEqual(s.basepath, '/bar/')
+
     def test_ensure(self):
         inst = self.klass(self.db, self.url, ensure=False)
         self.assertRaises(NotFound, inst.get)

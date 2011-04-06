@@ -615,6 +615,7 @@ class Database(CouchBase):
 
     Niceties:
 
+        * `Database.server()` - return a `Server` pointing at same URL
         * `Database.ensure()` - ensure the database exists
         * `Database.save(doc)` - save to CouchDB, update doc _id & _rev in place
         * `Database.bulksave(docs)` - as above, but with a list of docs
@@ -631,6 +632,12 @@ class Database(CouchBase):
         return '{}({!r}, {!r})'.format(
             self.__class__.__name__, self.name, self.url
         )
+
+    def server(self):
+        """
+        Return a `Server` instance pointing at the same URL as this database.
+        """
+        return Server(self.url)
 
     def ensure(self):
         """
