@@ -670,6 +670,7 @@ class TestDatabaseLive(LiveTestCase):
         # Test that _id is generated if missing:
         docs = [{'n': i} for i in range(1000)]
         rows = inst.bulksave(docs)
+        self.assertEqual(len(docs), len(rows))
         i = 0
         for (d, r) in zip(docs, rows):
             self.assertEqual(set(d), set(['_id', '_rev', 'n']))
