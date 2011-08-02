@@ -120,7 +120,6 @@ __all__ = (
 __version__ = '0.2.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
-errors = {}
 
 
 def random_id():
@@ -203,21 +202,7 @@ def query(**options):
     return urlencode(tuple(queryiter(**options)))
 
 
-class HTTPErrorMeta(type):
-    """
-    Metaclass to build mapping of status code to `HTTPError` subclasses.
-
-    If the class has a ``status`` attribute, it will be added to the `errors`
-    dictionary.
-    """
-    def __new__(meta, name, bases, dict):
-        cls = type.__new__(meta, name, bases, dict)
-        if isinstance(getattr(cls, 'status', None), int):
-            errors[cls.status] = cls
-        return cls
-
-
-class HTTPError(Exception, metaclass=HTTPErrorMeta):
+class HTTPError(Exception):
     """
     Base class for custom `microfiber` exceptions.
     """
@@ -248,42 +233,36 @@ class BadRequest(ClientError):
     """
     400 Bad Request.
     """
-    status = 400
 
 
 class Unauthorized(ClientError):
     """
     401 Unauthorized.
     """
-    status = 401
 
 
 class Forbidden(ClientError):
     """
     403 Forbidden.
     """
-    status = 403
 
 
 class NotFound(ClientError):
     """
     404 Not Found.
     """
-    status = 404
 
 
 class MethodNotAllowed(ClientError):
     """
     405 Method Not Allowed.
     """
-    status = 405
 
 
 class NotAcceptable(ClientError):
     """
     406 Not Acceptable.
     """
-    status = 406
 
 
 class Conflict(ClientError):
@@ -292,28 +271,24 @@ class Conflict(ClientError):
 
     Raised when the request resulted in an update conflict.
     """
-    status = 409
 
 
 class PreconditionFailed(ClientError):
     """
     412 Precondition Failed.
     """
-    status = 412
 
 
 class BadContentType(ClientError):
     """
     415 Unsupported Media Type.
     """
-    status = 415
 
 
 class BadRangeRequest(ClientError):
     """
     416 Requested Range Not Satisfiable.
     """
-    status = 416
 
 
 class ExpectationFailed(ClientError):
@@ -322,13 +297,27 @@ class ExpectationFailed(ClientError):
 
     Raised when a bulk operation failed.
     """
-    status = 417
 
 
 class ServerError(HTTPError):
     """
     Used to raise exceptions for any 5xx Server Errors.
     """
+
+
+errors = {
+    400: BadRequest,
+    401: Unauthorized,
+    403: Forbidden,
+    404: NotFound,
+    405: MethodNotAllowed,
+    406: NotAcceptable,
+    409: Conflict,
+    412: PreconditionFailed,
+    415: BadContentType,
+    416: BadRangeRequest,
+    417: ExpectationFailed,
+}
 
 
 class CouchBase(object):

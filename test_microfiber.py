@@ -172,7 +172,6 @@ class TestErrors(TestCase):
         method = 'MOST'
         url = '/restful?and=awesome'
         for (status, klass) in microfiber.errors.items():
-            self.assertEqual(klass.status, status)
             reason = b32encode(os.urandom(10))
             data = os.urandom(20)
             r = FakeResponse(status, reason)
