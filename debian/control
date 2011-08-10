@@ -4,7 +4,8 @@ Priority: optional
 Maintainer: Jason Gerard DeRose <jderose@novacut.com>
 Build-Depends: debhelper (>= 8.1), python3 (>= 3.2)
 Standards-Version: 3.9.1
-XS-Python-Version: >= 3.2
+X-Python-Version: 3.2
+X-Python3-Version: 3.2
 Homepage: https://launchpad.net/microfiber
 
 Package: python3-microfiber
