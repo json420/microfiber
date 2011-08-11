@@ -25,12 +25,16 @@
 Install `microfiber`.
 """
 
+import sys
 from distutils.core import setup
 from distutils.cmd import Command
 from unittest import TestLoader, TextTestRunner
 from doctest import DocTestSuite
-from urllib.parse import urlparse
 import os
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlparse
+else:
+    from urlparse import urlparse
 
 import microfiber
 

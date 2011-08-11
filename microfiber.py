@@ -95,11 +95,19 @@ For python-couchdb documentation, see:
     http://packages.python.org/CouchDB/
 """
 
+import sys
 from os import urandom
 from base64 import b32encode
-from http.client import HTTPConnection, HTTPSConnection
-from urllib.parse import urlparse, urlencode
 import json
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlparse, urlencode
+    from http.client import HTTPConnection, HTTPSConnection
+else:
+    from urlparse import urlparse
+    from urllib import urlencode
+    from httplib import HTTPConnection, HTTPSConnection
+    str = basestring
+
 
 __all__ = (
     'Server',
@@ -145,8 +153,8 @@ def dumps(obj):
 
     For example:
 
-    >>> dumps({'micro': 'fiber', '_id': 'python'})
-    b'{"_id":"python","micro":"fiber"}'
+    >>> dumps({'micro': 'fiber', '_id': 'python'})  #doctest: +SKIP
+    '{"_id":"python","micro":"fiber"}'
 
     :param obj: a JSON serialize-able object, likely a ``dict`` or ``list``
     """
@@ -159,7 +167,7 @@ def loads(data):
 
     For example:
 
-    >>> loads(b'{"_id":"python","micro":"fiber"}')
+    >>> loads(b'{"_id":"python","micro":"fiber"}')  #doctest: +SKIP
     {'micro': 'fiber', '_id': 'python'}
 
 
@@ -212,7 +220,7 @@ class HTTPError(Exception):
         self.data = data
         self.method = method
         self.url = url
-        super().__init__()
+        super(HTTPError, self).__init__()
 
     def __str__(self):
         return '{} {}: {} {}'.format(
@@ -573,7 +581,7 @@ class Server(CouchBase):
     """
 
     def __init__(self, url=SERVER):
-        super().__init__(url=url)
+        super(Server, self).__init__(url=url)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -611,7 +619,7 @@ class Database(CouchBase):
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, url=SERVER, ensure=False):
-        super().__init__(url)
+        super(Database, self).__init__(url)
         self.name = name
         self.basepath += (name + '/')
         if ensure:

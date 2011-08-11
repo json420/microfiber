@@ -23,15 +23,20 @@
 Unit tests for `microfiber` module.
 """
 
+import sys
 from unittest import TestCase
-from http.client import HTTPConnection, HTTPSConnection
-from urllib.parse import urlparse
 import os
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
 import time
 import io
+if sys.version_info >= (3, 0):
+    from urllib.parse import urlparse, urlencode
+    from http.client import HTTPConnection, HTTPSConnection
+else:
+    from urlparse import urlparse
+    from httplib import HTTPConnection, HTTPSConnection
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -50,7 +55,10 @@ class FakeResponse(object):
 class TestFunctions(TestCase):
     def test_random_id(self):
         _id = microfiber.random_id()
-        self.assertIsInstance(_id, str)
+        if sys.version_info >= (3, 0):
+            self.assertIsInstance(_id, str)
+        else:
+            self.assertIsInstance(_id, unicode)
         self.assertEqual(len(_id), 24)
         b = b32decode(_id.encode('ascii'))
         self.assertIsInstance(b, bytes)
