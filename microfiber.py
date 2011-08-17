@@ -99,14 +99,16 @@ import sys
 from os import urandom
 from base64 import b32encode
 import json
+import time
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode
     from http.client import HTTPConnection, HTTPSConnection
+    strtype = str
 else:
     from urlparse import urlparse
     from urllib import urlencode
     from httplib import HTTPConnection, HTTPSConnection
-    str = basestring
+    strtype = basestring
 
 
 __all__ = (
@@ -143,6 +145,22 @@ def random_id():
     approved", for what that's worth.
     """
     return b32encode(urandom(15)).decode('ascii')
+
+
+def random_id2():
+    """
+    Returns random ID with timestamp + 80 bits of base32-encoded random data.
+
+    The ID will be 27-characters long, URL and filesystem safe.  For example:
+
+    >>> random_id2()  #doctest: +SKIP
+    '1313567384.67DFPERIOU66CT56'
+
+    """
+    return '.'.join([
+        str(int(time.time())),
+        b32encode(urandom(10)).decode('ascii')
+    ])
 
 
 def dumps(obj):
@@ -186,7 +204,7 @@ def queryiter(**options):
     """
     for key in sorted(options):
         value = options[key]
-        if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
+        if key in ('key', 'startkey', 'endkey') or not isinstance(value, strtype):
             value = json.dumps(value)
         yield (key, value)
 

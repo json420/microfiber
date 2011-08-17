@@ -64,6 +64,21 @@ class TestFunctions(TestCase):
         self.assertIsInstance(b, bytes)
         self.assertEqual(len(b) * 8, 120)
 
+    def test_random_id2(self):
+        _id = microfiber.random_id2()
+        if sys.version_info >= (3, 0):
+            self.assertIsInstance(_id, str)
+        else:
+            self.assertIsInstance(_id, unicode)
+        self.assertEqual(len(_id), 27)
+        (t, r) = _id.split('.')
+        self.assertEqual(len(t), 10)
+        self.assertTrue(int(t) > 1234567890)
+        self.assertEqual(len(r), 16)
+        b = b32decode(r.encode('ascii'))
+        self.assertIsInstance(b, bytes)
+        self.assertEqual(len(b) * 8, 80)
+
     def test_dumps(self):
         obj = [
             {
