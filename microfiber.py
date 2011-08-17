@@ -608,7 +608,10 @@ class Server(CouchBase):
         """
         Return a new `Database` instance for the database *name*.
         """
-        return Database(name, self.url, ensure)
+        db = Database(name, self.url)
+        if ensure:
+            db.ensure()
+        return db
 
 
 class Database(CouchBase):
@@ -636,12 +639,10 @@ class Database(CouchBase):
         * `Database.bulksave(docs)` - as above, but with a list of docs
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, url=SERVER, ensure=False):
+    def __init__(self, name, url=SERVER):
         super(Database, self).__init__(url)
         self.name = name
         self.basepath += (name + '/')
-        if ensure:
-            self.ensure()
 
     def __repr__(self):
         return '{}({!r}, {!r})'.format(

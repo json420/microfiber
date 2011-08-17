@@ -673,17 +673,13 @@ class TestDatabaseLive(LiveTestCase):
         self.assertEqual(s.basepath, '/bar/')
 
     def test_ensure(self):
-        inst = self.klass(self.db, self.url, ensure=False)
+        inst = self.klass(self.db, self.url)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.delete(), {'ok': True})
         self.assertRaises(NotFound, inst.get)
-
-        inst = self.klass(self.db, self.url, ensure=True)
-        self.assertEqual(inst.get()['db_name'], self.db)
-        self.assertIsNone(inst.ensure())
 
     def test_save(self):
         inst = self.klass(self.db, self.url)
