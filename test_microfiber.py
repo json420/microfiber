@@ -233,27 +233,36 @@ class TestCouchBase(TestCase):
         self.assertEqual(inst.url, 'https://localhost:5984/couch/')
         self.assertEqual(inst.basepath, '/couch/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
+        self.assertIsNone(inst.session)
 
         inst = self.klass(url='http://localhost:5984?/')
         self.assertEqual(inst.url, 'http://localhost:5984/')
         self.assertEqual(inst.basepath, '/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsNone(inst.session)
 
         inst = self.klass(url='http://localhost:5001/')
         self.assertEqual(inst.url, 'http://localhost:5001/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsNone(inst.session)
 
         inst = self.klass(url='http://localhost:5002')
         self.assertEqual(inst.url, 'http://localhost:5002/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsNone(inst.session)
 
         inst = self.klass(url='https://localhost:5003/')
         self.assertEqual(inst.url, 'https://localhost:5003/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
+        self.assertIsNone(inst.session)
 
         inst = self.klass(url='https://localhost:5004')
         self.assertEqual(inst.url, 'https://localhost:5004/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
+        self.assertIsNone(inst.session)
+
+        inst = self.klass(session='foo')
+        self.assertEqual(inst.session, 'foo')
 
     def test_path(self):
         options = dict(
@@ -377,6 +386,9 @@ class TestServer(TestCase):
         self.assertEqual(inst.basepath, '/bar/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
+        inst = self.klass(session='bar')
+        self.assertEqual(inst.session, 'bar')
+
     def test_repr(self):
         inst = self.klass('http://localhost:5001/')
         self.assertEqual(repr(inst), "Server('http://localhost:5001/')")
@@ -389,6 +401,18 @@ class TestServer(TestCase):
 
         inst = self.klass('https://localhost:5004')
         self.assertEqual(repr(inst), "Server('https://localhost:5004/')")
+
+    def test_database(self):
+        s = microfiber.Server()
+        db = s.database('foo')
+        self.assertIsInstance(db, microfiber.Database)
+        self.assertIsNone(db.session)
+
+        s = microfiber.Server(session='bar')
+        self.assertEqual(s.session, 'bar')
+        db = s.database('foo')
+        self.assertIsInstance(db, microfiber.Database)
+        self.assertEqual(db.session, 'bar')
 
 
 class TestDatabase(TestCase):
@@ -417,6 +441,19 @@ class TestDatabase(TestCase):
             repr(inst),
             "Database('novacut', 'https://localhost:5004/')"
         )
+
+    def test_server(self):
+        db = microfiber.Database('foo')
+        self.assertIsNone(db.session)
+        s = db.server()
+        self.assertIsInstance(s, microfiber.Server)
+        self.assertIsNone(s.session)
+
+        db = microfiber.Database('foo', session='bar')
+        self.assertEqual(db.session, 'bar')
+        s = db.server()
+        self.assertIsInstance(s, microfiber.Server)
+        self.assertEqual(s.session, 'bar')
 
 
 class LiveTestCase(TestCase):

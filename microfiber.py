@@ -110,6 +110,11 @@ else:
     from httplib import HTTPConnection, HTTPSConnection
     strtype = basestring
 
+try:
+    from oauth import oauth
+except ImportError:
+    oauth = None
+
 
 __all__ = (
     'Server',
@@ -149,7 +154,7 @@ def random_id():
 
 def random_id2():
     """
-    Returns random ID with timestamp + 80 bits of base32-encoded random data.
+    Returns a random ID with timestamp + 80 bits of base32-encoded random data.
 
     The ID will be 27-characters long, URL and filesystem safe.  For example:
 
@@ -346,6 +351,36 @@ errors = {
 }
 
 
+if oauth is not None:
+    class Session(object):
+        __slots__ = ('_consumer', '_token')
+
+        def __init__(self, tokens):
+            self._consumer = oauth.OAuthConsumer(
+                tokens['consumer_key'],
+                tokens['consumer_secret']
+            )
+            self._token = oauth.OAuthToken(
+                tokens['token'],
+                tokens['token_secret']
+            )
+
+        def sign(self, method, url, query):
+            req = oauth.OAuthRequest.from_consumer_and_token(
+                self._consumer,
+                self._token,
+                http_method=method,
+                http_url=url,
+                parameters=query,
+            )
+            req.sign_request(
+                oauth.OAuthSignatureMethod_HMAC_SHA1(),
+                self._consumer,
+                self._token
+            )
+            return req.to_header()
+
+
 class CouchBase(object):
     """
     Base class for `Server` and `Database`.
@@ -376,7 +411,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, url=SERVER):
+    def __init__(self, url=SERVER, session=None):
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -386,6 +421,7 @@ class CouchBase(object):
             raise ValueError('bad url: {!r}'.format(url))
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
         self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
+        self.session = session
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
@@ -598,17 +634,17 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, url=SERVER):
-        super(Server, self).__init__(url=url)
+    def __init__(self, url=SERVER, session=None):
+        super(Server, self).__init__(url, session)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
 
-    def database(self, name, ensure=True):
+    def database(self, name, ensure=False):
         """
         Return a new `Database` instance for the database *name*.
         """
-        db = Database(name, self.url)
+        db = Database(name, self.url, self.session)
         if ensure:
             db.ensure()
         return db
@@ -639,8 +675,8 @@ class Database(CouchBase):
         * `Database.bulksave(docs)` - as above, but with a list of docs
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, url=SERVER):
-        super(Database, self).__init__(url)
+    def __init__(self, name, url=SERVER, session=None):
+        super(Database, self).__init__(url, session)
         self.name = name
         self.basepath += (name + '/')
 
@@ -653,7 +689,7 @@ class Database(CouchBase):
         """
         Return a `Server` instance pointing at the same URL as this database.
         """
-        return Server(self.url)
+        return Server(self.url, self.session)
 
     def ensure(self):
         """
