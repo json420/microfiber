@@ -479,6 +479,20 @@ class LiveTestCase(TestCase):
 class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
+    def test_bad_status_line(self):
+        inst = self.klass(url=self.url)
+
+        # Create database
+        self.assertEqual(inst.put(None, self.db), {'ok': True})
+
+        # Create a doc:
+        inst.put({'hello': 'world'}, self.db, 'bar')
+
+        time.sleep(30)  # The connection should close, raising BadStatusLine
+
+        # Get the doc
+        doc = inst.get(self.db, 'bar')
+
     def test_put_att(self):
         inst = self.klass(url=self.url)
 

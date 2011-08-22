@@ -102,12 +102,12 @@ import json
 import time
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode
-    from http.client import HTTPConnection, HTTPSConnection
+    from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = str
 else:
     from urlparse import urlparse
     from urllib import urlencode
-    from httplib import HTTPConnection, HTTPSConnection
+    from httplib import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = basestring
 
 try:
@@ -454,13 +454,19 @@ class CouchBase(object):
         }
         if headers:
             h.update(headers)
-        try:
-            self.conn.request(method, url, body, h)
-            response = self.conn.getresponse()
-            data = response.read()
-        except Exception as e:
-            self.conn.close()
-            raise e
+        for retry in range(2):
+            try:
+                self.conn.request(method, url, body, h)
+                response = self.conn.getresponse()
+                data = response.read()
+                break
+            except BadStatusLine as e:
+                self.conn.close()
+                if retry == 1:
+                    raise e
+            except Exception as e:
+                self.conn.close()
+                raise e
         if response.status >= 500:
             raise ServerError(response, data, method, url)
         if response.status >= 400:
