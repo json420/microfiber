@@ -98,7 +98,7 @@ For python-couchdb documentation, see:
 import sys
 from os import urandom
 from base64 import b32encode
-import json
+from json import dumps, loads
 import time
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode
@@ -168,41 +168,9 @@ def random_id2():
     ])
 
 
-def dumps(obj):
-    """
-    JSON encode *obj*.
-
-    Returns a ``bytes`` instance with a compact JSON encoding of *obj*.
-
-    For example:
-
-    >>> dumps({'micro': 'fiber', '_id': 'python'})  #doctest: +SKIP
-    '{"_id":"python","micro":"fiber"}'
-
-    :param obj: a JSON serialize-able object, likely a ``dict`` or ``list``
-    """
-    return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
-
-
-def loads(data):
-    """
-    Decode object from JSON bytes *data*.
-
-    For example:
-
-    >>> loads(b'{"_id":"python","micro":"fiber"}')  #doctest: +SKIP
-    {'micro': 'fiber', '_id': 'python'}
-
-
-    :param data: a ``bytes`` instance containing a UTF-8 encoded, JSON
-        serialized object
-    """
-    return json.loads(data.decode('utf-8'))
-
-
 def _json_body(obj):
     if isinstance(obj, (dict, list)):
-        return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
     elif isinstance(obj, str):
         return obj.encode('utf-8')
     return obj
@@ -218,7 +186,7 @@ def queryiter(options):
     for key in sorted(options):
         value = options[key]
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, strtype):
-            value = json.dumps(value)
+            value = dumps(value)
         yield (key, value)
 
 
@@ -259,7 +227,7 @@ class HTTPError(Exception):
         )
 
     def loads(self):
-        return loads(self.data)
+        return loads(self.data.decode('utf-8'))
 
 
 class ClientError(HTTPError):
@@ -491,7 +459,7 @@ class CouchBase(object):
             body=_json_body(obj),
             headers={'Content-Type': 'application/json'},
         )
-        return loads(data)
+        return loads(data.decode('utf-8'))
 
     def put(self, obj, *parts, **options):
         """
@@ -513,7 +481,7 @@ class CouchBase(object):
             body=_json_body(obj),
             headers={'Content-Type': 'application/json'},
         )
-        return loads(data)
+        return loads(data.decode('utf-8'))
 
     def get(self, *parts, **options):
         """
@@ -532,7 +500,7 @@ class CouchBase(object):
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
         (response, data) = self._request('GET', parts, options)
-        return loads(data)
+        return loads(data.decode('utf-8'))
 
     def delete(self, *parts, **options):
         """
@@ -551,7 +519,7 @@ class CouchBase(object):
 
         """
         (response, data) = self._request('DELETE', parts, options)
-        return loads(data)
+        return loads(data.decode('utf-8'))
 
     def head(self, *parts, **options):
         """
@@ -587,7 +555,7 @@ class CouchBase(object):
             body=data,
             headers={'Content-Type': mime},
         )
-        return loads(data)
+        return loads(data.decode('utf-8'))
 
     def get_att(self, *parts, **options):
         """

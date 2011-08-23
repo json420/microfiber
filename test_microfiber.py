@@ -79,38 +79,6 @@ class TestFunctions(TestCase):
         self.assertIsInstance(b, bytes)
         self.assertEqual(len(b) * 8, 80)
 
-    def test_dumps(self):
-        obj = [
-            {
-                '_id': random_id(),
-                '_rev': random_id(),
-                'foo': True,
-                'bar': None,
-                'hello': 17,
-                'world': 18.5,
-                'index': i,
-            }
-            for i in range(100)
-        ]
-        s = json.dumps(obj, sort_keys=True, separators=(',', ':'))
-        self.assertEqual(microfiber.dumps(obj), s.encode('UTF-8'))
-
-    def test_loads(self):
-        obj = [
-            {
-                '_id': random_id(),
-                '_rev': random_id(),
-                'foo': True,
-                'bar': None,
-                'hello': 17,
-                'world': 18.5,
-                'index': i,
-            }
-            for i in range(100)
-        ]
-        b = json.dumps(obj).encode('utf-8')
-        self.assertEqual(microfiber.loads(b), obj)
-
     def test_json_body(self):
         doc = {
             '_id': 'foo',
