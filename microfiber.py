@@ -112,11 +112,6 @@ else:
     from httplib import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = basestring
 
-try:
-    from oauth import oauth
-except ImportError:
-    oauth = None
-
 
 __all__ = (
     'Server',
@@ -151,7 +146,7 @@ def random_id():
     This is how dmedia/Novacut random IDs are created, so this is "Jason
     approved", for what that's worth.
     """
-    return b32encode(urandom(15)).decode('ascii')
+    return b32encode(urandom(15)).decode('utf-8')
 
 
 def random_id2():
@@ -166,7 +161,7 @@ def random_id2():
     """
     return '.'.join([
         str(int(time.time())),
-        b32encode(urandom(10)).decode('ascii')
+        b32encode(urandom(10)).decode('utf-8')
     ])
 
 
@@ -310,36 +305,6 @@ errors = {
 }
 
 
-if oauth is not None:
-    class Session(object):
-        __slots__ = ('_consumer', '_token')
-
-        def __init__(self, tokens):
-            self._consumer = oauth.OAuthConsumer(
-                tokens['consumer_key'],
-                tokens['consumer_secret']
-            )
-            self._token = oauth.OAuthToken(
-                tokens['token'],
-                tokens['token_secret']
-            )
-
-        def sign(self, method, url, query):
-            req = oauth.OAuthRequest.from_consumer_and_token(
-                self._consumer,
-                self._token,
-                http_method=method,
-                http_url=url,
-                parameters=query,
-            )
-            req.sign_request(
-                oauth.OAuthSignatureMethod_HMAC_SHA1(),
-                self._consumer,
-                self._token
-            )
-            return req.to_header()
-
-
 def oauth_base_string(method, url, params):
     q = urlencode(tuple((k, params[k]) for k in sorted(params)))
     return '&'.join([method, quote_plus(url), quote_plus(q)])
@@ -353,13 +318,6 @@ def oauth_sign(oauth, base_string):
     if sys.version_info >= (3, 0):
         return b64encode(h.digest()).decode('utf-8')
     return b64encode(h.digest())
-
-
-def oauth_authorization_header(items):
-    value = ', '.join(
-        '{}="{}"'.format(k, v) for (k, v) in items
-    )
-    return {'Authorization': value}
 
 
 def oauth_header(oauth, method, baseurl, query, testing=None):
@@ -380,9 +338,10 @@ def oauth_header(oauth, method, baseurl, query, testing=None):
     base_string = oauth_base_string(method, baseurl, query)
     o['oauth_signature'] = quote_plus(oauth_sign(oauth, base_string))
     o['OAuth realm'] = ''
-    return ', '.join(
+    value = ', '.join(
         '{}="{}"'.format(k, o[k]) for k in sorted(o)
     )
+    return {'Authorization': value}
 
 
 class CouchBase(object):
@@ -415,7 +374,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, url=SERVER, session=None):
+    def __init__(self, url=SERVER, oauth=None):
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -423,11 +382,11 @@ class CouchBase(object):
             )
         if not t.netloc:
             raise ValueError('bad url: {!r}'.format(url))
-        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
-        self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
         self.scheme = t.scheme
         self.netloc = t.netloc
-        self.session = session
+        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
+        self.url = self._full_url(self.basepath)
+        self.oauth = oauth
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
@@ -449,9 +408,15 @@ class CouchBase(object):
         }
         if headers:
             h.update(headers)
-        (path, q) = self._path(parts, options)
-        if self.session is not None:
-            h.update(self.session.sign(method, self._full_url(path), dict(q)))
+        path = (self.basepath + '/'.join(parts) if parts else self.basepath)
+        query = tuple(_queryiter(options))
+        if self.oauth:
+            baseurl = self._full_url(path)
+            h.update(
+                oauth_header(self.oauth, method, baseurl, dict(query))
+            )
+        if query:
+            path = '?'.join([path, urlencode(query)])
         for retry in range(2):
             try:
                 self.conn.request(method, path, body, h)
@@ -631,8 +596,8 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, url=SERVER, session=None):
-        super(Server, self).__init__(url, session)
+    def __init__(self, url=SERVER, oauth=None):
+        super(Server, self).__init__(url, oauth)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -641,7 +606,7 @@ class Server(CouchBase):
         """
         Return a new `Database` instance for the database *name*.
         """
-        db = Database(name, self.url, self.session)
+        db = Database(name, self.url, self.oauth)
         if ensure:
             db.ensure()
         return db
@@ -672,8 +637,8 @@ class Database(CouchBase):
         * `Database.bulksave(docs)` - as above, but with a list of docs
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, url=SERVER, session=None):
-        super(Database, self).__init__(url, session)
+    def __init__(self, name, url=SERVER, oauth=None):
+        super(Database, self).__init__(url, oauth)
         self.name = name
         self.basepath += (name + '/')
 
@@ -686,7 +651,7 @@ class Database(CouchBase):
         """
         Return a `Server` instance pointing at the same URL as this database.
         """
-        return Server(self.url, self.session)
+        return Server(self.url, self.oauth)
 
     def ensure(self):
         """
