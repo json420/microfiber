@@ -378,17 +378,22 @@ class CouchBase(object):
             raise ValueError('bad url: {!r}'.format(url))
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
         self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
+        self.scheme = t.scheme
+        self.netloc = t.netloc
         self.session = session
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
     def _path(self, parts, options):
-        url = (self.basepath + '/'.join(parts) if parts else self.basepath)
+        path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         if options:
             q = tuple(_queryiter(options))
-            url = '?'.join([url, urlencode(q)])
-            return (url, q)
-        return (url, tuple())
+            path = '?'.join([path, urlencode(q)])
+            return (path, q)
+        return (path, tuple())
+
+    def _full_url(self, path):
+        return ''.join([self.scheme, '://', self.netloc, path])
 
     def _request(self, method, parts, options, body=None, headers=None):
         h = {
@@ -397,12 +402,12 @@ class CouchBase(object):
         }
         if headers:
             h.update(headers)
-        (url, q) = self._path(parts, options)
+        (path, q) = self._path(parts, options)
         if self.session is not None:
-            h.update(self.session.sign(method, url, dict(q)))
+            h.update(self.session.sign(method, self._full_url(path), dict(q)))
         for retry in range(2):
             try:
-                self.conn.request(method, url, body, h)
+                self.conn.request(method, path, body, h)
                 response = self.conn.getresponse()
                 data = response.read()
                 break
@@ -414,10 +419,10 @@ class CouchBase(object):
                 self.conn.close()
                 raise e
         if response.status >= 500:
-            raise ServerError(response, data, method, url)
+            raise ServerError(response, data, method, path)
         if response.status >= 400:
             E = errors.get(response.status, ClientError)
-            raise E(response, data, method, url)
+            raise E(response, data, method, path)
         return (response, data)
 
     def post(self, obj, *parts, **options):
