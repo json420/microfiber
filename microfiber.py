@@ -97,16 +97,18 @@ For python-couchdb documentation, see:
 
 import sys
 from os import urandom
-from base64 import b32encode
+from base64 import b32encode, b64encode
 from json import dumps, loads
 import time
+from hashlib import sha1
+import hmac
 if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse, urlencode
+    from urllib.parse import urlparse, urlencode, quote_plus
     from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = str
 else:
     from urlparse import urlparse
-    from urllib import urlencode
+    from urllib import urlencode, quote_plus
     from httplib import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = basestring
 
@@ -336,6 +338,51 @@ if oauth is not None:
                 self._token
             )
             return req.to_header()
+
+
+def oauth_base_string(method, url, params):
+    q = urlencode(tuple((k, params[k]) for k in sorted(params)))
+    return '&'.join([method, quote_plus(url), quote_plus(q)])
+
+
+def oauth_sign(oauth, base_string):
+    key = '&'.join(
+        oauth[k] for k in ('consumer_secret', 'token_secret')
+    ).encode('utf-8')
+    h = hmac.new(key, base_string.encode('utf-8'), sha1)
+    if sys.version_info >= (3, 0):
+        return b64encode(h.digest()).decode('utf-8')
+    return b64encode(h.digest())
+
+
+def oauth_authorization_header(items):
+    value = ', '.join(
+        '{}="{}"'.format(k, v) for (k, v) in items
+    )
+    return {'Authorization': value}
+
+
+def oauth_header(oauth, method, baseurl, query, testing=None):
+    if testing is None:
+        timestamp = str(int(time.time()))
+        nonce = b32encode(urandom(10)).decode('utf-8')
+    else:
+        (timestamp, nonce) = testing
+    o = {
+        'oauth_consumer_key': oauth['consumer_key'],
+        'oauth_token': oauth['token'],
+        'oauth_timestamp': timestamp,
+        'oauth_nonce': nonce,
+        'oauth_signature_method': 'HMAC-SHA1',
+        'oauth_version': '1.0',
+    }
+    query.update(o)
+    base_string = oauth_base_string(method, baseurl, query)
+    o['oauth_signature'] = quote_plus(oauth_sign(oauth, base_string))
+    o['OAuth realm'] = ''
+    return ', '.join(
+        '{}="{}"'.format(k, o[k]) for k in sorted(o)
+    )
 
 
 class CouchBase(object):
