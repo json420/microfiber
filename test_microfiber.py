@@ -53,6 +53,7 @@ class FakeResponse(object):
 
 
 class TestFunctions(TestCase):
+
     def test_random_id(self):
         _id = microfiber.random_id()
         if sys.version_info >= (3, 0):
@@ -105,7 +106,7 @@ class TestFunctions(TestCase):
         self.assertIs(microfiber._json_body(obj), obj)
 
     def test_queryiter(self):
-        f = microfiber.queryiter
+        f = microfiber._queryiter
         d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')
         self.assertEqual(
             list(f(d)),
@@ -154,17 +155,6 @@ class TestFunctions(TestCase):
                 ('startkey_docid', '6BLRBJKV2J3COTUPJCU57UNA'),
                 ('update_seq', 'true'),
             ]
-        )
-
-    def test_query(self):
-        f = microfiber.query
-        self.assertEqual(
-            f(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app'),
-            'aye=10&bar=false&baz=null&foo=true&key=%22app%22&zee=17.5'
-        )
-        self.assertEqual(
-            f(need='some space', bad='and+how', nauhty='you&you&you'),
-            'bad=and%2Bhow&nauhty=you%26you%26you&need=some+space'
         )
 
 

@@ -171,12 +171,12 @@ def random_id2():
 def _json_body(obj):
     if isinstance(obj, (dict, list)):
         return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
-    elif isinstance(obj, str):
+    elif isinstance(obj, strtype):
         return obj.encode('utf-8')
     return obj
 
 
-def queryiter(options):
+def _queryiter(options):
     """
     Return appropriately encoded (key, value) pairs sorted by key.
 
@@ -188,25 +188,6 @@ def queryiter(options):
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, strtype):
             value = dumps(value)
         yield (key, value)
-
-
-def query(**options):
-    """
-    Transform keyword arguments into the query portion of a request URL.
-
-    For example:
-
-    >>> query(attachments=True)
-    'attachments=true'
-    >>> query(limit=1000, endkey='foo+bar', group=True)
-    'endkey=%22foo%2Bbar%22&group=true&limit=1000'
-    >>> query(json=None)
-    'json=null'
-
-    Notice that ``True``, ``False``, and ``None`` are transformed into their
-    JSON-equivalents.
-    """
-    return urlencode(tuple(queryiter(options)))
 
 
 class HTTPError(Exception):
@@ -404,7 +385,7 @@ class CouchBase(object):
     def _path(self, parts, options):
         url = (self.basepath + '/'.join(parts) if parts else self.basepath)
         if options:
-            q = tuple(queryiter(options))
+            q = tuple(_queryiter(options))
             url = '?'.join([url, urlencode(q)])
             return (url, q)
         return (url, tuple())
@@ -592,7 +573,6 @@ class Server(CouchBase):
     'http://localhost:5984/'
     >>> s.basepath
     '/'
-
 
     Niceties:
 
