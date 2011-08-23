@@ -29,6 +29,7 @@ import os
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
+import subprocess
 import time
 import io
 if sys.version_info >= (3, 0):
@@ -44,6 +45,18 @@ from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
+
+
+def get_env():
+    env_s = subprocess.check_output(['/usr/bin/dmedia-cli', 'GetEnv'])
+    env = json.loads(env_s)
+    env['url'] = env['url'].encode('ascii')
+    if 'oauth' in env:
+        env['oauth'] = dict(
+            (k.encode('ascii'), v.encode('ascii'))
+            for (k, v) in env['oauth'].items()
+        )
+    return env
 
 
 class FakeResponse(object):
@@ -401,16 +414,19 @@ class LiveTestCase(TestCase):
             self.skipTest('{} not set'.format(key))
 
     def setUp(self):
-        self.url = self.getvar('MICROFIBER_TEST_URL')
         self.db = self.getvar('MICROFIBER_TEST_DB')
-        self.dburl = self.url + self.db
-        self.session = None
-        t = urlparse(self.dburl)
-        conn = HTTPConnection(t.netloc)
-        headers = {'Accept': 'application/json'}
-        conn.request('DELETE', t.path, None, headers)
-        r = conn.getresponse()
-        r.read()
+        if os.environ.get('MICROFIBER_TEST_DESKTOPCOUCH') == 'true':
+            env = get_env()
+            self.url = env['url']
+            self.session = microfiber.Session(env['oauth'])
+        else:
+            self.url = self.getvar('MICROFIBER_TEST_URL')
+            self.session = None
+        cb = microfiber.CouchBase(self.url, self.session)
+        try:
+            cb.delete(self.db)
+        except microfiber.NotFound:
+            pass
 
 
 class TestCouchBaseLive(LiveTestCase):
