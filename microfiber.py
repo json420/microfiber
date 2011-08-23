@@ -95,6 +95,10 @@ For python-couchdb documentation, see:
     http://packages.python.org/CouchDB/
 """
 
+# FIXME: There is some rather hacky crap in here to support both Python2 and
+# Python3... but once we migrate dmedia to Python3, we'll drop Python2 support
+# in microfiber and clean this up a bit.
+
 import sys
 from os import urandom
 from base64 import b32encode, b64encode
@@ -114,8 +118,12 @@ else:
 
 
 __all__ = (
+    'random_id',
+    'random_id2',
+
     'Server',
     'Database',
+
     'BadRequest',
     'Unauthorized',
     'Forbidden',
@@ -127,6 +135,8 @@ __all__ = (
     'BadContentType',
     'BadRangeRequest',
     'ExpectationFailed',
+
+    'ServerError',
 )
 
 __version__ = '11.09.0'
