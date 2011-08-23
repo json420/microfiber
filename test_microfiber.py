@@ -237,8 +237,6 @@ class TestFunctions(TestCase):
         )
 
 
-
-
 class TestErrors(TestCase):
     def test_errors(self):
         self.assertEqual(
@@ -329,47 +327,25 @@ class TestCouchBase(TestCase):
         inst = self.klass(oauth='foo')
         self.assertEqual(inst.oauth, 'foo')
 
-    def test_path(self):
-        options = dict(
-            rev='1-3e812567',
-            foo=True,
-            bar=None,
-        )
-        inst = self.klass(url='http://localhost:5001/')
-
-        self.assertEqual(inst._path(tuple(), {}), ('/', tuple()))
-
+    def test_full_url(self):
+        inst = self.klass(url='https://localhost:5003/')
         self.assertEqual(
-            inst._path(tuple(), options),
-            (
-                '/?bar=null&foo=true&rev=1-3e812567',
-                (('bar', 'null'), ('foo', 'true'), ('rev', '1-3e812567'))
-            ),
-        )
-
-        self.assertEqual(
-            inst._path(('db', 'doc', 'att'), {}),
-            ('/db/doc/att', tuple())
+            inst._full_url('/'),
+            'https://localhost:5003/'
         )
         self.assertEqual(
-            inst._path(('db', 'doc', 'att'), options),
-            (
-                '/db/doc/att?bar=null&foo=true&rev=1-3e812567',
-                (('bar', 'null'), ('foo', 'true'), ('rev', '1-3e812567'))
-            )
-
+            inst._full_url('/db/doc/att?bar=null&foo=true'),
+            'https://localhost:5003/db/doc/att?bar=null&foo=true'
         )
 
+        inst = self.klass(url='http://localhost:5003/mydb/')
         self.assertEqual(
-            inst._path(('db/doc/att',), {}),
-            ('/db/doc/att', tuple())
+            inst._full_url('/'),
+            'http://localhost:5003/'
         )
         self.assertEqual(
-            inst._path(('db/doc/att',), options),
-            (
-                '/db/doc/att?bar=null&foo=true&rev=1-3e812567',
-                (('bar', 'null'), ('foo', 'true'), ('rev', '1-3e812567'))
-            )
+            inst._full_url('/db/doc/att?bar=null&foo=true'),
+            'http://localhost:5003/db/doc/att?bar=null&foo=true'
         )
 
 

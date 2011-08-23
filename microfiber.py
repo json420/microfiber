@@ -390,14 +390,6 @@ class CouchBase(object):
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
-    def _path(self, parts, options):
-        path = (self.basepath + '/'.join(parts) if parts else self.basepath)
-        if options:
-            q = tuple(_queryiter(options))
-            path = '?'.join([path, urlencode(q)])
-            return (path, q)
-        return (path, tuple())
-
     def _full_url(self, path):
         return ''.join([self.scheme, '://', self.netloc, path])
 
@@ -409,7 +401,7 @@ class CouchBase(object):
         if headers:
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
-        query = tuple(_queryiter(options))
+        query = (tuple(_queryiter(options)) if options else tuple())
         if self.oauth:
             baseurl = self._full_url(path)
             h.update(
