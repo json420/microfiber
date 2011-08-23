@@ -200,7 +200,7 @@ def loads(data):
     return json.loads(data.decode('utf-8'))
 
 
-def queryiter(**options):
+def queryiter(options):
     """
     Return appropriately encoded (key, value) pairs sorted by key.
 
@@ -230,7 +230,7 @@ def query(**options):
     Notice that ``True``, ``False``, and ``None`` are transformed into their
     JSON-equivalents.
     """
-    return urlencode(tuple(queryiter(**options)))
+    return urlencode(tuple(queryiter(options)))
 
 
 class HTTPError(Exception):
@@ -474,6 +474,44 @@ class CouchBase(object):
             raise E(response, data, method, url)
         return (response, data)
 
+    def _path(self, parts, options):
+        url = (self.basepath + '/'.join(parts) if parts else self.basepath)
+        if options:
+            q = tuple(queryiter(options))
+            url = '?'.join([url, urlencode(q)])
+            return (url, q)
+        return (url, tuple())
+
+    def _request(self, method, parts, options, body=None, headers=None):
+        h = {
+            'User-Agent': USER_AGENT,
+            'Accept': 'application/json',
+        }
+        if headers:
+            h.update(headers)
+        (url, q) = self._path(parts, options)
+        if self.session is not None:
+            h.update(self.session.sign(method, url, dict(q)))
+        for retry in range(2):
+            try:
+                self.conn.request(method, url, body, h)
+                response = self.conn.getresponse()
+                data = response.read()
+                break
+            except BadStatusLine as e:
+                self.conn.close()
+                if retry == 1:
+                    raise e
+            except Exception as e:
+                self.conn.close()
+                raise e
+        if response.status >= 500:
+            raise ServerError(response, data, method, url)
+        if response.status >= 400:
+            E = errors.get(response.status, ClientError)
+            raise E(response, data, method, url)
+        return (response, data)
+
     def json(self, method, obj, *parts, **options):
         """
         Make a PUT or POST request with a JSON body.
@@ -541,7 +579,7 @@ class CouchBase(object):
         >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
-        (response, data) = self.request('GET', self.path(*parts, **options))
+        (response, data) = self._request('GET', parts, options)
         return loads(data)
 
     def delete(self, *parts, **options):
@@ -560,7 +598,7 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        (response, data) = self.request('DELETE', self.path(*parts, **options))
+        (response, data) = self._request('DELETE', parts, options)
         return loads(data)
 
     def head(self, *parts, **options):
@@ -570,7 +608,7 @@ class CouchBase(object):
         Returns a ``dict`` containing the response headers from the HEAD
         request.
         """
-        (response, data) = self.request('HEAD', self.path(*parts, **options))
+        (response, data) = self._request('HEAD', parts, options)
         return dict(response.getheaders())
 
     def put_att(self, mime, data, *parts, **options):
@@ -593,9 +631,10 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        url = self.path(*parts, **options)
-        headers = {'Content-Type': mime}
-        (response, data) = self.request('PUT', url, data, headers)
+        (response, data) = self._request('PUT', parts, options,
+            body=data,
+            headers={'Content-Type': mime},
+        )
         return loads(data)
 
     def get_att(self, *parts, **options):
@@ -616,7 +655,7 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        (response, data) = self.request('GET', self.path(*parts, **options))
+        (response, data) = self._request('GET', parts, options)
         return (response.getheader('Content-Type'), data)
 
 

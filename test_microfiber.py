@@ -113,8 +113,9 @@ class TestFunctions(TestCase):
 
     def test_queryiter(self):
         f = microfiber.queryiter
+        d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')
         self.assertEqual(
-            list(f(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')),
+            list(f(d)),
             [
                 ('aye', '10'),
                 ('bar', 'false'),
@@ -142,7 +143,7 @@ class TestFunctions(TestCase):
             update_seq=True,
         )
         self.assertEqual(
-            list(f(**options)),
+            list(f(options)),
             [
                 ('endkey', '"baz"'),
                 ('endkey_docid', 'V5XXVMUJHR3WKHLLJ4W2UMTL'),
@@ -272,22 +273,39 @@ class TestCouchBase(TestCase):
         )
         inst = self.klass(url='http://localhost:5001/')
 
-        self.assertEqual(inst.path(), '/')
+        self.assertEqual(inst._path(tuple(), {}), ('/', tuple()))
+
         self.assertEqual(
-            inst.path(**options),
-            '/?bar=null&foo=true&rev=1-3e812567'
+            inst._path(tuple(), options),
+            (
+                '/?bar=null&foo=true&rev=1-3e812567',
+                (('bar', 'null'), ('foo', 'true'), ('rev', '1-3e812567'))
+            ),
         )
 
-        self.assertEqual(inst.path('db', 'doc', 'att'), '/db/doc/att')
         self.assertEqual(
-            inst.path('db', 'doc', 'att', **options),
-            '/db/doc/att?bar=null&foo=true&rev=1-3e812567'
+            inst._path(('db', 'doc', 'att'), {}),
+            ('/db/doc/att', tuple())
+        )
+        self.assertEqual(
+            inst._path(('db', 'doc', 'att'), options),
+            (
+                '/db/doc/att?bar=null&foo=true&rev=1-3e812567',
+                (('bar', 'null'), ('foo', 'true'), ('rev', '1-3e812567'))
+            )
+
         )
 
-        self.assertEqual(inst.path('db/doc/att'), '/db/doc/att')
         self.assertEqual(
-            inst.path('db/doc/att', **options),
-            '/db/doc/att?bar=null&foo=true&rev=1-3e812567'
+            inst._path(('db/doc/att',), {}),
+            ('/db/doc/att', tuple())
+        )
+        self.assertEqual(
+            inst._path(('db/doc/att',), options),
+            (
+                '/db/doc/att?bar=null&foo=true&rev=1-3e812567',
+                (('bar', 'null'), ('foo', 'true'), ('rev', '1-3e812567'))
+            )
         )
 
     def test_json(self):
