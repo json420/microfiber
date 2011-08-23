@@ -183,7 +183,7 @@ class TestFunctions(TestCase):
         )
 
     def test_oauth_base_string(self):
-        f = microfiber.oauth_base_string
+        f = microfiber._oauth_base_string
 
         method = 'GET'
         url = 'http://photos.example.net/photos'
@@ -200,13 +200,12 @@ class TestFunctions(TestCase):
         self.assertEqual(f(method, url, params), BASE_STRING)
 
     def test_oauth_sign(self):
-        f = microfiber.oauth_sign
+        f = microfiber._oauth_sign
 
         oauth = {
             'consumer_secret': 'kd94hf93k423kf44',
             'token_secret': 'pfkkdhi9sl3r4s00',
         }
-
         self.assertEqual(
             f(oauth, BASE_STRING),
             'tR3+Ty81lMeYAr/Fid0kMTYa/WM='
@@ -214,7 +213,7 @@ class TestFunctions(TestCase):
 
     def test_oauth_header(self):
         self.maxDiff = None
-        f = microfiber.oauth_header
+        f = microfiber._oauth_header
 
         oauth = {
             'consumer_secret': 'kd94hf93k423kf44',

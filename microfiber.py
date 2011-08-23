@@ -197,6 +197,45 @@ def _queryiter(options):
         yield (key, value)
 
 
+def _oauth_base_string(method, baseurl, query):
+    q = urlencode(tuple((k, query[k]) for k in sorted(query)))
+    return '&'.join([method, quote_plus(baseurl), quote_plus(q)])
+
+
+def _oauth_sign(oauth, base_string):
+    key = '&'.join(
+        oauth[k] for k in ('consumer_secret', 'token_secret')
+    ).encode('utf-8')
+    h = hmac.new(key, base_string.encode('utf-8'), sha1)
+    if sys.version_info >= (3, 0):
+        return b64encode(h.digest()).decode('utf-8')
+    return b64encode(h.digest())
+
+
+def _oauth_header(oauth, method, baseurl, query, testing=None):
+    if testing is None:
+        timestamp = str(int(time.time()))
+        nonce = b32encode(urandom(10)).decode('utf-8')
+    else:
+        (timestamp, nonce) = testing
+    o = {
+        'oauth_consumer_key': oauth['consumer_key'],
+        'oauth_token': oauth['token'],
+        'oauth_timestamp': timestamp,
+        'oauth_nonce': nonce,
+        'oauth_signature_method': 'HMAC-SHA1',
+        'oauth_version': '1.0',
+    }
+    query.update(o)
+    base_string = _oauth_base_string(method, baseurl, query)
+    o['oauth_signature'] = quote_plus(_oauth_sign(oauth, base_string))
+    o['OAuth realm'] = ''
+    value = ', '.join(
+        '{}="{}"'.format(k, o[k]) for k in sorted(o)
+    )
+    return {'Authorization': value}
+
+
 class HTTPError(Exception):
     """
     Base class for custom `microfiber` exceptions.
@@ -315,45 +354,6 @@ errors = {
 }
 
 
-def oauth_base_string(method, url, params):
-    q = urlencode(tuple((k, params[k]) for k in sorted(params)))
-    return '&'.join([method, quote_plus(url), quote_plus(q)])
-
-
-def oauth_sign(oauth, base_string):
-    key = '&'.join(
-        oauth[k] for k in ('consumer_secret', 'token_secret')
-    ).encode('utf-8')
-    h = hmac.new(key, base_string.encode('utf-8'), sha1)
-    if sys.version_info >= (3, 0):
-        return b64encode(h.digest()).decode('utf-8')
-    return b64encode(h.digest())
-
-
-def oauth_header(oauth, method, baseurl, query, testing=None):
-    if testing is None:
-        timestamp = str(int(time.time()))
-        nonce = b32encode(urandom(10)).decode('utf-8')
-    else:
-        (timestamp, nonce) = testing
-    o = {
-        'oauth_consumer_key': oauth['consumer_key'],
-        'oauth_token': oauth['token'],
-        'oauth_timestamp': timestamp,
-        'oauth_nonce': nonce,
-        'oauth_signature_method': 'HMAC-SHA1',
-        'oauth_version': '1.0',
-    }
-    query.update(o)
-    base_string = oauth_base_string(method, baseurl, query)
-    o['oauth_signature'] = quote_plus(oauth_sign(oauth, base_string))
-    o['OAuth realm'] = ''
-    value = ', '.join(
-        '{}="{}"'.format(k, o[k]) for k in sorted(o)
-    )
-    return {'Authorization': value}
-
-
 class CouchBase(object):
     """
     Base class for `Server` and `Database`.
@@ -415,7 +415,7 @@ class CouchBase(object):
         if self.oauth:
             baseurl = self._full_url(path)
             h.update(
-                oauth_header(self.oauth, method, baseurl, dict(query))
+                _oauth_header(self.oauth, method, baseurl, dict(query))
             )
         if query:
             path = '?'.join([path, urlencode(query)])
