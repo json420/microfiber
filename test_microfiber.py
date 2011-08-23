@@ -379,13 +379,17 @@ class TestDatabase(TestCase):
         self.assertIsNone(db.session)
         s = db.server()
         self.assertIsInstance(s, microfiber.Server)
+        self.assertEqual(s.url, 'http://localhost:5984/')
+        self.assertEqual(s.basepath, '/')
         self.assertIsNone(s.session)
 
-        db = microfiber.Database('foo', session='bar')
-        self.assertEqual(db.session, 'bar')
+        db = microfiber.Database('foo', 'https://example.com/bar', 'baz')
+        self.assertEqual(db.session, 'baz')
         s = db.server()
         self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.session, 'bar')
+        self.assertEqual(s.url, 'https://example.com/bar/')
+        self.assertEqual(s.basepath, '/bar/')
+        self.assertEqual(s.session, 'baz')
 
 
 class LiveTestCase(TestCase):
@@ -400,6 +404,7 @@ class LiveTestCase(TestCase):
         self.url = self.getvar('MICROFIBER_TEST_URL')
         self.db = self.getvar('MICROFIBER_TEST_DB')
         self.dburl = self.url + self.db
+        self.session = None
         t = urlparse(self.dburl)
         conn = HTTPConnection(t.netloc)
         headers = {'Accept': 'application/json'}
@@ -412,7 +417,7 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
-        inst = self.klass(url=self.url)
+        inst = self.klass(self.url, self.session)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -426,7 +431,7 @@ class TestCouchBaseLive(LiveTestCase):
         doc = inst.get(self.db, 'bar')
 
     def test_put_att(self):
-        inst = self.klass(url=self.url)
+        inst = self.klass(self.url, self.session)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -504,7 +509,7 @@ class TestCouchBaseLive(LiveTestCase):
         )
 
     def test_put_post(self):
-        inst = self.klass(url=self.url)
+        inst = self.klass(self.url, self.session)
 
         ####################
         # Test requests to /
@@ -642,21 +647,8 @@ class TestCouchBaseLive(LiveTestCase):
 class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
-    def test_server(self):
-        inst = self.klass('foo')
-        s = inst.server()
-        self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'http://localhost:5984/')
-        self.assertEqual(s.basepath, '/')
-
-        inst = self.klass('baz', 'https://example.com/bar')
-        s = inst.server()
-        self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'https://example.com/bar/')
-        self.assertEqual(s.basepath, '/bar/')
-
     def test_ensure(self):
-        inst = self.klass(self.db, self.url)
+        inst = self.klass(self.db, self.url, self.session)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
@@ -665,7 +657,7 @@ class TestDatabaseLive(LiveTestCase):
         self.assertRaises(NotFound, inst.get)
 
     def test_save(self):
-        inst = self.klass(self.db, self.url)
+        inst = self.klass(self.db, self.url, self.session)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -702,7 +694,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulksave(self):
-        inst = self.klass(self.db, self.url)
+        inst = self.klass(self.db, self.url, self.session)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
