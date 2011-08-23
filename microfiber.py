@@ -433,55 +433,6 @@ class CouchBase(object):
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
-    def path(self, *parts, **options):
-        """
-        Construct URL from base path.
-
-        For example:
-
-        >>> cc = CouchBase('http://localhost:55506/dmedia/')
-        >>> cc.path()
-        '/dmedia/'
-        >>> cc.path('_design', 'file', '_view', 'bytes')
-        '/dmedia/_design/file/_view/bytes'
-        >>> cc.path('mydoc', rev='1-3e812567', attachments=True)
-        '/dmedia/mydoc?attachments=true&rev=1-3e812567'
-
-        :param parts: path components to construct URL relative to base path
-        :param options: optional keyword arguments to include in query
-        """
-        url = (self.basepath + '/'.join(parts) if parts else self.basepath)
-        if options:
-            return '?'.join([url, query(**options)])
-        return url
-
-    def request(self, method, url, body=None, headers=None):
-        h = {
-            'User-Agent': USER_AGENT,
-            'Accept': 'application/json',
-        }
-        if headers:
-            h.update(headers)
-        for retry in range(2):
-            try:
-                self.conn.request(method, url, body, h)
-                response = self.conn.getresponse()
-                data = response.read()
-                break
-            except BadStatusLine as e:
-                self.conn.close()
-                if retry == 1:
-                    raise e
-            except Exception as e:
-                self.conn.close()
-                raise e
-        if response.status >= 500:
-            raise ServerError(response, data, method, url)
-        if response.status >= 400:
-            E = errors.get(response.status, ClientError)
-            raise E(response, data, method, url)
-        return (response, data)
-
     def _path(self, parts, options):
         url = (self.basepath + '/'.join(parts) if parts else self.basepath)
         if options:
@@ -520,19 +471,6 @@ class CouchBase(object):
             raise E(response, data, method, url)
         return (response, data)
 
-    def json(self, method, obj, *parts, **options):
-        """
-        Make a PUT or POST request with a JSON body.
-        """
-        url = self.path(*parts, **options)
-        if isinstance(obj, dict):
-            obj = dumps(obj)
-        elif isinstance(obj, str):
-            obj = obj.encode('utf-8')
-        return self.request(method, url, obj,
-            {'Content-Type': 'application/json'}
-        )
-
     def post(self, obj, *parts, **options):
         """
         POST *obj*.
@@ -549,7 +487,10 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        (response, data) = self.json('POST', obj, *parts, **options)
+        (response, data) = self._request('POST', parts, options,
+            body=_json_body(obj),
+            headers={'Content-Type': 'application/json'},
+        )
         return loads(data)
 
     def put(self, obj, *parts, **options):
@@ -568,7 +509,10 @@ class CouchBase(object):
         {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
 
         """
-        (response, data) = self.json('PUT', obj, *parts, **options)
+        (response, data) = self._request('PUT', parts, options,
+            body=_json_body(obj),
+            headers={'Content-Type': 'application/json'},
+        )
         return loads(data)
 
     def get(self, *parts, **options):
