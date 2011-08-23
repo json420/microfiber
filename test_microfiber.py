@@ -111,6 +111,31 @@ class TestFunctions(TestCase):
         b = json.dumps(obj).encode('utf-8')
         self.assertEqual(microfiber.loads(b), obj)
 
+    def test_json_body(self):
+        doc = {
+            '_id': 'foo',
+            'bar': 'baz',
+            'hello': 'world',
+        }
+        json_str = json.dumps(doc, sort_keys=True, separators=(',',':'))
+        json_bytes = json_str.encode('utf-8')
+
+        # Test with obj=None
+        self.assertIsNone(microfiber._json_body(None))
+
+        # Test when obj is a dict:
+        self.assertEqual(microfiber._json_body(doc), json_bytes)
+
+        # Test when obj is a pre-dumped str
+        self.assertEqual(microfiber._json_body(json_str), json_bytes)
+
+        # Test when obj is pre-encoded bytes
+        self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
+
+        # Test when obj is an io.BytesIO
+        obj = io.BytesIO(json_bytes)
+        self.assertIs(microfiber._json_body(obj), obj)
+
     def test_queryiter(self):
         f = microfiber.queryiter
         d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')

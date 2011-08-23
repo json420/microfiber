@@ -200,6 +200,14 @@ def loads(data):
     return json.loads(data.decode('utf-8'))
 
 
+def _json_body(obj):
+    if isinstance(obj, (dict, list)):
+        return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+    elif isinstance(obj, str):
+        return obj.encode('utf-8')
+    return obj
+
+
 def queryiter(options):
     """
     Return appropriately encoded (key, value) pairs sorted by key.
