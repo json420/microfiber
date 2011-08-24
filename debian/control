@@ -10,7 +10,7 @@ Homepage: https://launchpad.net/microfiber
 
 Package: python3-microfiber
 Architecture: all
-Depends: ${misc:Depends}, python (>= 3.2)
+Depends: ${misc:Depends}, python3 (>= 3.2)
 Description: fabric for a lightweight Couch
  microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON
  loving REST API like CouchDB.  Rather than wrapping the API in a bunch of
