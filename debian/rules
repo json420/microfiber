@@ -7,6 +7,7 @@ PYTHON3=$(shell py3versions -vr)
 
 test-python%:
 	python$* setup.py test -vv
+	python2.7 setup.py test -vv
 
 override_dh_auto_install:
 	for pyvers in $(shell py3versions -vr); do \
