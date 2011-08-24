@@ -95,25 +95,35 @@ For python-couchdb documentation, see:
     http://packages.python.org/CouchDB/
 """
 
+# FIXME: There is some rather hacky crap in here to support both Python2 and
+# Python3... but once we migrate dmedia to Python3, we'll drop Python2 support
+# in microfiber and clean this up a bit.
+
 import sys
 from os import urandom
-from base64 import b32encode
-import json
+from base64 import b32encode, b64encode
+from json import dumps, loads
 import time
+from hashlib import sha1
+import hmac
 if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse, urlencode
-    from http.client import HTTPConnection, HTTPSConnection
+    from urllib.parse import urlparse, urlencode, quote_plus
+    from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = str
 else:
     from urlparse import urlparse
-    from urllib import urlencode
-    from httplib import HTTPConnection, HTTPSConnection
+    from urllib import urlencode, quote_plus
+    from httplib import HTTPConnection, HTTPSConnection, BadStatusLine
     strtype = basestring
 
 
 __all__ = (
+    'random_id',
+    'random_id2',
+
     'Server',
     'Database',
+
     'BadRequest',
     'Unauthorized',
     'Forbidden',
@@ -125,6 +135,8 @@ __all__ = (
     'BadContentType',
     'BadRangeRequest',
     'ExpectationFailed',
+
+    'ServerError',
 )
 
 __version__ = '11.09.0'
@@ -144,12 +156,12 @@ def random_id():
     This is how dmedia/Novacut random IDs are created, so this is "Jason
     approved", for what that's worth.
     """
-    return b32encode(urandom(15)).decode('ascii')
+    return b32encode(urandom(15)).decode('utf-8')
 
 
 def random_id2():
     """
-    Returns random ID with timestamp + 80 bits of base32-encoded random data.
+    Returns a random ID with timestamp + 80 bits of base32-encoded random data.
 
     The ID will be 27-characters long, URL and filesystem safe.  For example:
 
@@ -159,43 +171,19 @@ def random_id2():
     """
     return '.'.join([
         str(int(time.time())),
-        b32encode(urandom(10)).decode('ascii')
+        b32encode(urandom(10)).decode('utf-8')
     ])
 
 
-def dumps(obj):
-    """
-    JSON encode *obj*.
-
-    Returns a ``bytes`` instance with a compact JSON encoding of *obj*.
-
-    For example:
-
-    >>> dumps({'micro': 'fiber', '_id': 'python'})  #doctest: +SKIP
-    '{"_id":"python","micro":"fiber"}'
-
-    :param obj: a JSON serialize-able object, likely a ``dict`` or ``list``
-    """
-    return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+def _json_body(obj):
+    if isinstance(obj, (dict, list)):
+        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+    elif isinstance(obj, strtype):
+        return obj.encode('utf-8')
+    return obj
 
 
-def loads(data):
-    """
-    Decode object from JSON bytes *data*.
-
-    For example:
-
-    >>> loads(b'{"_id":"python","micro":"fiber"}')  #doctest: +SKIP
-    {'micro': 'fiber', '_id': 'python'}
-
-
-    :param data: a ``bytes`` instance containing a UTF-8 encoded, JSON
-        serialized object
-    """
-    return json.loads(data.decode('utf-8'))
-
-
-def queryiter(**options):
+def _queryiter(options):
     """
     Return appropriately encoded (key, value) pairs sorted by key.
 
@@ -205,27 +193,47 @@ def queryiter(**options):
     for key in sorted(options):
         value = options[key]
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, strtype):
-            value = json.dumps(value)
+            value = dumps(value)
         yield (key, value)
 
 
-def query(**options):
-    """
-    Transform keyword arguments into the query portion of a request URL.
+def _oauth_base_string(method, baseurl, query):
+    q = urlencode(tuple((k, query[k]) for k in sorted(query)))
+    return '&'.join([method, quote_plus(baseurl), quote_plus(q)])
 
-    For example:
 
-    >>> query(attachments=True)
-    'attachments=true'
-    >>> query(limit=1000, endkey='foo+bar', group=True)
-    'endkey=%22foo%2Bbar%22&group=true&limit=1000'
-    >>> query(json=None)
-    'json=null'
+def _oauth_sign(oauth, base_string):
+    key = '&'.join(
+        oauth[k] for k in ('consumer_secret', 'token_secret')
+    ).encode('utf-8')
+    h = hmac.new(key, base_string.encode('utf-8'), sha1)
+    if sys.version_info >= (3, 0):
+        return b64encode(h.digest()).decode('utf-8')
+    return b64encode(h.digest())
 
-    Notice that ``True``, ``False``, and ``None`` are transformed into their
-    JSON-equivalents.
-    """
-    return urlencode(tuple(queryiter(**options)))
+
+def _oauth_header(oauth, method, baseurl, query, testing=None):
+    if testing is None:
+        timestamp = str(int(time.time()))
+        nonce = b32encode(urandom(10)).decode('utf-8')
+    else:
+        (timestamp, nonce) = testing
+    o = {
+        'oauth_consumer_key': oauth['consumer_key'],
+        'oauth_token': oauth['token'],
+        'oauth_timestamp': timestamp,
+        'oauth_nonce': nonce,
+        'oauth_signature_method': 'HMAC-SHA1',
+        'oauth_version': '1.0',
+    }
+    query.update(o)
+    base_string = _oauth_base_string(method, baseurl, query)
+    o['oauth_signature'] = quote_plus(_oauth_sign(oauth, base_string))
+    o['OAuth realm'] = ''
+    value = ', '.join(
+        '{}="{}"'.format(k, o[k]) for k in sorted(o)
+    )
+    return {'Authorization': value}
 
 
 class HTTPError(Exception):
@@ -246,7 +254,7 @@ class HTTPError(Exception):
         )
 
     def loads(self):
-        return loads(self.data)
+        return loads(self.data.decode('utf-8'))
 
 
 class ClientError(HTTPError):
@@ -376,7 +384,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, url=SERVER):
+    def __init__(self, url=SERVER, oauth=None):
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -384,66 +392,52 @@ class CouchBase(object):
             )
         if not t.netloc:
             raise ValueError('bad url: {!r}'.format(url))
+        self.scheme = t.scheme
+        self.netloc = t.netloc
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
-        self.url = ''.join([t.scheme, '://', t.netloc, self.basepath])
+        self.url = self._full_url(self.basepath)
+        self.oauth = oauth
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
-    def path(self, *parts, **options):
-        """
-        Construct URL from base path.
+    def _full_url(self, path):
+        return ''.join([self.scheme, '://', self.netloc, path])
 
-        For example:
-
-        >>> cc = CouchBase('http://localhost:55506/dmedia/')
-        >>> cc.path()
-        '/dmedia/'
-        >>> cc.path('_design', 'file', '_view', 'bytes')
-        '/dmedia/_design/file/_view/bytes'
-        >>> cc.path('mydoc', rev='1-3e812567', attachments=True)
-        '/dmedia/mydoc?attachments=true&rev=1-3e812567'
-
-        :param parts: path components to construct URL relative to base path
-        :param options: optional keyword arguments to include in query
-        """
-        url = (self.basepath + '/'.join(parts) if parts else self.basepath)
-        if options:
-            return '?'.join([url, query(**options)])
-        return url
-
-    def request(self, method, url, body=None, headers=None):
+    def _request(self, method, parts, options, body=None, headers=None):
         h = {
             'User-Agent': USER_AGENT,
             'Accept': 'application/json',
         }
         if headers:
             h.update(headers)
-        try:
-            self.conn.request(method, url, body, h)
-            response = self.conn.getresponse()
-            data = response.read()
-        except Exception as e:
-            self.conn.close()
-            raise e
+        path = (self.basepath + '/'.join(parts) if parts else self.basepath)
+        query = (tuple(_queryiter(options)) if options else tuple())
+        if self.oauth:
+            baseurl = self._full_url(path)
+            h.update(
+                _oauth_header(self.oauth, method, baseurl, dict(query))
+            )
+        if query:
+            path = '?'.join([path, urlencode(query)])
+        for retry in range(2):
+            try:
+                self.conn.request(method, path, body, h)
+                response = self.conn.getresponse()
+                data = response.read()
+                break
+            except BadStatusLine as e:
+                self.conn.close()
+                if retry == 1:
+                    raise e
+            except Exception as e:
+                self.conn.close()
+                raise e
         if response.status >= 500:
-            raise ServerError(response, data, method, url)
+            raise ServerError(response, data, method, path)
         if response.status >= 400:
             E = errors.get(response.status, ClientError)
-            raise E(response, data, method, url)
+            raise E(response, data, method, path)
         return (response, data)
-
-    def json(self, method, obj, *parts, **options):
-        """
-        Make a PUT or POST request with a JSON body.
-        """
-        url = self.path(*parts, **options)
-        if isinstance(obj, dict):
-            obj = dumps(obj)
-        elif isinstance(obj, str):
-            obj = obj.encode('utf-8')
-        return self.request(method, url, obj,
-            {'Content-Type': 'application/json'}
-        )
 
     def post(self, obj, *parts, **options):
         """
@@ -461,8 +455,11 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        (response, data) = self.json('POST', obj, *parts, **options)
-        return loads(data)
+        (response, data) = self._request('POST', parts, options,
+            body=_json_body(obj),
+            headers={'Content-Type': 'application/json'},
+        )
+        return loads(data.decode('utf-8'))
 
     def put(self, obj, *parts, **options):
         """
@@ -480,8 +477,11 @@ class CouchBase(object):
         {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
 
         """
-        (response, data) = self.json('PUT', obj, *parts, **options)
-        return loads(data)
+        (response, data) = self._request('PUT', parts, options,
+            body=_json_body(obj),
+            headers={'Content-Type': 'application/json'},
+        )
+        return loads(data.decode('utf-8'))
 
     def get(self, *parts, **options):
         """
@@ -499,8 +499,8 @@ class CouchBase(object):
         >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
-        (response, data) = self.request('GET', self.path(*parts, **options))
-        return loads(data)
+        (response, data) = self._request('GET', parts, options)
+        return loads(data.decode('utf-8'))
 
     def delete(self, *parts, **options):
         """
@@ -518,8 +518,8 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        (response, data) = self.request('DELETE', self.path(*parts, **options))
-        return loads(data)
+        (response, data) = self._request('DELETE', parts, options)
+        return loads(data.decode('utf-8'))
 
     def head(self, *parts, **options):
         """
@@ -528,7 +528,7 @@ class CouchBase(object):
         Returns a ``dict`` containing the response headers from the HEAD
         request.
         """
-        (response, data) = self.request('HEAD', self.path(*parts, **options))
+        (response, data) = self._request('HEAD', parts, options)
         return dict(response.getheaders())
 
     def put_att(self, mime, data, *parts, **options):
@@ -551,10 +551,11 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        url = self.path(*parts, **options)
-        headers = {'Content-Type': mime}
-        (response, data) = self.request('PUT', url, data, headers)
-        return loads(data)
+        (response, data) = self._request('PUT', parts, options,
+            body=data,
+            headers={'Content-Type': mime},
+        )
+        return loads(data.decode('utf-8'))
 
     def get_att(self, *parts, **options):
         """
@@ -574,7 +575,7 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        (response, data) = self.request('GET', self.path(*parts, **options))
+        (response, data) = self._request('GET', parts, options)
         return (response.getheader('Content-Type'), data)
 
 
@@ -592,23 +593,22 @@ class Server(CouchBase):
     >>> s.basepath
     '/'
 
-
     Niceties:
 
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, url=SERVER):
-        super(Server, self).__init__(url=url)
+    def __init__(self, url=SERVER, oauth=None):
+        super(Server, self).__init__(url, oauth)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
 
-    def database(self, name, ensure=True):
+    def database(self, name, ensure=False):
         """
         Return a new `Database` instance for the database *name*.
         """
-        db = Database(name, self.url)
+        db = Database(name, self.url, self.oauth)
         if ensure:
             db.ensure()
         return db
@@ -639,8 +639,8 @@ class Database(CouchBase):
         * `Database.bulksave(docs)` - as above, but with a list of docs
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, url=SERVER):
-        super(Database, self).__init__(url)
+    def __init__(self, name, url=SERVER, oauth=None):
+        super(Database, self).__init__(url, oauth)
         self.name = name
         self.basepath += (name + '/')
 
@@ -653,7 +653,7 @@ class Database(CouchBase):
         """
         Return a `Server` instance pointing at the same URL as this database.
         """
-        return Server(self.url)
+        return Server(self.url, self.oauth)
 
     def ensure(self):
         """

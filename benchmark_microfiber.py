@@ -18,6 +18,7 @@ try:
 except microfiber.NotFound:
     pass
 db = s.database(name)
+db.ensure()
 
 
 def random_id():

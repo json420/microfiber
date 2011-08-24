@@ -23,12 +23,17 @@
 Unit tests for `microfiber` module.
 """
 
+# FIXME: There is some rather hacky crap in here to support both Python2 and
+# Python3... but once we migrate dmedia to Python3, we'll drop Python2 support
+# in microfiber and clean this up a bit.
+
 import sys
 from unittest import TestCase
 import os
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
+import subprocess
 import time
 import io
 if sys.version_info >= (3, 0):
@@ -41,9 +46,29 @@ else:
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
+# OAuth test string from http://oauth.net/core/1.0a/#anchor46
+BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
+
 
 def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
+
+
+if sys.version_info >= (3, 0):
+    def get_env():
+        env_s = subprocess.check_output(['/usr/bin/dmedia-cli', 'GetEnv'])
+        return json.loads(env_s.decode('utf-8'))
+else:
+    def get_env():
+        env_s = subprocess.check_output(['/usr/bin/dmedia-cli', 'GetEnv'])
+        env = json.loads(env_s)
+        env['url'] = env['url'].encode('ascii')
+        if 'oauth' in env:
+            env['oauth'] = dict(
+                (k.encode('ascii'), v.encode('ascii'))
+                for (k, v) in env['oauth'].items()
+            )
+        return env
 
 
 class FakeResponse(object):
@@ -53,6 +78,7 @@ class FakeResponse(object):
 
 
 class TestFunctions(TestCase):
+
     def test_random_id(self):
         _id = microfiber.random_id()
         if sys.version_info >= (3, 0):
@@ -79,42 +105,36 @@ class TestFunctions(TestCase):
         self.assertIsInstance(b, bytes)
         self.assertEqual(len(b) * 8, 80)
 
-    def test_dumps(self):
-        obj = [
-            {
-                '_id': random_id(),
-                '_rev': random_id(),
-                'foo': True,
-                'bar': None,
-                'hello': 17,
-                'world': 18.5,
-                'index': i,
-            }
-            for i in range(100)
-        ]
-        s = json.dumps(obj, sort_keys=True, separators=(',', ':'))
-        self.assertEqual(microfiber.dumps(obj), s.encode('UTF-8'))
+    def test_json_body(self):
+        doc = {
+            '_id': 'foo',
+            'bar': 'baz',
+            'hello': 'world',
+        }
+        json_str = json.dumps(doc, sort_keys=True, separators=(',',':'))
+        json_bytes = json_str.encode('utf-8')
 
-    def test_loads(self):
-        obj = [
-            {
-                '_id': random_id(),
-                '_rev': random_id(),
-                'foo': True,
-                'bar': None,
-                'hello': 17,
-                'world': 18.5,
-                'index': i,
-            }
-            for i in range(100)
-        ]
-        b = json.dumps(obj).encode('utf-8')
-        self.assertEqual(microfiber.loads(b), obj)
+        # Test with obj=None
+        self.assertIsNone(microfiber._json_body(None))
+
+        # Test when obj is a dict:
+        self.assertEqual(microfiber._json_body(doc), json_bytes)
+
+        # Test when obj is a pre-dumped str
+        self.assertEqual(microfiber._json_body(json_str), json_bytes)
+
+        # Test when obj is pre-encoded bytes
+        self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
+
+        # Test when obj is an io.BytesIO
+        obj = io.BytesIO(json_bytes)
+        self.assertIs(microfiber._json_body(obj), obj)
 
     def test_queryiter(self):
-        f = microfiber.queryiter
+        f = microfiber._queryiter
+        d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')
         self.assertEqual(
-            list(f(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')),
+            list(f(d)),
             [
                 ('aye', '10'),
                 ('bar', 'false'),
@@ -142,7 +162,7 @@ class TestFunctions(TestCase):
             update_seq=True,
         )
         self.assertEqual(
-            list(f(**options)),
+            list(f(options)),
             [
                 ('endkey', '"baz"'),
                 ('endkey_docid', 'V5XXVMUJHR3WKHLLJ4W2UMTL'),
@@ -162,15 +182,63 @@ class TestFunctions(TestCase):
             ]
         )
 
-    def test_query(self):
-        f = microfiber.query
+    def test_oauth_base_string(self):
+        f = microfiber._oauth_base_string
+
+        method = 'GET'
+        url = 'http://photos.example.net/photos'
+        params = {
+            'oauth_consumer_key': 'dpf43f3p2l4k3l03',
+            'oauth_token': 'nnch734d00sl2jdk',
+            'oauth_signature_method': 'HMAC-SHA1',
+            'oauth_timestamp': '1191242096',
+            'oauth_nonce': 'kllo9940pd9333jh',
+            'oauth_version': '1.0',
+            'file': 'vacation.jpg',
+            'size': 'original',
+        }
+        self.assertEqual(f(method, url, params), BASE_STRING)
+
+    def test_oauth_sign(self):
+        f = microfiber._oauth_sign
+
+        oauth = {
+            'consumer_secret': 'kd94hf93k423kf44',
+            'token_secret': 'pfkkdhi9sl3r4s00',
+        }
         self.assertEqual(
-            f(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app'),
-            'aye=10&bar=false&baz=null&foo=true&key=%22app%22&zee=17.5'
+            f(oauth, BASE_STRING),
+            'tR3+Ty81lMeYAr/Fid0kMTYa/WM='
         )
+
+    def test_oauth_header(self):
+        self.maxDiff = None
+        f = microfiber._oauth_header
+
+        oauth = {
+            'consumer_secret': 'kd94hf93k423kf44',
+            'token_secret': 'pfkkdhi9sl3r4s00',
+            'consumer_key': 'dpf43f3p2l4k3l03',
+            'token': 'nnch734d00sl2jdk',
+        }
+        method = 'GET'
+        baseurl = 'http://photos.example.net/photos'
+        query = {'file': 'vacation.jpg', 'size': 'original'}
+        testing = ('1191242096', 'kllo9940pd9333jh')
+
+        expected = ', '.join([
+            'OAuth realm=""',
+            'oauth_consumer_key="dpf43f3p2l4k3l03"',
+            'oauth_nonce="kllo9940pd9333jh"',
+            'oauth_signature="tR3%2BTy81lMeYAr%2FFid0kMTYa%2FWM%3D"',
+            'oauth_signature_method="HMAC-SHA1"',
+            'oauth_timestamp="1191242096"',
+            'oauth_token="nnch734d00sl2jdk"',
+            'oauth_version="1.0"',
+        ])
         self.assertEqual(
-            f(need='some space', bad='and+how', nauhty='you&you&you'),
-            'bad=and%2Bhow&nauhty=you%26you%26you&need=some+space'
+            f(oauth, method, baseurl, query, testing),
+            {'Authorization': expected},
         )
 
 
@@ -233,122 +301,57 @@ class TestCouchBase(TestCase):
         self.assertEqual(inst.url, 'https://localhost:5984/couch/')
         self.assertEqual(inst.basepath, '/couch/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
+        self.assertIsNone(inst.oauth)
 
         inst = self.klass(url='http://localhost:5984?/')
         self.assertEqual(inst.url, 'http://localhost:5984/')
         self.assertEqual(inst.basepath, '/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsNone(inst.oauth)
 
         inst = self.klass(url='http://localhost:5001/')
         self.assertEqual(inst.url, 'http://localhost:5001/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsNone(inst.oauth)
 
         inst = self.klass(url='http://localhost:5002')
         self.assertEqual(inst.url, 'http://localhost:5002/')
         self.assertIsInstance(inst.conn, HTTPConnection)
+        self.assertIsNone(inst.oauth)
 
         inst = self.klass(url='https://localhost:5003/')
         self.assertEqual(inst.url, 'https://localhost:5003/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
+        self.assertIsNone(inst.oauth)
 
         inst = self.klass(url='https://localhost:5004')
         self.assertEqual(inst.url, 'https://localhost:5004/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
+        self.assertIsNone(inst.oauth)
 
-    def test_path(self):
-        options = dict(
-            rev='1-3e812567',
-            foo=True,
-            bar=None,
-        )
-        inst = self.klass(url='http://localhost:5001/')
+        inst = self.klass(oauth='foo')
+        self.assertEqual(inst.oauth, 'foo')
 
-        self.assertEqual(inst.path(), '/')
+    def test_full_url(self):
+        inst = self.klass(url='https://localhost:5003/')
         self.assertEqual(
-            inst.path(**options),
-            '/?bar=null&foo=true&rev=1-3e812567'
-        )
-
-        self.assertEqual(inst.path('db', 'doc', 'att'), '/db/doc/att')
-        self.assertEqual(
-            inst.path('db', 'doc', 'att', **options),
-            '/db/doc/att?bar=null&foo=true&rev=1-3e812567'
-        )
-
-        self.assertEqual(inst.path('db/doc/att'), '/db/doc/att')
-        self.assertEqual(
-            inst.path('db/doc/att', **options),
-            '/db/doc/att?bar=null&foo=true&rev=1-3e812567'
-        )
-
-    def test_json(self):
-        class Subclass(self.klass):
-            def request(self, *args):
-                self._args = args
-                return 'fake response'
-
-        inst = Subclass()
-
-        headers = {'Content-Type': 'application/json'}
-        doc = {
-            '_id': 'foo',
-            'bar': 'baz',
-            'hello': 'world',
-        }
-        json_str = json.dumps(doc, sort_keys=True, separators=(',',':'))
-        json_bytes = json_str.encode('utf-8')
-
-        # Test with obj=None
-        self.assertEqual(
-            inst.json('PUT', None, 'foo', 'bar', okay=True),
-            'fake response'
+            inst._full_url('/'),
+            'https://localhost:5003/'
         )
         self.assertEqual(
-            inst._args,
-            ('PUT', '/foo/bar?okay=true', None, headers)
+            inst._full_url('/db/doc/att?bar=null&foo=true'),
+            'https://localhost:5003/db/doc/att?bar=null&foo=true'
         )
 
-        # Test when obj is a dict:
+        inst = self.klass(url='http://localhost:5003/mydb/')
         self.assertEqual(
-            inst.json('PUT', doc, 'foo', 'bar', okay=True),
-            'fake response'
+            inst._full_url('/'),
+            'http://localhost:5003/'
         )
         self.assertEqual(
-            inst._args,
-            ('PUT', '/foo/bar?okay=true', json_bytes, headers)
+            inst._full_url('/db/doc/att?bar=null&foo=true'),
+            'http://localhost:5003/db/doc/att?bar=null&foo=true'
         )
-
-        # Test when obj is a pre-encoded str
-        self.assertEqual(
-            inst.json('PUT', json_str, 'foo', 'bar', okay=True),
-            'fake response'
-        )
-        self.assertEqual(
-            inst._args,
-            ('PUT', '/foo/bar?okay=true', json_bytes, headers)
-        )
-
-        # Test when obj is pre-encoded bytes
-        self.assertEqual(
-            inst.json('PUT', json_bytes, 'foo', 'bar', okay=True),
-            'fake response'
-        )
-        self.assertEqual(
-            inst._args,
-            ('PUT', '/foo/bar?okay=true', json_bytes, headers)
-        )
-
-        # Test when obj is an io.BytesIO
-        obj = io.BytesIO(json_bytes)
-        self.assertEqual(
-            inst.json('PUT', obj, 'foo', 'bar', okay=True),
-            'fake response'
-        )
-        self.assertEqual(
-            inst._args,
-            ('PUT', '/foo/bar?okay=true', obj, headers)
-        )
-
 
 
 class TestServer(TestCase):
@@ -377,6 +380,9 @@ class TestServer(TestCase):
         self.assertEqual(inst.basepath, '/bar/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
+        inst = self.klass(oauth='bar')
+        self.assertEqual(inst.oauth, 'bar')
+
     def test_repr(self):
         inst = self.klass('http://localhost:5001/')
         self.assertEqual(repr(inst), "Server('http://localhost:5001/')")
@@ -389,6 +395,18 @@ class TestServer(TestCase):
 
         inst = self.klass('https://localhost:5004')
         self.assertEqual(repr(inst), "Server('https://localhost:5004/')")
+
+    def test_database(self):
+        s = microfiber.Server()
+        db = s.database('foo')
+        self.assertIsInstance(db, microfiber.Database)
+        self.assertIsNone(db.oauth)
+
+        s = microfiber.Server(oauth='bar')
+        self.assertEqual(s.oauth, 'bar')
+        db = s.database('foo')
+        self.assertIsInstance(db, microfiber.Database)
+        self.assertEqual(db.oauth, 'bar')
 
 
 class TestDatabase(TestCase):
@@ -418,6 +436,23 @@ class TestDatabase(TestCase):
             "Database('novacut', 'https://localhost:5004/')"
         )
 
+    def test_server(self):
+        db = microfiber.Database('foo')
+        self.assertIsNone(db.oauth)
+        s = db.server()
+        self.assertIsInstance(s, microfiber.Server)
+        self.assertEqual(s.url, 'http://localhost:5984/')
+        self.assertEqual(s.basepath, '/')
+        self.assertIsNone(s.oauth)
+
+        db = microfiber.Database('foo', 'https://example.com/bar', 'baz')
+        self.assertEqual(db.oauth, 'baz')
+        s = db.server()
+        self.assertIsInstance(s, microfiber.Server)
+        self.assertEqual(s.url, 'https://example.com/bar/')
+        self.assertEqual(s.basepath, '/bar/')
+        self.assertEqual(s.oauth, 'baz')
+
 
 class LiveTestCase(TestCase):
 
@@ -428,22 +463,40 @@ class LiveTestCase(TestCase):
             self.skipTest('{} not set'.format(key))
 
     def setUp(self):
-        self.url = self.getvar('MICROFIBER_TEST_URL')
         self.db = self.getvar('MICROFIBER_TEST_DB')
-        self.dburl = self.url + self.db
-        t = urlparse(self.dburl)
-        conn = HTTPConnection(t.netloc)
-        headers = {'Accept': 'application/json'}
-        conn.request('DELETE', t.path, None, headers)
-        r = conn.getresponse()
-        r.read()
+        if os.environ.get('MICROFIBER_TEST_DESKTOPCOUCH') == 'true':
+            env = get_env()
+            self.url = env['url']
+            self.oauth = env['oauth']
+        else:
+            self.url = self.getvar('MICROFIBER_TEST_URL')
+            self.oauth = None
+        cb = microfiber.CouchBase(self.url, self.oauth)
+        try:
+            cb.delete(self.db)
+        except microfiber.NotFound:
+            pass
 
 
 class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
+    def test_bad_status_line(self):
+        inst = self.klass(self.url, self.oauth)
+
+        # Create database
+        self.assertEqual(inst.put(None, self.db), {'ok': True})
+
+        # Create a doc:
+        inst.put({'hello': 'world'}, self.db, 'bar')
+
+        time.sleep(30)  # The connection should close, raising BadStatusLine
+
+        # Get the doc
+        doc = inst.get(self.db, 'bar')
+
     def test_put_att(self):
-        inst = self.klass(url=self.url)
+        inst = self.klass(self.url, self.oauth)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -521,7 +574,7 @@ class TestCouchBaseLive(LiveTestCase):
         )
 
     def test_put_post(self):
-        inst = self.klass(url=self.url)
+        inst = self.klass(self.url, self.oauth)
 
         ####################
         # Test requests to /
@@ -659,21 +712,8 @@ class TestCouchBaseLive(LiveTestCase):
 class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
-    def test_server(self):
-        inst = self.klass('foo')
-        s = inst.server()
-        self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'http://localhost:5984/')
-        self.assertEqual(s.basepath, '/')
-
-        inst = self.klass('baz', 'https://example.com/bar')
-        s = inst.server()
-        self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'https://example.com/bar/')
-        self.assertEqual(s.basepath, '/bar/')
-
     def test_ensure(self):
-        inst = self.klass(self.db, self.url)
+        inst = self.klass(self.db, self.url, self.oauth)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
@@ -682,7 +722,7 @@ class TestDatabaseLive(LiveTestCase):
         self.assertRaises(NotFound, inst.get)
 
     def test_save(self):
-        inst = self.klass(self.db, self.url)
+        inst = self.klass(self.db, self.url, self.oauth)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -719,7 +759,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulksave(self):
-        inst = self.klass(self.db, self.url)
+        inst = self.klass(self.db, self.url, self.oauth)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
