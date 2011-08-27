@@ -56,11 +56,11 @@ def random_id():
 
 if sys.version_info >= (3, 0):
     def get_env():
-        env_s = subprocess.check_output(['/usr/bin/dmedia-cli', 'GetEnv'])
+        env_s = subprocess.check_output(['/usr/bin/abstractcouch'])
         return json.loads(env_s.decode('utf-8'))
 else:
     def get_env():
-        env_s = subprocess.check_output(['/usr/bin/dmedia-cli', 'GetEnv'])
+        env_s = subprocess.check_output(['/usr/bin/abstractcouch'])
         env = json.loads(env_s)
         env['url'] = env['url'].encode('ascii')
         if 'oauth' in env:
@@ -489,11 +489,17 @@ class LiveTestCase(TestCase):
         if os.environ.get('MICROFIBER_TEST_DESKTOPCOUCH') == 'true':
             env = get_env()
             self.url = env['url']
-            self.oauth = env['oauth']
+            self.basic = env.get('basic')
+            if os.environ.get('MICROFIBER_TEST_BASIC_AUTH') == 'true':
+                # Force use of basic auth even if env['oauth'] exists
+                self.oauth = None
+            else:
+                self.oauth = env.get('oauth')
         else:
             self.url = self.getvar('MICROFIBER_TEST_URL')
             self.oauth = None
-        cb = microfiber.CouchBase(self.url, self.oauth)
+            self.basic = None
+        cb = microfiber.CouchBase(self.url, self.oauth, self.basic)
         try:
             cb.delete(self.db)
         except microfiber.NotFound:
@@ -504,7 +510,7 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
-        inst = self.klass(self.url, self.oauth)
+        inst = self.klass(self.url, self.oauth, self.basic)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -518,7 +524,7 @@ class TestCouchBaseLive(LiveTestCase):
         doc = inst.get(self.db, 'bar')
 
     def test_put_att(self):
-        inst = self.klass(self.url, self.oauth)
+        inst = self.klass(self.url, self.oauth, self.basic)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -596,7 +602,7 @@ class TestCouchBaseLive(LiveTestCase):
         )
 
     def test_put_post(self):
-        inst = self.klass(self.url, self.oauth)
+        inst = self.klass(self.url, self.oauth, self.basic)
 
         ####################
         # Test requests to /
@@ -735,7 +741,7 @@ class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
-        inst = self.klass(self.db, self.url, self.oauth)
+        inst = self.klass(self.db, self.url, self.oauth, self.basic)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
@@ -744,7 +750,7 @@ class TestDatabaseLive(LiveTestCase):
         self.assertRaises(NotFound, inst.get)
 
     def test_save(self):
-        inst = self.klass(self.db, self.url, self.oauth)
+        inst = self.klass(self.db, self.url, self.oauth, self.basic)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -781,7 +787,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulksave(self):
-        inst = self.klass(self.db, self.url, self.oauth)
+        inst = self.klass(self.db, self.url, self.oauth, self.basic)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
