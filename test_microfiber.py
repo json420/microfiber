@@ -339,6 +339,20 @@ class TestCouchBase(TestCase):
 
         inst = self.klass(oauth='foo')
         self.assertEqual(inst.oauth, 'foo')
+        
+        # Test with basic auth:
+        basic = {'username': 'Aladdin', 'password': 'open sesame'}
+        inst = self.klass(basic=basic)
+        self.assertIs(inst.basic, basic)
+        self.assertEqual(
+            inst._basic_auth_header,
+            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+        )
+        
+        inst = self.klass(oauth='foo', basic=basic)
+        self.assertEqual(inst.oauth, 'foo')
+        self.assertIs(inst.basic, basic)
+        self.assertIsNone(inst._basic_auth_header)
 
     def test_full_url(self):
         inst = self.klass(url='https://localhost:5003/')
