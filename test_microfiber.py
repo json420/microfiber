@@ -241,6 +241,14 @@ class TestFunctions(TestCase):
             {'Authorization': expected},
         )
 
+    def test_basic_auth_header(self):
+        f = microfiber._basic_auth_header
+        basic = {'username': 'Aladdin', 'password': 'open sesame'}
+        self.assertEqual(
+            f(basic),
+            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+        )
+
 
 class TestErrors(TestCase):
     def test_errors(self):

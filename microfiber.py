@@ -236,6 +236,12 @@ def _oauth_header(oauth, method, baseurl, query, testing=None):
     return {'Authorization': value}
 
 
+def _basic_auth_header(basic):
+    b = '{username}:{password}'.format(**basic).encode('utf-8')
+    b64 = b64encode(b).decode('utf-8')
+    return {'Authorization': 'Basic ' + b64}
+
+
 class HTTPError(Exception):
     """
     Base class for custom `microfiber` exceptions.
