@@ -47,7 +47,8 @@ class Test(Command):
 
     user_options = [
         ('live', None, 'also run live tests against running CouchDB'),
-        ('dc', None, 'live against desktopcouch using `dmedia-cli GetEnv`'),
+        ('dc', None, 'test with desktopcouch using `/usr/bin/abstractcouch`'),
+        ('basic', None, 'force desktopcouch couch tests to use basic auth'),
         ('url=', None,
             'live test server URL; default is {!r}'.format(microfiber.SERVER)
         ),
@@ -59,6 +60,7 @@ class Test(Command):
     def initialize_options(self):
         self.live = 0
         self.dc = 0
+        self.basic = 0
         self.url = microfiber.SERVER
         self.db = TEST_DB
 
@@ -75,6 +77,8 @@ class Test(Command):
             os.environ['MICROFIBER_TEST_URL'] = self.url
         if self.dc:
             os.environ['MICROFIBER_TEST_DESKTOPCOUCH'] = 'true'
+        if self.basic:
+            os.environ['MICROFIBER_TEST_BASIC_AUTH'] = 'true'
 
         pynames = ['microfiber', 'test_microfiber']
 

@@ -236,6 +236,12 @@ def _oauth_header(oauth, method, baseurl, query, testing=None):
     return {'Authorization': value}
 
 
+def _basic_auth_header(basic):
+    b = '{username}:{password}'.format(**basic).encode('utf-8')
+    b64 = b64encode(b).decode('utf-8')
+    return {'Authorization': 'Basic ' + b64}
+
+
 class HTTPError(Exception):
     """
     Base class for custom `microfiber` exceptions.
@@ -384,7 +390,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, url=SERVER, oauth=None):
+    def __init__(self, url=SERVER, oauth=None, basic=None):
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -397,6 +403,11 @@ class CouchBase(object):
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
         self.url = self._full_url(self.basepath)
         self.oauth = oauth
+        self.basic = basic
+        if self.basic and not self.oauth:
+            self._basic_auth_header = _basic_auth_header(self.basic)
+        else:
+            self._basic_auth_header = None
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
@@ -417,6 +428,8 @@ class CouchBase(object):
             h.update(
                 _oauth_header(self.oauth, method, baseurl, dict(query))
             )
+        elif self._basic_auth_header:
+            h.update(self._basic_auth_header)
         if query:
             path = '?'.join([path, urlencode(query)])
         for retry in range(2):
@@ -598,8 +611,8 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, url=SERVER, oauth=None):
-        super(Server, self).__init__(url, oauth)
+    def __init__(self, url=SERVER, oauth=None, basic=None):
+        super(Server, self).__init__(url, oauth, basic)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -608,7 +621,7 @@ class Server(CouchBase):
         """
         Return a new `Database` instance for the database *name*.
         """
-        db = Database(name, self.url, self.oauth)
+        db = Database(name, self.url, self.oauth, self.basic)
         if ensure:
             db.ensure()
         return db
@@ -639,8 +652,8 @@ class Database(CouchBase):
         * `Database.bulksave(docs)` - as above, but with a list of docs
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, url=SERVER, oauth=None):
-        super(Database, self).__init__(url, oauth)
+    def __init__(self, name, url=SERVER, oauth=None, basic=None):
+        super(Database, self).__init__(url, oauth, basic)
         self.name = name
         self.basepath += (name + '/')
 
@@ -653,7 +666,7 @@ class Database(CouchBase):
         """
         Return a `Server` instance pointing at the same URL as this database.
         """
-        return Server(self.url, self.oauth)
+        return Server(self.url, self.oauth, self.basic)
 
     def ensure(self):
         """
