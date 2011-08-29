@@ -54,22 +54,17 @@ def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
 
 
+DC3_CMD = ['/usr/bin/dc3-control', 'GetEnv']
 if sys.version_info >= (3, 0):
     def get_env():
-        env_s = subprocess.check_output(['/usr/bin/abstractcouch'])
+        env_s = subprocess.check_output(DC3_CMD)
         return json.loads(env_s.decode('utf-8'))
 else:
     def get_env():
-        env_s = subprocess.check_output(['/usr/bin/abstractcouch'])
+        env_s = subprocess.check_output(DC3_CMD)
         env = json.loads(env_s)
-        env['url'] = env['url'].encode('ascii')
-        if 'oauth' in env:
-            env['oauth'] = dict(
-                (k.encode('ascii'), v.encode('ascii'))
-                for (k, v) in env['oauth'].items()
-            )
+        env['url'] = env['url'].encode('utf-8')
         return env
-
 
 class FakeResponse(object):
     def __init__(self, status, reason):
@@ -486,7 +481,7 @@ class LiveTestCase(TestCase):
 
     def setUp(self):
         self.db = self.getvar('MICROFIBER_TEST_DB')
-        if os.environ.get('MICROFIBER_TEST_DESKTOPCOUCH') == 'true':
+        if os.environ.get('MICROFIBER_TEST_DC3') == 'true':
             env = get_env()
             self.url = env['url']
             self.basic = env.get('basic')
