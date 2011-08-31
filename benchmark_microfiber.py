@@ -5,6 +5,7 @@ from base64 import b32encode
 import time
 import platform
 import json
+import optparse
 
 import microfiber
 
@@ -12,7 +13,28 @@ name = 'test_benchmark_microfiber'
 count = 2000
 keys = 50
 
-s = microfiber.Server()
+
+parser = optparse.OptionParser()
+parser.add_option('--dc3',
+    help='benchmark against dc3',
+    action='store_true',
+    default=False,
+)
+parser.add_option('--basic',
+    help='when used with --dc3, forces basic auth',
+    action='store_true',
+    default=False,
+)
+(options, args) = parser.parse_args()
+if options.dc3:
+    env = microfiber.dc3_env()
+    if options.basic:
+        env['oauth'] = None
+else:
+    env = microfiber.SERVER
+
+
+s = microfiber.Server(env)
 try:
     s.delete(name)
 except microfiber.NotFound:

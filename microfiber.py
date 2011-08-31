@@ -107,6 +107,7 @@ from json import dumps, loads
 import time
 from hashlib import sha1
 import hmac
+import subprocess
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode, quote_plus
     from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
@@ -143,6 +144,7 @@ __all__ = (
 __version__ = '11.09.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
+DC3_CMD = ('/usr/bin/dc3-control', 'GetEnv')
 
 
 def random_id():
@@ -174,6 +176,18 @@ def random_id2():
         str(int(time.time())),
         b32encode(urandom(10)).decode('utf-8')
     ])
+
+
+if sys.version_info >= (3, 0):
+    def dc3_env():
+        env_s = subprocess.check_output(DC3_CMD)
+        return loads(env_s.decode('utf-8'))
+else:
+    def dc3_env():
+        env_s = subprocess.check_output(DC3_CMD)
+        env = loads(env_s)
+        env['url'] = env['url'].encode('utf-8')
+        return env
 
 
 if sys.version_info >= (3, 0):
@@ -399,7 +413,10 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, url=SERVER, oauth=None, basic=None):
+    def __init__(self, env=SERVER):
+        self.env = ({'url': env} if isinstance(env, str) else env)
+        assert isinstance(self.env, dict)
+        url = self.env.get('url', SERVER)
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -411,12 +428,8 @@ class CouchBase(object):
         self.netloc = t.netloc
         self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
         self.url = self._full_url(self.basepath)
-        self.oauth = oauth
-        self.basic = basic
-        if self.basic and not self.oauth:
-            self._basic_auth_header = _basic_auth_header(self.basic)
-        else:
-            self._basic_auth_header = None
+        self._oauth = self.env.get('oauth')
+        self._basic = self.env.get('basic')
         klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
         self.conn = klass(t.netloc)
 
@@ -432,13 +445,13 @@ class CouchBase(object):
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        if self.oauth:
+        if self._oauth:
             baseurl = self._full_url(path)
             h.update(
-                _oauth_header(self.oauth, method, baseurl, dict(query))
+                _oauth_header(self._oauth, method, baseurl, dict(query))
             )
-        elif self._basic_auth_header:
-            h.update(self._basic_auth_header)
+        elif self._basic:
+            h.update(_basic_auth_header(self._basic))
         if query:
             path = '?'.join([path, urlencode(query)])
         for retry in range(2):
@@ -620,8 +633,8 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, url=SERVER, oauth=None, basic=None):
-        super(Server, self).__init__(url, oauth, basic)
+    def __init__(self, env=SERVER):
+        super(Server, self).__init__(env)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -630,7 +643,7 @@ class Server(CouchBase):
         """
         Return a new `Database` instance for the database *name*.
         """
-        db = Database(name, self.url, self.oauth, self.basic)
+        db = Database(name, self.env)
         if ensure:
             db.ensure()
         return db
@@ -661,8 +674,8 @@ class Database(CouchBase):
         * `Database.bulksave(docs)` - as above, but with a list of docs
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, url=SERVER, oauth=None, basic=None):
-        super(Database, self).__init__(url, oauth, basic)
+    def __init__(self, name, env=SERVER):
+        super(Database, self).__init__(env)
         self.name = name
         self.basepath += (name + '/')
 
@@ -675,7 +688,7 @@ class Database(CouchBase):
         """
         Return a `Server` instance pointing at the same URL as this database.
         """
-        return Server(self.url, self.oauth, self.basic)
+        return Server(self.env)
 
     def ensure(self):
         """

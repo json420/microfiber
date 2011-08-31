@@ -58,18 +58,6 @@ def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
 
 
-DC3_CMD = ['/usr/bin/dc3-control', 'GetEnv']
-if sys.version_info >= (3, 0):
-    def get_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        return json.loads(env_s.decode('utf-8'))
-else:
-    def get_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        env = json.loads(env_s)
-        env['url'] = env['url'].encode('utf-8')
-        return env
-
 class FakeResponse(object):
     def __init__(self, status, reason):
         self.status = status
@@ -319,7 +307,7 @@ class TestCouchBase(TestCase):
     def test_init(self):
         bad = 'sftp://localhost:5984/'
         with self.assertRaises(ValueError) as cm:
-            inst = self.klass(url=bad)
+            inst = self.klass(bad)
         self.assertEqual(
             str(cm.exception),
             'url scheme must be http or https: {!r}'.format(bad)
@@ -327,63 +315,58 @@ class TestCouchBase(TestCase):
 
         bad = 'http:localhost:5984/foo/bar'
         with self.assertRaises(ValueError) as cm:
-            inst = self.klass(url=bad)
+            inst = self.klass(bad)
         self.assertEqual(
             str(cm.exception),
             'bad url: {!r}'.format(bad)
         )
 
-        inst = self.klass(url='https://localhost:5984/couch?foo=bar/')
+        inst = self.klass('https://localhost:5984/couch?foo=bar/')
         self.assertEqual(inst.url, 'https://localhost:5984/couch/')
         self.assertEqual(inst.basepath, '/couch/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIsNone(inst.oauth)
+        self.assertIsNone(inst._oauth)
+        self.assertIsNone(inst._basic)
 
-        inst = self.klass(url='http://localhost:5984?/')
+        inst = self.klass('http://localhost:5984?/')
         self.assertEqual(inst.url, 'http://localhost:5984/')
         self.assertEqual(inst.basepath, '/')
         self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIsNone(inst.oauth)
+        self.assertIsNone(inst._oauth)
+        self.assertIsNone(inst._basic)
 
-        inst = self.klass(url='http://localhost:5001/')
+        inst = self.klass('http://localhost:5001/')
         self.assertEqual(inst.url, 'http://localhost:5001/')
         self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIsNone(inst.oauth)
+        self.assertIsNone(inst._oauth)
+        self.assertIsNone(inst._basic)
 
-        inst = self.klass(url='http://localhost:5002')
+        inst = self.klass('http://localhost:5002')
         self.assertEqual(inst.url, 'http://localhost:5002/')
         self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIsNone(inst.oauth)
+        self.assertIsNone(inst._oauth)
+        self.assertIsNone(inst._basic)
 
-        inst = self.klass(url='https://localhost:5003/')
+        inst = self.klass('https://localhost:5003/')
         self.assertEqual(inst.url, 'https://localhost:5003/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIsNone(inst.oauth)
+        self.assertIsNone(inst._oauth)
+        self.assertIsNone(inst._basic)
 
-        inst = self.klass(url='https://localhost:5004')
+        inst = self.klass('https://localhost:5004')
         self.assertEqual(inst.url, 'https://localhost:5004/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIsNone(inst.oauth)
+        self.assertIsNone(inst._oauth)
+        self.assertIsNone(inst._basic)
 
-        inst = self.klass(oauth='foo')
-        self.assertEqual(inst.oauth, 'foo')
+        inst = self.klass({'oauth': 'foo'})
+        self.assertEqual(inst._oauth, 'foo')
         
-        # Test with basic auth:
-        basic = {'username': 'Aladdin', 'password': 'open sesame'}
-        inst = self.klass(basic=basic)
-        self.assertIs(inst.basic, basic)
-        self.assertEqual(
-            inst._basic_auth_header,
-            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
-        )
-        
-        inst = self.klass(oauth='foo', basic=basic)
-        self.assertEqual(inst.oauth, 'foo')
-        self.assertIs(inst.basic, basic)
-        self.assertIsNone(inst._basic_auth_header)
+        inst = self.klass({'basic': 'bar'})
+        self.assertEqual(inst._basic, 'bar')
 
     def test_full_url(self):
-        inst = self.klass(url='https://localhost:5003/')
+        inst = self.klass('https://localhost:5003/')
         self.assertEqual(
             inst._full_url('/'),
             'https://localhost:5003/'
@@ -393,7 +376,7 @@ class TestCouchBase(TestCase):
             'https://localhost:5003/db/doc/att?bar=null&foo=true'
         )
 
-        inst = self.klass(url='http://localhost:5003/mydb/')
+        inst = self.klass('http://localhost:5003/mydb/')
         self.assertEqual(
             inst._full_url('/'),
             'http://localhost:5003/'
@@ -430,8 +413,8 @@ class TestServer(TestCase):
         self.assertEqual(inst.basepath, '/bar/')
         self.assertIsInstance(inst.conn, HTTPSConnection)
 
-        inst = self.klass(oauth='bar')
-        self.assertEqual(inst.oauth, 'bar')
+        inst = self.klass({'oauth': 'bar'})
+        self.assertEqual(inst._oauth, 'bar')
 
     def test_repr(self):
         inst = self.klass('http://localhost:5001/')
@@ -448,15 +431,18 @@ class TestServer(TestCase):
 
     def test_database(self):
         s = microfiber.Server()
-        db = s.database('foo')
+        db = s.database('mydb')
         self.assertIsInstance(db, microfiber.Database)
-        self.assertIsNone(db.oauth)
-
-        s = microfiber.Server(oauth='bar')
-        self.assertEqual(s.oauth, 'bar')
-        db = s.database('foo')
+        self.assertIsNone(db._basic)
+        self.assertIsNone(db._oauth)
+        
+        s = microfiber.Server({'basic': 'foo', 'oauth': 'bar'})
+        self.assertEqual(s._basic, 'foo')
+        self.assertEqual(s._oauth, 'bar')
+        db = s.database('mydb')
         self.assertIsInstance(db, microfiber.Database)
-        self.assertEqual(db.oauth, 'bar')
+        self.assertEqual(s._basic, 'foo')
+        self.assertEqual(s._oauth, 'bar')
 
 
 class TestDatabase(TestCase):
@@ -487,21 +473,27 @@ class TestDatabase(TestCase):
         )
 
     def test_server(self):
-        db = microfiber.Database('foo')
-        self.assertIsNone(db.oauth)
+        db = microfiber.Database('mydb')
+        self.assertIsNone(db._basic)
+        self.assertIsNone(db._oauth)
         s = db.server()
         self.assertIsInstance(s, microfiber.Server)
         self.assertEqual(s.url, 'http://localhost:5984/')
         self.assertEqual(s.basepath, '/')
-        self.assertIsNone(s.oauth)
+        self.assertIsNone(s._basic)
+        self.assertIsNone(s._oauth)
 
-        db = microfiber.Database('foo', 'https://example.com/bar', 'baz')
-        self.assertEqual(db.oauth, 'baz')
+        db = microfiber.Database('mydb',
+            {'url': 'https://example.com/stuff', 'basic': 'foo', 'oauth': 'bar'}
+        )
+        self.assertEqual(db._basic, 'foo')
+        self.assertEqual(db._oauth, 'bar')
         s = db.server()
         self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'https://example.com/bar/')
-        self.assertEqual(s.basepath, '/bar/')
-        self.assertEqual(s.oauth, 'baz')
+        self.assertEqual(s.url, 'https://example.com/stuff/')
+        self.assertEqual(s.basepath, '/stuff/')
+        self.assertEqual(s._basic, 'foo')
+        self.assertEqual(s._oauth, 'bar')
 
 
 class LiveTestCase(TestCase):
@@ -515,19 +507,13 @@ class LiveTestCase(TestCase):
     def setUp(self):
         self.db = self.getvar('MICROFIBER_TEST_DB')
         if os.environ.get('MICROFIBER_TEST_DC3') == 'true':
-            env = get_env()
-            self.url = env['url']
-            self.basic = env.get('basic')
+            self.env = microfiber.dc3_env()
             if os.environ.get('MICROFIBER_TEST_BASIC_AUTH') == 'true':
                 # Force use of basic auth even if env['oauth'] exists
-                self.oauth = None
-            else:
-                self.oauth = env.get('oauth')
+                self.env['oauth'] = None
         else:
-            self.url = self.getvar('MICROFIBER_TEST_URL')
-            self.oauth = None
-            self.basic = None
-        cb = microfiber.CouchBase(self.url, self.oauth, self.basic)
+            self.env = {'url': self.getvar('MICROFIBER_TEST_URL')}
+        cb = microfiber.CouchBase(self.env)
         try:
             cb.delete(self.db)
         except microfiber.NotFound:
@@ -538,7 +524,7 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
-        inst = self.klass(self.url, self.oauth, self.basic)
+        inst = self.klass(self.env)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -552,7 +538,7 @@ class TestCouchBaseLive(LiveTestCase):
         doc = inst.get(self.db, 'bar')
 
     def test_put_att(self):
-        inst = self.klass(self.url, self.oauth, self.basic)
+        inst = self.klass(self.env)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -637,7 +623,7 @@ class TestCouchBaseLive(LiveTestCase):
         )
 
     def test_put_post(self):
-        inst = self.klass(self.url, self.oauth, self.basic)
+        inst = self.klass(self.env)
 
         ####################
         # Test requests to /
@@ -776,7 +762,7 @@ class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
-        inst = self.klass(self.db, self.url, self.oauth, self.basic)
+        inst = self.klass(self.db, self.env)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
@@ -785,7 +771,7 @@ class TestDatabaseLive(LiveTestCase):
         self.assertRaises(NotFound, inst.get)
 
     def test_save(self):
-        inst = self.klass(self.db, self.url, self.oauth, self.basic)
+        inst = self.klass(self.db, self.env)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -822,7 +808,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulksave(self):
-        inst = self.klass(self.db, self.url, self.oauth, self.basic)
+        inst = self.klass(self.db, self.env)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
