@@ -431,13 +431,13 @@ class CouchBase(object):
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        if self.oauth:
+        if self._oauth:
             baseurl = self._full_url(path)
             h.update(
-                _oauth_header(self.oauth, method, baseurl, dict(query))
+                _oauth_header(self._oauth, method, baseurl, dict(query))
             )
-        elif self._basic_auth_header:
-            h.update(self._basic_auth_header)
+        elif self._basic:
+            h.update(_basic_auth_header(self._basic))
         if query:
             path = '?'.join([path, urlencode(query)])
         for retry in range(2):

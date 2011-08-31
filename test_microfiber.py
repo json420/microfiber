@@ -519,19 +519,13 @@ class LiveTestCase(TestCase):
     def setUp(self):
         self.db = self.getvar('MICROFIBER_TEST_DB')
         if os.environ.get('MICROFIBER_TEST_DC3') == 'true':
-            env = get_env()
-            self.url = env['url']
-            self.basic = env.get('basic')
+            self.env = get_env()
             if os.environ.get('MICROFIBER_TEST_BASIC_AUTH') == 'true':
                 # Force use of basic auth even if env['oauth'] exists
-                self.oauth = None
-            else:
-                self.oauth = env.get('oauth')
+                self.env['oauth'] = None
         else:
-            self.url = self.getvar('MICROFIBER_TEST_URL')
-            self.oauth = None
-            self.basic = None
-        cb = microfiber.CouchBase(self.url, self.oauth, self.basic)
+            self.env = {'url': self.getvar('MICROFIBER_TEST_URL')}
+        cb = microfiber.CouchBase(self.env)
         try:
             cb.delete(self.db)
         except microfiber.NotFound:
@@ -542,7 +536,7 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
-        inst = self.klass(self.url, self.oauth, self.basic)
+        inst = self.klass(self.env)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -556,7 +550,7 @@ class TestCouchBaseLive(LiveTestCase):
         doc = inst.get(self.db, 'bar')
 
     def test_put_att(self):
-        inst = self.klass(self.url, self.oauth, self.basic)
+        inst = self.klass(self.env)
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -641,7 +635,7 @@ class TestCouchBaseLive(LiveTestCase):
         )
 
     def test_put_post(self):
-        inst = self.klass(self.url, self.oauth, self.basic)
+        inst = self.klass(self.env)
 
         ####################
         # Test requests to /
@@ -780,7 +774,7 @@ class TestDatabaseLive(LiveTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
-        inst = self.klass(self.db, self.url, self.oauth, self.basic)
+        inst = self.klass(self.db, self.env)
         self.assertRaises(NotFound, inst.get)
         self.assertIsNone(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
@@ -789,7 +783,7 @@ class TestDatabaseLive(LiveTestCase):
         self.assertRaises(NotFound, inst.get)
 
     def test_save(self):
-        inst = self.klass(self.db, self.url, self.oauth, self.basic)
+        inst = self.klass(self.db, self.env)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -826,7 +820,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulksave(self):
-        inst = self.klass(self.db, self.url, self.oauth, self.basic)
+        inst = self.klass(self.db, self.env)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
