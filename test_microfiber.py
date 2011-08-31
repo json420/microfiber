@@ -36,6 +36,7 @@ import json
 import subprocess
 import time
 import io
+from hashlib import md5
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode
     from http.client import HTTPConnection, HTTPSConnection
@@ -526,6 +527,7 @@ class TestCouchBaseLive(LiveTestCase):
 
         mime = 'image/jpeg'
         data = os.urandom(2001)
+        digest = b64encode(md5(data).digest()).decode('utf-8')
 
         # Try to GET attachment that doesn't exist:
         self.assertRaises(NotFound, inst.get_att, self.db, 'doc1', 'att')
@@ -541,16 +543,21 @@ class TestCouchBaseLive(LiveTestCase):
         self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
         self.assertEqual(doc['_id'], 'doc1')
         self.assertEqual(doc['_rev'], r['rev'])
+        self.assertEqual(set(doc['_attachments']), set(['att']))
+        att = doc['_attachments']['att']
         self.assertEqual(
-            doc['_attachments'],
-            {
-                'att': {
-                    'content_type': mime,
-                    'data': b64encode(data).decode('ascii'),
-                    'revpos': 1,
-                },
-            }
+            set(att),
+            set([
+                'content_type',
+                'data',
+                'digest',
+                'revpos',   
+            ])
         )
+        self.assertEqual(att['content_type'], mime)
+        self.assertEqual(att['digest'], 'md5-{}'.format(digest))
+        self.assertEqual(att['revpos'], 1)
+        self.assertEqual(att['data'], b64encode(data).decode('utf-8'))
 
         # GET the attachment
         self.assertEqual(
@@ -586,6 +593,7 @@ class TestCouchBaseLive(LiveTestCase):
                     'content_type': mime,
                     'data': b64encode(data).decode('ascii'),
                     'revpos': 1,
+                    'digest': 'md5-{}'.format(digest),
                 },
             }
         )
@@ -606,7 +614,7 @@ class TestCouchBaseLive(LiveTestCase):
         self.assertRaises(MethodNotAllowed, inst.delete)
         self.assertEqual(
             inst.get(),
-            {'couchdb': 'Welcome', 'version': '1.0.1'}
+            {'couchdb': 'Welcome', 'version': '1.1.0'}
         )
 
 
