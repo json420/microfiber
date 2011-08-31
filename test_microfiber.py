@@ -138,9 +138,6 @@ class TestFunctions(TestCase):
             b'["one",true,3]'
         )
 
-        # Test when obj is pre-encoded bytes
-        self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
-
         # Test when obj is an io.BytesIO
         obj = io.BytesIO(json_bytes)
         self.assertIs(microfiber._json_body(obj), obj)
@@ -154,6 +151,12 @@ class TestFunctions(TestCase):
             self.assertIs(microfiber._json_body(fp), fp)
         finally:
             shutil.rmtree(d)
+            
+        # FIXME: There is no way to do this correctly in Python2
+        if sys.version_info < (3, 0):
+            return
+        # Test when obj is pre-encoded bytes
+        self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
 
     def test_queryiter(self):
         f = microfiber._queryiter

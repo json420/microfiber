@@ -176,20 +176,20 @@ def random_id2():
     ])
 
 
-def _json_body(obj):
-    if isinstance(obj, (dict, list)):
+if sys.version_info >= (3, 0):
+    def _json_body(obj):
+        if obj is None:
+            return None
+        if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
+            return obj
         return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
-    elif isinstance(obj, strtype):
-        return obj.encode('utf-8')
-    return obj
-
-
-def _json_body(obj):
-    if obj is None:
-        return None
-    if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
-        return obj
-    return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+else:
+    def _json_body(obj):
+        if obj is None:
+            return None
+        if isinstance(obj, (file, io.BytesIO)):
+            return obj
+        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
 def _queryiter(options):
