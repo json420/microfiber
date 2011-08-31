@@ -30,12 +30,15 @@ Unit tests for `microfiber` module.
 import sys
 from unittest import TestCase
 import os
+from os import path
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
 import subprocess
 import time
 import io
+import tempfile
+import shutil
 from hashlib import md5
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode
@@ -108,6 +111,7 @@ class TestFunctions(TestCase):
             'hello': 'world',
         }
         json_str = json.dumps(doc, sort_keys=True, separators=(',',':'))
+        json_str2 = json.dumps(json_str, sort_keys=True, separators=(',',':'))
         json_bytes = json_str.encode('utf-8')
 
         # Test with obj=None
@@ -117,7 +121,22 @@ class TestFunctions(TestCase):
         self.assertEqual(microfiber._json_body(doc), json_bytes)
 
         # Test when obj is a pre-dumped str
-        self.assertEqual(microfiber._json_body(json_str), json_bytes)
+        self.assertEqual(
+            microfiber._json_body(json_str),
+            json_str2.encode('utf-8')
+        )
+        
+        # Test other stuff that should get JSON encoded:
+        self.assertEqual(microfiber._json_body(True), b'true')
+        self.assertEqual(microfiber._json_body(False), b'false')
+        self.assertEqual(microfiber._json_body('hello'), b'"hello"')
+        self.assertEqual(microfiber._json_body(18), b'18')
+        self.assertEqual(microfiber._json_body(17.9), b'17.9')
+        self.assertEqual(microfiber._json_body({}), b'{}')
+        self.assertEqual(
+            microfiber._json_body(['one', True, 3]),
+            b'["one",true,3]'
+        )
 
         # Test when obj is pre-encoded bytes
         self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
@@ -125,6 +144,16 @@ class TestFunctions(TestCase):
         # Test when obj is an io.BytesIO
         obj = io.BytesIO(json_bytes)
         self.assertIs(microfiber._json_body(obj), obj)
+        
+        # Test when obj in an open file
+        d = tempfile.mkdtemp()
+        try:
+            f = path.join(d, 'foo.json')
+            open(f, 'wb').write(b'["one",true,3]')
+            fp = open(f, 'rb')
+            self.assertIs(microfiber._json_body(fp), fp)
+        finally:
+            shutil.rmtree(d)
 
     def test_queryiter(self):
         f = microfiber._queryiter

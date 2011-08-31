@@ -101,6 +101,7 @@ For python-couchdb documentation, see:
 
 import sys
 from os import urandom
+import io
 from base64 import b32encode, b64encode
 from json import dumps, loads
 import time
@@ -181,6 +182,14 @@ def _json_body(obj):
     elif isinstance(obj, strtype):
         return obj.encode('utf-8')
     return obj
+
+
+def _json_body(obj):
+    if obj is None:
+        return None
+    if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
+        return obj
+    return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
 def _queryiter(options):
