@@ -58,18 +58,6 @@ def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
 
 
-DC3_CMD = ['/usr/bin/dc3-control', 'GetEnv']
-if sys.version_info >= (3, 0):
-    def get_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        return json.loads(env_s.decode('utf-8'))
-else:
-    def get_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        env = json.loads(env_s)
-        env['url'] = env['url'].encode('utf-8')
-        return env
-
 class FakeResponse(object):
     def __init__(self, status, reason):
         self.status = status
@@ -519,7 +507,7 @@ class LiveTestCase(TestCase):
     def setUp(self):
         self.db = self.getvar('MICROFIBER_TEST_DB')
         if os.environ.get('MICROFIBER_TEST_DC3') == 'true':
-            self.env = get_env()
+            self.env = microfiber.dc3_env()
             if os.environ.get('MICROFIBER_TEST_BASIC_AUTH') == 'true':
                 # Force use of basic auth even if env['oauth'] exists
                 self.env['oauth'] = None

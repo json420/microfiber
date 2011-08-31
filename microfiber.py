@@ -107,6 +107,7 @@ from json import dumps, loads
 import time
 from hashlib import sha1
 import hmac
+import subprocess
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse, urlencode, quote_plus
     from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
@@ -143,6 +144,7 @@ __all__ = (
 __version__ = '11.09.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
+DC3_CMD = ('/usr/bin/dc3-control', 'GetEnv')
 
 
 def random_id():
@@ -174,6 +176,18 @@ def random_id2():
         str(int(time.time())),
         b32encode(urandom(10)).decode('utf-8')
     ])
+
+
+if sys.version_info >= (3, 0):
+    def dc3_env():
+        env_s = subprocess.check_output(DC3_CMD)
+        return loads(env_s.decode('utf-8'))
+else:
+    def dc3_env():
+        env_s = subprocess.check_output(DC3_CMD)
+        env = loads(env_s)
+        env['url'] = env['url'].encode('utf-8')
+        return env
 
 
 if sys.version_info >= (3, 0):
