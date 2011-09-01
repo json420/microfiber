@@ -9,8 +9,8 @@ is documented here.  For more details, see the full `CouchDB REST API`_.
 .. _`CouchDB REST API`: http://www.couchbase.org/sites/default/files/uploads/all/documentation/couchbase-api.html
 
 
-Database Methods
-================
+Databases
+=========
 
 All the following database method examples assume you started out with this:
 
@@ -19,8 +19,8 @@ All the following database method examples assume you started out with this:
 >>> server = Server()
 
 
-Create a database
------------------
+Create
+------
 
 >>> database.put(None)
 {'ok': True}
@@ -28,8 +28,8 @@ Create a database
 {'ok': True}
 
 
-Database info
--------------
+Info
+----
 
 >>> database.get()
 {'update_seq': 0, 'disk_size': 79, 'purge_seq': 0, 'doc_count': 0, 'compact_running': False, 'db_name': 'db1', 'doc_del_count': 0, 'instance_start_time': '1314870632421649', 'committed_update_seq': 0, 'disk_format_version': 5}
@@ -37,8 +37,8 @@ Database info
 {'update_seq': 0, 'disk_size': 79, 'purge_seq': 0, 'doc_count': 0, 'compact_running': False, 'db_name': 'db2', 'doc_del_count': 0, 'instance_start_time': '1314870646021676', 'committed_update_seq': 0, 'disk_format_version': 5}
 
 
-Database changes
-----------------
+Changes
+-------
 
 >>> database.get('_changes')
 {'last_seq': 0, 'results': []}
@@ -46,8 +46,8 @@ Database changes
 {'last_seq': 0, 'results': []}
 
 
-Compact a database
-------------------
+Compact
+-------
 
 >>> database.post(None, '_compact')
 {'ok': True}
@@ -55,8 +55,8 @@ Compact a database
 {'ok': True}
 
 
-Delete a database
------------------
+Delete
+------
 
 >>> database.delete()
 {'ok': True}
@@ -65,8 +65,13 @@ Delete a database
 
 
 
-Document Methods
-================
+Documents
+=========
+
+
+
+Server
+======
 
 
 
