@@ -8,13 +8,14 @@ of one-off methods, Microfiber just makes it super easy to call any part of the
 very simple and basically maintenance free as it requires no changes to support
 new additions to the CouchDB API.
 
-For example:
+In a nutshell, the Microfiber API is the CouchDB API, nothing more.  For
+example:
 
 >>> from microfiber import Database
 >>> db = Database('foo', env)
 >>> db.put(None)  # PUT /foo
 {'ok': True}
->>> db.put({}, 'bar')  # POST /foo/bar
+>>> db.put({}, 'bar')  # PUT /foo/bar
 {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
 >>> db.get('bar')  # GET /foo/bar
 {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
@@ -35,4 +36,5 @@ Contents:
    :maxdepth: 2
    
    couchdb_api
+   microfiber
 
