@@ -68,10 +68,47 @@ Delete
 Documents
 =========
 
+All the following document method examples assume you started out with this:
+
+>>> from microfiber import Database, Server
+>>> database = Database('db1')
+>>> server = Server()  # 'db2'
+
+
+Create
+------
+
+>>> database.post({'_id': 'mydoc'})
+{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'mydoc'}
+>>> server.post({'_id': 'mydoc'}, 'db2')
+{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'mydoc'}
+
+
+
+Update
+------
+
+>>> database.post({'_id': 'mydoc', 'hello': 'world', '_rev': '1-967a00dff5e02add41819138abb3284d'})
+{'rev': '2-0a8fff77f08f178bd1e2905f7dfb54b2', 'ok': True, 'id': 'mydoc'}
+
+Retrieve
+--------
+
+
+Delete
+------
 
 
 Server
 ======
+
+
+Welcome
+-------
+
+
+Config
+------
 
 
 
