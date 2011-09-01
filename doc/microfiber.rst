@@ -85,13 +85,38 @@ The CouchBase class
         "foo":
         
         >>> cb = CouchBase()
-        >>> cb.head('foo', 'baz')['Etag']
+        >>> cb.head('foo', 'baz')['Etag']  #doctest: +SKIP
         '"1-967a00dff5e02add41819138abb3284d"'
 
     
     .. method:: put_att(content_type, data, *parts, **options)
     
-    .. method:: put_att(*parts, **options)
+        PUT an attachment.
+
+        For example, to upload the attachment "baz" for the doc "bar" in the
+        database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.put_att('image/png', b'da pic', 'foo', 'bar', 'baz')  #doctest: +SKIP
+        {'rev': '1-d536771b631a30c2ab4c0340adc72570', 'ok': True, 'id': 'bar'}
+
+        Note that you don't need any attachment-specific method for DELETE. 
+        Just use CouchBase.delete(), like this:
+        
+        >>> cb.delete('foo', 'bar', 'baz', rev='1-d536771b631a30c2ab4c0340adc72570')  #doctest: +SKIP
+        {'rev': '2-082e66867f6d4d1753d7d0bf08122425', 'ok': True, 'id': 'bar'}
+
+        
+    .. method:: get_att(*parts, **options)
+    
+        GET an attachment.
+
+        Returns a ``(content_type, data)`` tuple.  For example, to download the
+        attachment "baz" for the doc "bar" in the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.get_att('foo', 'bar', 'baz')  #doctest: +SKIP
+        ('image/png', b'da pic')
 
 
 

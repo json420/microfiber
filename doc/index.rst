@@ -35,6 +35,6 @@ Contents:
 .. toctree::
    :maxdepth: 2
    
-   couchdb_api
    microfiber
+   couchdb_api
 
