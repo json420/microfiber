@@ -6,6 +6,30 @@ The microfiber module
 The CouchBase class
 ===================
 
+Although Microfiber is quite generic, it assumes you're using a JSON-loving
+REST API similar to CouchDB (especially if it happens to be CouchDB).  To
+simplify things, Microfiber makes 2 key assumptions:
+
+    1. Request bodies are empty or JSON, except when you PUT an attachment
+
+    2. Response bodies are JSON, except when you GET an attachment
+
+:class:`CouchBase` is the base class for the :class:`Server` and
+:class:`Database` classes.  You typically wont use the :class:`CouchBase` class
+directly, but it provides the seven methods that make up the generic REST
+adapter:
+
+    * :meth:`CouchBase.post()`
+    * :meth:`CouchBase.put()`
+    * :meth:`CouchBase.get()`
+    * :meth:`CouchBase.delete()`
+    * :meth:`CouchBase.head()`
+    * :meth:`CouchBase.put_att()`
+    * :meth:`CouchBase.get_att()`
+    
+All these methods are inherited unchanged by the :class:`Server` and
+:class:`Database` classes.
+
 .. class:: CouchBase(env)
 
 
@@ -143,6 +167,26 @@ The Database class
     .. method:: bulksave(docs)
     
     .. method:: view(design, view, **options)
+    
+        Shortcut for making a GET request to a view.
+
+        No magic here, just saves you having to type "_design" and "_view" over
+        and over.  This:
+
+            ``Database.view(design, view, **options)``
+
+        Is just a shortcut for:
+
+            ``Database.get('_design', design, '_view', view, **options)``
+    
+        For example:
+    
+        >>> db = Database('dmedia')
+        >>> db.view('file', 'bytes')  #doctest: +SKIP
+        {u'rows': []}
+        >>> db.get('_design', 'file', '_view', 'bytes')  #doctest: +SKIP
+        {u'rows': []}
+
 
 
 Random ID functions
