@@ -19,11 +19,11 @@ simplify things, Microfiber makes 2 key assumptions:
 directly, but it provides the seven methods that make up the generic REST
 adapter:
 
-    * :meth:`CouchBase.post()`
     * :meth:`CouchBase.put()`
+    * :meth:`CouchBase.post()`
     * :meth:`CouchBase.get()`
-    * :meth:`CouchBase.delete()`
     * :meth:`CouchBase.head()`
+    * :meth:`CouchBase.delete()`
     * :meth:`CouchBase.put_att()`
     * :meth:`CouchBase.get_att()`
     
@@ -31,22 +31,6 @@ All these methods are inherited unchanged by the :class:`Server` and
 :class:`Database` classes.
 
 .. class:: CouchBase(env)
-
-
-    .. method:: post(obj, *parts, **options)
-    
-        POST *obj*.
-
-        For example, to create the doc "bar" in the database "foo":
-
-        >>> cb = CouchBase()
-        >>> cb.post({'_id': 'bar'}, 'foo')  #doctest: +SKIP
-        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
-
-        Or to compact the database "foo":
-
-        >>> cb.post(None, 'foo', '_compact')  #doctest: +SKIP
-        {'ok': True}
 
 
     .. method:: put(obj, *parts, **options)
@@ -63,6 +47,22 @@ All these methods are inherited unchanged by the :class:`Server` and
 
         >>> cb.put({'micro': 'fiber'}, 'foo', 'baz')  #doctest: +SKIP
         {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
+
+
+    .. method:: post(obj, *parts, **options)
+    
+        POST *obj*.
+
+        For example, to create the doc "bar" in the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.post({'_id': 'bar'}, 'foo')  #doctest: +SKIP
+        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+
+        Or to compact the database "foo":
+
+        >>> cb.post(None, 'foo', '_compact')  #doctest: +SKIP
+        {'ok': True}
     
     
     .. method:: get(*parts, **options)
@@ -80,22 +80,6 @@ All these methods are inherited unchanged by the :class:`Server` and
 
         >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
-    
-    
-    .. method:: delete(*parts, **options)
-    
-        Make a DELETE request.
-
-        For example, to delete the doc "bar" in the database "foo":
-
-        >>> cb = CouchBase()
-        >>> cb.delete('foo', 'bar', rev='1-967a00dff5e02add41819138abb3284d')  #doctest: +SKIP
-        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
-
-        Or to delete the database "foo":
-
-        >>> cb.delete('foo')  #doctest: +SKIP
-        {'ok': True}
 
 
     .. method:: head(*parts, **options)
@@ -112,7 +96,23 @@ All these methods are inherited unchanged by the :class:`Server` and
         >>> cb.head('foo', 'baz')['Etag']  #doctest: +SKIP
         '"1-967a00dff5e02add41819138abb3284d"'
 
+
+    .. method:: delete(*parts, **options)
     
+        Make a DELETE request.
+
+        For example, to delete the doc "bar" in the database "foo":
+
+        >>> cb = CouchBase()
+        >>> cb.delete('foo', 'bar', rev='1-967a00dff5e02add41819138abb3284d')  #doctest: +SKIP
+        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+
+        Or to delete the database "foo":
+
+        >>> cb.delete('foo')  #doctest: +SKIP
+        {'ok': True}
+
+
     .. method:: put_att(content_type, data, *parts, **options)
     
         PUT an attachment.
