@@ -73,7 +73,7 @@ True
 
 
 And this is also a typical *env* for `desktopcouch`_ or `dc3`_, except this time
-using basic auth instead of oauth:
+using basic auth instead of OAuth:
 
 >>> env4 = {
 ...     'basic': {
@@ -91,9 +91,9 @@ True
 (Note that if both ``env['oauth']`` and ``env['basic']`` are present, OAuth will
 be used.)
 
-As you might guess, Microfiber currently supports OAuth and basic HTTP auth, but
-support for other types of authentication might be added in the future.  We've
-designed *env* so that only 2 places need to understand the details:
+Microfiber currently supports OAuth and basic HTTP auth, but support for other
+types of authentication might be added in the future.  We've designed *env* so
+that only 2 places need to understand the details:
 
     1. Microfiber - it obviously needs to understand *env* so that it can make
        correctly authenticated requests to CouchDB
@@ -102,11 +102,10 @@ designed *env* so that only 2 places need to understand the details:
        needs a per-user CouchDB, so it will get the appropriate *env* from
        `desktopcouch`_ or `dc3`_
 
-Because of this, all the code in the middle (which is the vast majority of the
-code) just needs to take the *env* and pass it to Microfiber, without needing
-special case code for running against system-wide vs per-user CouchDB.
-
-Importantly, the code in the middle wont need changes should new types of
+Because of this design, all the code in the middle (which is the vast majority
+of the code) just needs to take the *env* and pass it to Microfiber, without
+needing any special-case code for running against system-wide vs per-user
+CouchDB.  Likewise, the code in the middle wont need changes should new types of
 authentication be added.
 
 

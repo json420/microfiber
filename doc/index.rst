@@ -8,26 +8,11 @@ of one-off methods, Microfiber just makes it super easy to call any part of the
 very simple and basically maintenance free as it requires no changes to support
 new additions to the CouchDB API.
 
-In a nutshell, the Microfiber API is the CouchDB API, nothing more.  For
-example:
+Microfiber is being developed as part of the `Novacut`_ project.  Microfiber
+packages are available for Ubuntu in the `Novacut Stable Releases PPA`_ and the
+`Novacut Daily Builds PPA`_.
 
->>> from microfiber import Database
->>> db = Database('foo', env)
->>> db.put(None)  # PUT /foo
-{'ok': True}
->>> db.put({}, 'bar')  # PUT /foo/bar
-{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
->>> db.get('bar')  # GET /foo/bar
-{'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
->>> db.delete('bar', rev='1-967a00dff5e02add41819138abb3284d')  # DELETE /foo/bar
-{'rev': '2-eec205a9d413992850a6e32678485900', 'ok': True, 'id': 'bar'}
->>> db.delete()  # DELETE /foo
-{'ok': True}
-
-
-.. _`Microfiber`: https://launchpad.net/microfiber
-.. _`CouchDB`: http://couchdb.apache.org/
-.. _`CouchDB REST API`: http://www.couchbase.org/sites/default/files/uploads/all/documentation/couchbase-api.html
+Microfiber is licensed `LGPLv3+`_.
 
 
 Contents:
@@ -37,4 +22,15 @@ Contents:
    
    microfiber
    couchdb_api
+
+
+
+.. _`Microfiber`: https://launchpad.net/microfiber
+.. _`CouchDB`: http://couchdb.apache.org/
+.. _`CouchDB REST API`: http://www.couchbase.org/sites/default/files/uploads/all/documentation/couchbase-api.html
+.. _`LGPLv3+`: http://www.gnu.org/licenses/lgpl-3.0.html
+
+.. _`Novacut`: https://wiki.ubuntu.com/Novacut
+.. _`Novacut Stable Releases PPA`: https://launchpad.net/~novacut/+archive/stable
+.. _`Novacut Daily Builds PPA`: https://launchpad.net/~novacut/+archive/daily
 
