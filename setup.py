@@ -109,11 +109,10 @@ class microfiber_build(build):
             return
         tree = path.dirname(path.abspath(__file__))
         src = path.join(tree, 'doc')
-        dst = path.join(tree, 'doc', '_build')
+        dst = path.join(tree, 'doc', '_build', 'html')
         cmd = [
             sphinx,
             '-b', 'html',
-            '-d', path.join(dst, 'doctrees'),
             src,
             dst
         ]
