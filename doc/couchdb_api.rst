@@ -12,55 +12,111 @@ is documented here.  For more details, see the full `CouchDB REST API`_.
 Databases
 =========
 
-All the following database method examples assume you started out with this:
-
->>> from microfiber import Database, Server
->>> database = Database('db1')
->>> server = Server()
+You'll generally perform database-level actions using a :class:`Database`
+instance, but you can do the same using a :class:`Server` instance.
 
 
 Create
 ------
 
->>> database.put(None)
+**PUT /db**
+
+This will create a new CouchDB database.  A :exc:`PreconditionFailed` exception
+is raised if a database with the same name already exists.
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.put(None)
 {'ok': True}
->>> server.put(None, 'db2')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.put(None, 'mydb')
 {'ok': True}
 
 
-Info
-----
+Retrieve
+--------
 
->>> database.get()
-{'update_seq': 0, 'disk_size': 79, 'purge_seq': 0, 'doc_count': 0, 'compact_running': False, 'db_name': 'db1', 'doc_del_count': 0, 'instance_start_time': '1314870632421649', 'committed_update_seq': 0, 'disk_format_version': 5}
->>> server.get('db2')
-{'update_seq': 0, 'disk_size': 79, 'purge_seq': 0, 'doc_count': 0, 'compact_running': False, 'db_name': 'db2', 'doc_del_count': 0, 'instance_start_time': '1314870646021676', 'committed_update_seq': 0, 'disk_format_version': 5}
+**GET /db**
+
+This will retrieve useful information about the database.  A :exc:`NotFound`
+exception is raised if the database does not exist.
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.get()
+{'update_seq': 0, 'disk_size': 79, 'purge_seq': 0, 'doc_count': 0, 'compact_running': False, 'db_name': 'mydb', 'doc_del_count': 0, 'instance_start_time': '1314934043214745', 'committed_update_seq': 0, 'disk_format_version': 5}
+
+
+Or using a :class:`Server`:
+
+>>> s = Server(env)
+>>> s.get('mydb')
+{'update_seq': 0, 'disk_size': 79, 'purge_seq': 0, 'doc_count': 0, 'compact_running': False, 'db_name': 'mydb', 'doc_del_count': 0, 'instance_start_time': '1314934043214745', 'committed_update_seq': 0, 'disk_format_version': 5}
 
 
 Changes
 -------
 
->>> database.get('_changes')
+**GET /db/_changes**
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.get('_changes')
 {'last_seq': 0, 'results': []}
->>> server.get('db2', '_changes')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.get('mydb', '_changes')
 {'last_seq': 0, 'results': []}
 
 
 Compact
 -------
 
->>> database.post(None, '_compact')
+**POST /db/_compact**
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.post(None, '_compact')
 {'ok': True}
->>> server.post(None, 'db2', '_compact')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.post(None, 'mydb', '_compact')
 {'ok': True}
 
 
 Delete
 ------
 
->>> database.delete()
+**DELETE /db**
+
+This will delete the CouchDB database.  A :exc:`NotFound` exception is raised if
+the database does not exist.
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.delete()
 {'ok': True}
->>> server.delete('db2')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.delete('mydb')
 {'ok': True}
 
 
@@ -68,19 +124,29 @@ Delete
 Documents
 =========
 
-All the following document method examples assume you started out with this:
-
->>> from microfiber import Database, Server
->>> database = Database('db1')
->>> server = Server()  # 'db2'
+You'll generally perform document-level actions using a :class:`Database`
+instance, but you can do the same using a :class:`Server` instance.
 
 
 Create
 ------
 
->>> database.post({'_id': 'mydoc'})
+**POST /db**
+
+This will create a new document.  A :exc:`Conflict` exception is raised if the
+document already exists.
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.post({'_id': 'mydoc'})
 {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'mydoc'}
->>> server.post({'_id': 'mydoc'}, 'db2')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.post({'_id': 'mydoc'}, 'mydb')
 {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'mydoc'}
 
 
@@ -88,15 +154,49 @@ Create
 Update
 ------
 
->>> database.post({'_id': 'mydoc', 'hello': 'world', '_rev': '1-967a00dff5e02add41819138abb3284d'})
-{'rev': '2-0a8fff77f08f178bd1e2905f7dfb54b2', 'ok': True, 'id': 'mydoc'}
+**POST /db**
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+
+
 
 Retrieve
 --------
 
+**GET /db/doc**
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+
 
 Delete
 ------
+
+**DELETE /db/doc**
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+
+
 
 
 Server
