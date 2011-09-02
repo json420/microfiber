@@ -265,7 +265,7 @@ Using a :class:`Server` when the document does *not* exists:
 >>> s.put_att('image/png', b'PNG Data', 'mydb', 'mydoc', 'myatt')
 {'rev': '1-904eb7a25f6c4df64f49b0eeeb27dbbc', 'ok': True, 'id': 'mydoc'}
 
-Or using a :class:`Server` when the document does *not* exists:
+Or using a :class:`Server` when the document does exists:
 
 >>> s.put_att('image/png', b'PNG Data', 'mydb', 'mydoc', 'myatt2',
 ...     rev='1-904eb7a25f6c4df64f49b0eeeb27dbbc'
