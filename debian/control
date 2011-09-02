@@ -2,7 +2,7 @@ Source: microfiber
 Section: python
 Priority: optional
 Maintainer: Jason Gerard DeRose <jderose@novacut.com>
-Build-Depends: debhelper (>= 8.1), python3 (>= 3.2), python (>= 2.7)
+Build-Depends: debhelper (>= 8.1), python3 (>= 3.2), python (>= 2.7), python-sphinx
 Standards-Version: 3.9.1
 X-Python-Version: 2.7
 X-Python3-Version: 3.2
@@ -29,3 +29,18 @@ Description: fabric for a lightweight Couch
  CouchDB REST API, current or future.  This approach allows microfiber to be
  very simple and basically maintenance free as it requires no changes to support
  new additions to the CouchDB API.
+
+Package: python3-microfiber-doc
+Architecture: all
+Section: doc
+Depends: ${misc:Depends}, libjs-jquery
+Suggests: python3-microfiber
+Description: documentation for python3-microfiber
+ microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON
+ loving REST API like CouchDB.  Rather than wrapping the API in a bunch of
+ one-off methods, microfiber just makes it super easy to call any part of the
+ CouchDB REST API, current or future.  This approach allows microfiber to be
+ very simple and basically maintenance free as it requires no changes to support
+ new additions to the CouchDB API.
+ .
+ This package provides the documentation.
