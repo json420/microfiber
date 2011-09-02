@@ -21,6 +21,96 @@ example:
 Chances are you'll use the :class:`Database` class most of all.
 
 
+Know thy env
+============
+
+Actually, the point is that you don't have to know your *env*, you just pass it
+around and let Microfiber handle the details.
+
+As Microfiber is being developed for the `Novacut`_ project, it needs to work
+equally well with a system-wide CouchDB or a per-user CouchDB launched by
+`desktopcouch`_ or `dc3`_.  Some example *env* will help make it clear why we
+want to describe the CouchDB environment with a single, extensible data
+structure.
+
+For example, this is the default *env*, what would be typical for system-wide
+CouchDB:
+
+>>> env1 = 'http://localhost:5984/'
+>>> db = Database('mydb', env1)
+>>> db.env
+{'url': 'http://localhost:5984/'}
+>>> db.url
+'http://localhost:5984/'
+
+
+This is the same *env*, but in its normalized form:
+
+>>> env2 = {'url': 'http://localhost:5984/'}
+>>> db = Database('mydb', env2)
+>>> db.env
+{'url': 'http://localhost:5984/'}
+>>> db.url
+'http://localhost:5984/'
+
+
+This is a typical *env* for `desktopcouch`_ or `dc3`_:
+
+>>> env3 = {
+...     'oauth': {
+...         'consumer_key': 'VXKZRHHGHYE5GIXI',
+...         'consumer_secret': 'O4UIX73BIKWBDPD3',
+...         'token': 'XZOT23SOO2DQJUZE',
+...         'token_secret': '3CP6FFY2VXEXJZKQ'
+...     },
+...     'url': 'http://localhost:41289/'
+... }
+>>> db = Database('mydb', env3)
+>>> db.env is env3
+True
+>>> db.url
+'http://localhost:41289/'
+
+
+And this is also a typical *env* for `desktopcouch`_ or `dc3`_, except this time
+using basic auth instead of oauth:
+
+>>> env4 = {
+...     'basic': {
+...         'password': 'LEJT4Q7PGGE33KHX',
+...         'username': 'BNLS6U5S7I32A6RQ'
+...     },
+...     'url': 'http://localhost:45612/'
+... }
+>>> db = Database('mydb', env4)
+>>> db.env is env4
+True
+>>> db.url
+'http://localhost:45612/'
+
+(Note that if both ``env['oauth']`` and ``env['basic']`` are present, OAuth will
+be used.)
+
+As you might guess, Microfiber currently supports OAuth and basic HTTP auth, but
+support for other types of authentication might be added in the future.  We've
+designed *env* so that only 2 places need to understand the details:
+
+    1. Microfiber - it obviously needs to understand *env* so that it can make
+       correctly authenticated requests to CouchDB
+       
+    2. The process entry point - for example, the dmedia DBus service knows it
+       needs a per-user CouchDB, so it will get the appropriate *env* from
+       `desktopcouch`_ or `dc3`_
+
+Because of this, all the code in the middle (which is the vast majority of the
+code) just needs to take the *env* and pass it to Microfiber, without needing
+special case code for running against system-wide vs per-user CouchDB.
+
+Importantly, the code in the middle wont need changes should new types of
+authentication be added.
+
+
+
 CouchBase class
 ===============
 
@@ -195,6 +285,9 @@ the :class:`Server` class provides one convenience method:
         >>> s = Server('http://localhost:41289/')
         >>> s.database('foo')
         Database('foo', 'http://localhost:41289/')
+        
+        If you call this method with ``ensure=True``, a call to
+        :meth:`Database.ensure()` is made prior to returning the instance.
 
 
 
@@ -308,8 +401,6 @@ the :class:`Database` class provides five convenience methods:
         {u'rows': []}
 
 
-.. _`python-couchdb`: http://packages.python.org/CouchDB/client.html#database
-
 
 Functions
 =========
@@ -328,7 +419,6 @@ Functions
     approved", for what that's worth.
 
 
-
 .. function:: random_id2()
 
     Returns a random ID with timestamp + 80 bits of base32-encoded random data.
@@ -338,6 +428,18 @@ Functions
     >>> random_id2()  #doctest: +SKIP
     '1313567384.67DFPERIOU66CT56'
 
+
+.. function:: dc3_env()
+
+    Return the dc3 environment information.
+    
+    For example, to create a :class:`Database` with the correct per-user `dc3`_
+    environment:
+    
+    >>> from microfiber import dc3_env, Database
+    >>> db = Database('dmedia', dc3_env())
+    >>> db.url
+    'http://localhost:41289/'
 
 
 Exceptions
@@ -429,6 +531,12 @@ Exceptions
 
     Used to raise exceptions for any 5xx Server Errors.
 
+
+
+.. _`Novacut`: https://wiki.ubuntu.com/Novacut
+.. _`desktopcouch`: https://launchpad.net/desktopcouch
+.. _`dc3`: https://launchpad.net/dc3
+.. _`python-couchdb`: http://packages.python.org/CouchDB/client.html#database
 
 
 
