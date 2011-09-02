@@ -156,14 +156,22 @@ Update
 
 **POST /db**
 
+This will update an existing document.  A :exc:`Conflict` exception is raised if
+``doc['_rev']`` doesn't match the latest revision of the document in CouchDB
+(meaning the document has been updated since you last retrieved it).
+
 Using a :class:`Database`:
 
 >>> db = Database('mydb')
+>>> db.post({'_id': 'mydoc', '_rev': '1-967a00dff5e02add41819138abb3284d'})
+{'rev': '2-7051cbe5c8faecd085a3fa619e6e6337', 'ok': True, 'id': 'mydoc'}
 
 
 Or using a :class:`Server`:
 
 >>> s = Server()
+>>> s.post({'_id': 'mydoc', '_rev': '1-967a00dff5e02add41819138abb3284d'}, 'mydb')
+{'rev': '2-7051cbe5c8faecd085a3fa619e6e6337', 'ok': True, 'id': 'mydoc'}
 
 
 
@@ -172,14 +180,21 @@ Retrieve
 
 **GET /db/doc**
 
+A :exc:`NotFound` exception is raised if the document does not exist.
+
 Using a :class:`Database`:
 
 >>> db = Database('mydb')
+>>> db.get('mydoc')
+{'_rev': '2-7051cbe5c8faecd085a3fa619e6e6337', '_id': 'mydoc'}
 
 
 Or using a :class:`Server`:
 
 >>> s = Server()
+>>> s.get('mydb', 'mydoc')
+{'_rev': '2-7051cbe5c8faecd085a3fa619e6e6337', '_id': 'mydoc'}
+
 
 
 Delete
@@ -187,29 +202,55 @@ Delete
 
 **DELETE /db/doc**
 
+This will delete a document.  A :exc:`NotFound` exception is raised if the
+document does not exist.
+
+A :exc:`Conflict` exception is raised if the *rev* keyword argument doesn't
+match the latest revision of the document in CouchDB (meaning the document has
+been updated since you last retrieved it).
+
 Using a :class:`Database`:
 
 >>> db = Database('mydb')
+>>> db.delete('mydoc', rev='2-7051cbe5c8faecd085a3fa619e6e6337')
+{'rev': '3-7379b9e515b161226c6559d90c4dc49f', 'ok': True, 'id': 'mydoc'}
 
 
 Or using a :class:`Server`:
 
 >>> s = Server()
-
-
+>>> s.delete('mydb', 'mydoc', rev='2-7051cbe5c8faecd085a3fa619e6e6337')
+{'rev': '3-7379b9e515b161226c6559d90c4dc49f', 'ok': True, 'id': 'mydoc'}
 
 
 Server
 ======
 
+To perform server-level actions, you must use a :class:`Server` instance.
+
 
 Welcome
 -------
 
+**GET /**
 
-Config
-------
+This will retrieve the CouchDB welcome response, which includes the CouchDB
+version.
 
+>>> s = Server()
+>>> s.get()
+{'couchdb': 'Welcome', 'version': '1.1.0'}
+
+
+Databases
+---------
+
+**GET /_all_dbs**
+
+This will retrieve the list of databases in this CouchDB instance.
+
+>>> s.get('_all_dbs')
+['_replicator', '_users', 'dmedia', 'mydb']
 
 
 
