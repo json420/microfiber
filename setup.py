@@ -100,12 +100,12 @@ class Test(Command):
             raise SystemExit(2)
 
 
-class microfiber_build(build):
+class build_with_docs(build):
 
     def run(self):
         build.run(self)
         sphinx = '/usr/bin/sphinx-build'
-        if not path.exists(sphinx):
+        if not path.isfile(sphinx):
             return
         tree = path.dirname(path.abspath(__file__))
         src = path.join(tree, 'doc')
@@ -130,6 +130,6 @@ setup(
     py_modules=['microfiber'],
     cmdclass={
         'test': Test,
-        'build': microfiber_build,
+        'build': build_with_docs,
     },
 )
