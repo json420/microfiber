@@ -223,6 +223,104 @@ Or using a :class:`Server`:
 {'rev': '3-7379b9e515b161226c6559d90c4dc49f', 'ok': True, 'id': 'mydoc'}
 
 
+Attachments
+===========
+
+You'll generally perform attachment-level actions using a :class:`Database`
+instance, but you can do the same using a :class:`Server` instance.
+
+
+Create
+------
+
+**PUT /db/doc/attachment**
+
+You create document attachments using the :meth:`CouchBase.put_att()` method.
+
+If you're creating an attachment for a document that does not yet exists, the
+*rev* keyword argument isn't needed, and the document will be implicitly created
+by CouchDB.  If the document exists, you must include *rev*.
+
+A :exc:`Conflict` exception is raised if the *rev* keyword argument doesn't
+match the latest revision of the document in CouchDB (meaning the document has
+been updated since you last retrieved it).
+
+Using a :class:`Database` when the document does *not* exists:
+
+>>> db = Database('mydb')
+>>> db.put_att('image/png', b'PNG Data', 'mydoc', 'myatt')
+{'rev': '1-904eb7a25f6c4df64f49b0eeeb27dbbc', 'ok': True, 'id': 'mydoc'}
+
+Or using a :class:`Database` when the document does exists:
+
+>>> db.put_att('image/png', b'PNG Data', 'mydoc', 'myatt2',
+...     rev='1-904eb7a25f6c4df64f49b0eeeb27dbbc'
+... )
+{'rev': '2-1e294b322cd16610bf3becb62167f7f2', 'ok': True, 'id': 'mydoc'}
+
+
+Using a :class:`Server` when the document does *not* exists:
+
+>>> s = Server()
+>>> s.put_att('image/png', b'PNG Data', 'mydb', 'mydoc', 'myatt')
+{'rev': '1-904eb7a25f6c4df64f49b0eeeb27dbbc', 'ok': True, 'id': 'mydoc'}
+
+Or using a :class:`Server` when the document does *not* exists:
+
+>>> s.put_att('image/png', b'PNG Data', 'mydb', 'mydoc', 'myatt2',
+...     rev='1-904eb7a25f6c4df64f49b0eeeb27dbbc'
+... )
+{'rev': '2-1e294b322cd16610bf3becb62167f7f2', 'ok': True, 'id': 'mydoc'}
+
+
+Retrieve
+--------
+
+**GET /db/doc/attachment**
+
+You retrieve document attachments using the :meth:`CouchBase.get_att()` method.
+
+A :exc:`NotFound` exception is raised if the attachment does not exist.
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.get_att('mydoc', 'myatt')
+('image/png', b'PNG Data')
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.get_att('mydb', 'mydoc', 'myatt')
+('image/png', b'PNG Data')
+
+
+Delete
+------
+
+**DELETE /db/doc/attachment**
+
+A :exc:`NotFound` exception is raised if the attachment does not exist.
+
+A :exc:`Conflict` exception is raised if the *rev* keyword argument doesn't
+match the latest revision of the document in CouchDB (meaning the document has
+been updated since you last retrieved it).
+
+Using a :class:`Database`:
+
+>>> db = Database('mydb')
+>>> db.delete('mydoc', 'myatt', rev='2-1e294b322cd16610bf3becb62167f7f2')
+{'rev': '3-6de76b26d1b5a1ca533d94039132e594', 'ok': True, 'id': 'mydoc'}
+
+
+Or using a :class:`Server`:
+
+>>> s = Server()
+>>> s.delete('mydb', 'mydoc', 'myatt', rev='2-1e294b322cd16610bf3becb62167f7f2')
+{'rev': '3-6de76b26d1b5a1ca533d94039132e594', 'ok': True, 'id': 'mydoc'}
+
+
 Server
 ======
 
