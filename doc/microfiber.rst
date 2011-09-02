@@ -30,7 +30,7 @@ adapter:
 All these methods are inherited unchanged by the :class:`Server` and
 :class:`Database` classes.
 
-.. class:: CouchBase(env)
+.. class:: CouchBase(env='http://localhost:5984/')
 
 
     .. method:: put(obj, *parts, **options)
@@ -125,7 +125,7 @@ All these methods are inherited unchanged by the :class:`Server` and
         {'rev': '1-d536771b631a30c2ab4c0340adc72570', 'ok': True, 'id': 'bar'}
 
         Note that you don't need any attachment-specific method for DELETE. 
-        Just use CouchBase.delete(), like this:
+        Just use :meth:`CouchBase.delete()`, like this:
         
         >>> cb.delete('foo', 'bar', 'baz', rev='1-d536771b631a30c2ab4c0340adc72570')  #doctest: +SKIP
         {'rev': '2-082e66867f6d4d1753d7d0bf08122425', 'ok': True, 'id': 'bar'}
@@ -147,20 +147,93 @@ All these methods are inherited unchanged by the :class:`Server` and
 The Server class
 ================
 
-.. class:: Server(env)
+In addition to the seven REST adapter methods inherited from :class:`CouchBase`,
+the :class:`Server` class provides one convenience method:
+
+    * :meth:`Server.database()`
+
+.. class:: Server(env='http://localhost:5984/')
+
+    Makes requests relative to a CouchDB server URL.
+    
+    Create a :class:`Server` like this:
+    
+    >>> from microfiber import Server
+    >>> s = Server({'url': 'http://localhost:41289/'})
+    >>> s.env
+    {'url': 'http://localhost:41289/'}
+    >>> s.url
+    'http://localhost:41289/'
+    >>> s.basepath
+    '/'
 
     .. method:: database(name, ensure=False)
+    
+        Return a :class:`Database` instance for the database *name*.
+        
+        This will create :class:`Database` instance, passing it the same *env*
+        that this :class:`Server` was created with.  For example:
+        
+        >>> s = Server('http://localhost:41289/')
+        >>> s.database('foo')
+        Database('foo', 'http://localhost:41289/')
+        
+        
 
 
 The Database class
 ==================
 
+In addition to the seven REST adapter methods inherited from :class:`CouchBase`,
+the :class:`Database` class provides five convenience methods:
 
-.. class:: Database(name, env)
+    * :meth:`Database.server()`
+    * :meth:`Database.ensure()`
+    * :meth:`Database.save()`
+    * :meth:`Database.bulksave()`
+    * :meth:`Database.view()`
+
+
+.. class:: Database(name, env='http://localhost:5984/')
+    
+    Makes requests relative to a CouchDB database URL.
+    
+    Create a :class:`Database` like this:
+    
+    >>> from microfiber import Database
+    >>> db = Database('foo', {'url': 'http://localhost:41289/'})
+    >>> db.name
+    'foo'
+    >>> db.env
+    {'url': 'http://localhost:41289/'}
+    >>> db.url
+    'http://localhost:41289/'
+    >>> db.basepath
+    '/foo/'
+
 
     .. method:: server()
     
+        Return a :class:`Server` instance with the same *env* as this database.
+        
+        For example:
+        
+        >>> db = Database('foo', 'http://localhost:41289/')
+        >>> db.server()
+        Server('http://localhost:41289/')
+        
+        
     .. method:: ensure()
+    
+        Ensure the database exists.
+
+        This method will attempt to create the database, and will handle the
+        :exc:`PreconditionFailed` exception raised if the database already
+        exists.
+
+        Higher level code can safely call this method at any time, and it only
+        results in a single PUT /db request being made.
+    
     
     .. method:: save(doc)
     
@@ -189,8 +262,8 @@ The Database class
 
 
 
-Random ID functions
-===================
+Functions
+=========
 
 
 .. function:: random_id()
@@ -215,8 +288,6 @@ Random ID functions
 
     >>> random_id2()  #doctest: +SKIP
     '1313567384.67DFPERIOU66CT56'
-
-
 
 
 
