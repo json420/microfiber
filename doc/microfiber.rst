@@ -1,10 +1,28 @@
-=====================
-The microfiber module
-=====================
+=================
+microfiber module
+=================
+
+In a nutshell, the Microfiber API is the CouchDB API, nothing more.  For
+example:
+
+>>> from microfiber import Database
+>>> db = Database('foo', env)
+>>> db.put(None)  # PUT /foo
+{'ok': True}
+>>> db.put({}, 'bar')  # PUT /foo/bar
+{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+>>> db.get('bar')  # GET /foo/bar
+{'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
+>>> db.delete('bar', rev='1-967a00dff5e02add41819138abb3284d')  # DELETE /foo/bar
+{'rev': '2-eec205a9d413992850a6e32678485900', 'ok': True, 'id': 'bar'}
+>>> db.delete()  # DELETE /foo
+{'ok': True}
+
+Chances are you'll use the :class:`Database` class most of all.
 
 
-The CouchBase class
-===================
+CouchBase class
+===============
 
 Although Microfiber is quite generic, it assumes you're using a JSON-loving
 REST API similar to CouchDB (especially if it happens to be CouchDB).  To
@@ -144,8 +162,8 @@ All these methods are inherited unchanged by the :class:`Server` and
 
 
 
-The Server class
-================
+Server class
+============
 
 In addition to the seven REST adapter methods inherited from :class:`CouchBase`,
 the :class:`Server` class provides one convenience method:
@@ -177,12 +195,11 @@ the :class:`Server` class provides one convenience method:
         >>> s = Server('http://localhost:41289/')
         >>> s.database('foo')
         Database('foo', 'http://localhost:41289/')
-        
-        
 
 
-The Database class
-==================
+
+Database class
+==============
 
 In addition to the seven REST adapter methods inherited from :class:`CouchBase`,
 the :class:`Database` class provides five convenience methods:
@@ -237,8 +254,38 @@ the :class:`Database` class provides five convenience methods:
     
     .. method:: save(doc)
     
+        POST *doc* to CouchDB and update ``doc['_rev']`` in-place.
+
+        For example:
+
+        >>> db = Database('foo')
+        >>> doc = {'_id': 'bar'}
+        >>> db.save(doc)  #doctest: +SKIP
+        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+        >>> doc  #doctest: +SKIP
+        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
+        >>> doc['a'] = 1  #doctest: +SKIP
+        >>> db.save(doc)  #doctest: +SKIP
+        {'rev': '2-4f54ab3740f3104eec1cf2ec2b0327ed', 'ok': True, 'id': 'bar'}
+        >>> doc  #doctest: +SKIP
+        {'a': 1, '_rev': '2-4f54ab3740f3104eec1cf2ec2b0327ed', '_id': 'bar'}
+
+        If *doc* has no ``'_id'``, one is generated using :func:`random_id()`
+        and added to *doc* in-place prior to making the request to CouchDB.
+
+        This method is inspired by the identical (and highly useful) method in
+        `python-couchdb`_.
+
+
     .. method:: bulksave(docs)
     
+        POST a list of docs to _bulk_docs, update all _rev in place.
+
+        This method works just like :meth:`Database.save()`, except on a whole
+        list of docs all at once.  As only a single request is made to CouchDB,
+        this is a high-performance way to update a large number of documents.
+
+
     .. method:: view(design, view, **options)
     
         Shortcut for making a GET request to a view.
@@ -260,6 +307,8 @@ the :class:`Database` class provides five convenience methods:
         >>> db.get('_design', 'file', '_view', 'bytes')  #doctest: +SKIP
         {u'rows': []}
 
+
+.. _`python-couchdb`: http://packages.python.org/CouchDB/client.html#database
 
 
 Functions
