@@ -28,9 +28,12 @@ Install `microfiber`.
 import sys
 from distutils.core import setup
 from distutils.cmd import Command
+from distutils.command.build import build
 from unittest import TestLoader, TextTestRunner
 from doctest import DocTestSuite
 import os
+from os import path
+import subprocess
 if sys.version_info >= (3, 0):
     from urllib.parse import urlparse
 else:
@@ -97,6 +100,26 @@ class Test(Command):
             raise SystemExit(2)
 
 
+class microfiber_build(build):
+
+    def run(self):
+        build.run(self)
+        sphinx = '/usr/bin/sphinx-build'
+        if not path.exists(sphinx):
+            return
+        tree = path.dirname(path.abspath(__file__))
+        src = path.join(tree, 'doc')
+        dst = path.join(tree, 'doc', '_build')
+        cmd = [
+            sphinx,
+            '-b', 'html',
+            '-d', path.join(dst, 'doctrees'),
+            src,
+            dst
+        ]
+        subprocess.check_call(cmd)
+
+
 setup(
     name='microfiber',
     description='fabric for a lightweight Couch',
@@ -106,5 +129,8 @@ setup(
     author_email='jderose@novacut.com',
     license='LGPLv3+',
     py_modules=['microfiber'],
-    cmdclass={'test': Test},
+    cmdclass={
+        'test': Test,
+        'build': microfiber_build,
+    },
 )
