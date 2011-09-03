@@ -6,7 +6,7 @@ In a nutshell, the Microfiber API is the CouchDB API, nothing more.  For
 example:
 
 >>> from microfiber import Database
->>> db = Database('foo', env)
+>>> db = Database('foo')
 >>> db.put(None)  # PUT /foo
 {'ok': True}
 >>> db.put({}, 'bar')  # PUT /foo/bar
@@ -373,9 +373,23 @@ the :class:`Database` class provides five convenience methods:
     
         POST a list of docs to _bulk_docs, update all _rev in place.
 
+        For example:
+
+        >>> db = Database('foo')
+        >>> doc1 = {'_id': 'bar'}
+        >>> doc2 = {'_id': 'baz'}
+        >>> db.bulksave([doc1, doc2])
+        [{'rev': '1-967a00dff5e02add41819138abb3284d', 'id': 'bar'}, {'rev': '1-967a00dff5e02add41819138abb3284d', 'id': 'baz'}]
+        >>> doc1
+        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
+        >>> doc2
+        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'baz'}
+
+
         This method works just like :meth:`Database.save()`, except on a whole
         list of docs all at once.  As only a single request is made to CouchDB,
         this is a high-performance way to update a large number of documents.
+
 
 
     .. method:: view(design, view, **options)
@@ -426,6 +440,9 @@ Functions
 
     >>> random_id2()  #doctest: +SKIP
     '1313567384.67DFPERIOU66CT56'
+    
+    The idea with this 2nd type of random ID is that it will be used for the
+    dmedia activity log.
 
 
 .. function:: dc3_env()
