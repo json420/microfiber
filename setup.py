@@ -5,6 +5,7 @@
 #
 # microfiber: fabric for a lightweight Couch
 # Copyright (C) 2011 Jason Gerard DeRose <jderose@novacut.com>
+# Copyright (C) 2011 Manish Sinha <manishsinha@ubuntu.com>
 #
 # This file is part of `microfiber`.
 #
@@ -106,6 +107,7 @@ class build_with_docs(build):
         build.run(self)
         sphinx = '/usr/bin/sphinx-build'
         if not path.isfile(sphinx):
+            print("WARNING: Documentation not generated. python3-sphinx missing")
             return
         tree = path.dirname(path.abspath(__file__))
         src = path.join(tree, 'doc')
