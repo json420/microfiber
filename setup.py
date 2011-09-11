@@ -104,9 +104,9 @@ class build_with_docs(build):
 
     def find_sphinx_path(self):
         for prefix in os.environ['PATH'].split(':'):
-            path = os.path.join(prefix, 'sphinx-build')
-            if path.isfile(path) and os.access(path, os.X_OK):
-                return path
+            file_path = os.path.join(prefix, 'sphinx-build')
+            if path.isfile(file_path) and os.access(file_path, os.X_OK):
+                return file_path
 
         return None
 
