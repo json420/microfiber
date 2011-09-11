@@ -106,6 +106,7 @@ class build_with_docs(build):
         build.run(self)
         sphinx = '/usr/bin/sphinx-build'
         if not path.isfile(sphinx):
+            print("WARNING: Documentation not generated. python-sphinx missing")
             return
         tree = path.dirname(path.abspath(__file__))
         src = path.join(tree, 'doc')
