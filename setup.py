@@ -102,10 +102,18 @@ class Test(Command):
 
 class build_with_docs(build):
 
+    def find_sphinx_path(self):
+        for prefix in os.environ['PATH'].split(':'):
+            file_path = os.path.join(prefix, 'sphinx-build')
+            if path.isfile(file_path) and os.access(file_path, os.X_OK):
+                return file_path
+
+        return None
+
     def run(self):
         build.run(self)
-        sphinx = '/usr/bin/sphinx-build'
-        if not path.isfile(sphinx):
+        sphinx = self.find_sphinx_path() 
+        if sphinx is None:
             print("WARNING: Documentation not generated. python-sphinx missing")
             return
         tree = path.dirname(path.abspath(__file__))
