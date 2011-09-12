@@ -702,8 +702,10 @@ class Database(CouchBase):
         """
         try:
             self.put(None)
+            return True
+
         except PreconditionFailed:
-            pass
+            return False
 
     def save(self, doc):
         """
