@@ -764,9 +764,9 @@ class TestDatabaseLive(LiveTestCase):
     def test_ensure(self):
         inst = self.klass(self.db, self.env)
         self.assertRaises(NotFound, inst.get)
-        self.assertIsNone(inst.ensure())
+        self.assertTrue(inst.ensure())
         self.assertEqual(inst.get()['db_name'], self.db)
-        self.assertIsNone(inst.ensure())
+        self.assertFalse(inst.ensure())
         self.assertEqual(inst.delete(), {'ok': True})
         self.assertRaises(NotFound, inst.get)
 
