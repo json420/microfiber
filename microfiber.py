@@ -146,8 +146,12 @@ USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 DC3_CMD = ('/usr/bin/dc3-control', 'GetEnv')
 
+RANDOM_BITS = 120
+RANDOM_BYTES = RANDOM_BITS // 8
+RANDOM_B32LEN = RANDOM_BITS // 5
 
-def random_id():
+
+def random_id(numbytes=RANDOM_BYTES):
     """
     Returns a 120-bit base32-encoded random ID.
 
@@ -159,7 +163,7 @@ def random_id():
     This is how dmedia/Novacut random IDs are created, so this is "Jason
     approved", for what that's worth.
     """
-    return b32encode(urandom(15)).decode('utf-8')
+    return b32encode(urandom(numbytes)).decode('utf-8')
 
 
 def random_id2():
