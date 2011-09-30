@@ -45,7 +45,6 @@ from json import dumps, loads
 import time
 from hashlib import sha1
 import hmac
-import subprocess
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 
@@ -114,6 +113,7 @@ def random_id2():
 
 
 def dc3_env():
+    import subprocess
     env_s = subprocess.check_output(DC3_CMD)
     return loads(env_s.decode('utf-8'))
 
