@@ -23,10 +23,6 @@
 Unit tests for `microfiber` module.
 """
 
-# FIXME: There is some rather hacky crap in here to support both Python2 and
-# Python3... but once we migrate dmedia to Python3, we'll drop Python2 support
-# in microfiber and clean this up a bit.
-
 from unittest import TestCase
 import os
 from os import path

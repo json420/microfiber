@@ -38,7 +38,6 @@ Launchpad project:
     https://launchpad.net/microfiber
 """
 
-import sys
 from os import urandom
 import io
 from base64 import b32encode, b64encode
@@ -151,9 +150,7 @@ def _oauth_sign(oauth, base_string):
         oauth[k] for k in ('consumer_secret', 'token_secret')
     ).encode('utf-8')
     h = hmac.new(key, base_string.encode('utf-8'), sha1)
-    if sys.version_info >= (3, 0):
-        return b64encode(h.digest()).decode('utf-8')
-    return b64encode(h.digest())
+    return b64encode(h.digest()).decode('utf-8')
 
 
 def _oauth_header(oauth, method, baseurl, query, testing=None):
@@ -196,7 +193,7 @@ class HTTPError(Exception):
         self.data = data
         self.method = method
         self.url = url
-        super(HTTPError, self).__init__()
+        super().__init__()
 
     def __str__(self):
         return '{} {}: {} {}'.format(
@@ -555,7 +552,7 @@ class Server(CouchBase):
     """
 
     def __init__(self, env=SERVER):
-        super(Server, self).__init__(env)
+        super().__init__(env)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -596,7 +593,7 @@ class Database(CouchBase):
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, env=SERVER):
-        super(Database, self).__init__(env)
+        super().__init__(env)
         self.name = name
         self.basepath += (name + '/')
 
