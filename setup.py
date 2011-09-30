@@ -34,10 +34,7 @@ from doctest import DocTestSuite
 import os
 from os import path
 import subprocess
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse
-else:
-    from urlparse import urlparse
+from urllib.parse import urlparse
 
 import microfiber
 
@@ -111,7 +108,7 @@ class build_with_docs(build):
         return None
 
     def run(self):
-        build.run(self)
+        super().run()
         sphinx = self.find_sphinx_path() 
         if sphinx is None:
             print("WARNING: Documentation not generated. python-sphinx missing")
