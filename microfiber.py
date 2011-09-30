@@ -47,15 +47,8 @@ import time
 from hashlib import sha1
 import hmac
 import subprocess
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse, urlencode, quote_plus
-    from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
-    strtype = str
-else:
-    from urlparse import urlparse
-    from urllib import urlencode, quote_plus
-    from httplib import HTTPConnection, HTTPSConnection, BadStatusLine
-    strtype = basestring
+from urllib.parse import urlparse, urlencode, quote_plus
+from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 
 
 __all__ = (
@@ -121,32 +114,17 @@ def random_id2():
     ])
 
 
-if sys.version_info >= (3, 0):
-    def dc3_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        return loads(env_s.decode('utf-8'))
-else:
-    def dc3_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        env = loads(env_s)
-        env['url'] = env['url'].encode('utf-8')
-        return env
+def dc3_env():
+    env_s = subprocess.check_output(DC3_CMD)
+    return loads(env_s.decode('utf-8'))
 
 
-if sys.version_info >= (3, 0):
-    def _json_body(obj):
-        if obj is None:
-            return None
-        if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
-            return obj
-        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
-else:
-    def _json_body(obj):
-        if obj is None:
-            return None
-        if isinstance(obj, (file, io.BytesIO)):
-            return obj
-        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+def _json_body(obj):
+    if obj is None:
+        return None
+    if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
+        return obj
+    return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
 def _queryiter(options):
@@ -158,7 +136,7 @@ def _queryiter(options):
     """
     for key in sorted(options):
         value = options[key]
-        if key in ('key', 'startkey', 'endkey') or not isinstance(value, strtype):
+        if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
             value = dumps(value)
         yield (key, value)
 
