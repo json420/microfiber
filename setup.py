@@ -25,7 +25,6 @@
 Install `microfiber`.
 """
 
-import sys
 from distutils.core import setup
 from distutils.cmd import Command
 from distutils.command.build import build
