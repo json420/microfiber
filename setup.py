@@ -119,9 +119,13 @@ class build_with_docs(build):
         tree = path.dirname(path.abspath(__file__))
         src = path.join(tree, 'doc')
         dst = path.join(tree, 'doc', '_build', 'html')
+        doctrees = path.join(tree, 'doc', '_build', 'doctrees')
         cmd = [
             sphinx,
+            '-W',  # Turn  warnings  into  errors
+            '-E',  # Don't  use a saved environment
             '-b', 'html',
+            '-d', doctrees,
             src,
             dst
         ]

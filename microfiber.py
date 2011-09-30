@@ -141,7 +141,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '11.09.1'
+__version__ = '11.10.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 DC3_CMD = ('/usr/bin/dc3-control', 'GetEnv')
