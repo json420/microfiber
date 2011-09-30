@@ -32,7 +32,7 @@ additions to the CouchDB API.
 Documentation:
 
     http://docs.novacut.com/microfiber/index.html
-    
+
 Launchpad project:
 
     https://launchpad.net/microfiber
