@@ -22,84 +22,22 @@
 """
 `microfiber` - fabric for a lightweight Couch.
 
-microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON
+Microfiber is an generic adapter for making HTTP requests to an arbitrary JSON
 loving REST API like CouchDB.  Rather than wrapping the API in a bunch of
-one-off methods, microfiber just makes it super easy to call any part of the
-CouchDB REST API, current or future.  This approach allows microfiber to be very
+one-off methods, Microfiber just makes it super easy to call any part of the
+CouchDB REST API, current or future.  This approach allows Microfiber to be very
 simple and basically maintenance free as it requires no changes to support new
 additions to the CouchDB API.
 
-For example, with python-couchdb you compact the database like this:
+Documentation:
 
->>> database.compact()  #doctest: +SKIP
+    http://docs.novacut.com/microfiber/index.html
 
+Launchpad project:
 
-With microfiber, you can accomplish the same thing one of two ways:
-
->>> database.post(None, '_compact')  #doctest: +SKIP
->>> server.post(None, 'mydb', '_compact')  #doctest: +SKIP
-
-
-Depending on your situation, python-couchdb may still be a better fit, so to
-each their own.  If you're new to CouchDB, you will probably find it much easier
-to get started with python-couchdb.  Likewise, if you're coming from the SQL
-world and like an ORM-style API, you will probably feel more at home with
-python-couchdb.
-
-However, if you know the CouchDB REST API or want to learn it, you will find
-microfiber a more harmonious experience.  Also, microfiber is *very* lightweight
-(1 Python file), fast, and memory efficient.  Unlike python-couchdb, microfiber
-doesn't use any wrappers around the results returned from CouchDB, so it's less
-prone to high memory usage and memory fragmentation problems in, say, a long
-running server process.
-
-Long story short, the microfiber API is the CouchDB REST API, and nothing more.
-For example:
-
->>> from microfiber import Server
->>> s = Server()
->>> s
-Server('http://localhost:5984/')
-
-
-Create a database:
-
->>> s.put(None, 'mydb')  #doctest: +SKIP
-{'ok': True}
-
-
-Create a doc:
-
->>> s.post({'_id': 'foo'}, 'mydb')  #doctest: +SKIP
-{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'foo'}
-
-
-Also create a doc:
-
->>> s.put({}, 'mydb', 'bar')  #doctest: +SKIP
-{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
-
-
-Upload attachment:
-
->>> s.put_att('image/png', b'da picture', 'mydb', 'baz', 'pic')  #doctest: +SKIP
-{'rev': '1-7c17d20f43962e360062659b4bcd8aea', 'ok': True, 'id': 'baz'}
-
-
-For CouchDB API documentation, see:
-
-    http://techzone.couchbase.com/sites/default/files/uploads/all/documentation/couchbase-api.html
-
-For python-couchdb documentation, see:
-
-    http://packages.python.org/CouchDB/
+    https://launchpad.net/microfiber
 """
 
-# FIXME: There is some rather hacky crap in here to support both Python2 and
-# Python3... but once we migrate dmedia to Python3, we'll drop Python2 support
-# in microfiber and clean this up a bit.
-
-import sys
 from os import urandom
 import io
 from base64 import b32encode, b64encode
@@ -107,16 +45,8 @@ from json import dumps, loads
 import time
 from hashlib import sha1
 import hmac
-import subprocess
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse, urlencode, quote_plus
-    from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
-    strtype = str
-else:
-    from urlparse import urlparse
-    from urllib import urlencode, quote_plus
-    from httplib import HTTPConnection, HTTPSConnection, BadStatusLine
-    strtype = basestring
+from urllib.parse import urlparse, urlencode, quote_plus
+from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 
 
 __all__ = (
@@ -182,32 +112,18 @@ def random_id2():
     ])
 
 
-if sys.version_info >= (3, 0):
-    def dc3_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        return loads(env_s.decode('utf-8'))
-else:
-    def dc3_env():
-        env_s = subprocess.check_output(DC3_CMD)
-        env = loads(env_s)
-        env['url'] = env['url'].encode('utf-8')
-        return env
+def dc3_env():
+    import subprocess
+    env_s = subprocess.check_output(DC3_CMD)
+    return loads(env_s.decode('utf-8'))
 
 
-if sys.version_info >= (3, 0):
-    def _json_body(obj):
-        if obj is None:
-            return None
-        if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
-            return obj
-        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
-else:
-    def _json_body(obj):
-        if obj is None:
-            return None
-        if isinstance(obj, (file, io.BytesIO)):
-            return obj
-        return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+def _json_body(obj):
+    if obj is None:
+        return None
+    if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
+        return obj
+    return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
 def _queryiter(options):
@@ -219,7 +135,7 @@ def _queryiter(options):
     """
     for key in sorted(options):
         value = options[key]
-        if key in ('key', 'startkey', 'endkey') or not isinstance(value, strtype):
+        if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
             value = dumps(value)
         yield (key, value)
 
@@ -234,9 +150,7 @@ def _oauth_sign(oauth, base_string):
         oauth[k] for k in ('consumer_secret', 'token_secret')
     ).encode('utf-8')
     h = hmac.new(key, base_string.encode('utf-8'), sha1)
-    if sys.version_info >= (3, 0):
-        return b64encode(h.digest()).decode('utf-8')
-    return b64encode(h.digest())
+    return b64encode(h.digest()).decode('utf-8')
 
 
 def _oauth_header(oauth, method, baseurl, query, testing=None):
@@ -279,7 +193,7 @@ class HTTPError(Exception):
         self.data = data
         self.method = method
         self.url = url
-        super(HTTPError, self).__init__()
+        super().__init__()
 
     def __str__(self):
         return '{} {}: {} {}'.format(
@@ -638,7 +552,7 @@ class Server(CouchBase):
     """
 
     def __init__(self, env=SERVER):
-        super(Server, self).__init__(env)
+        super().__init__(env)
 
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
@@ -679,7 +593,7 @@ class Database(CouchBase):
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, env=SERVER):
-        super(Database, self).__init__(env)
+        super().__init__(env)
         self.name = name
         self.basepath += (name + '/')
 

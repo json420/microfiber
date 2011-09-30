@@ -23,11 +23,6 @@
 Unit tests for `microfiber` module.
 """
 
-# FIXME: There is some rather hacky crap in here to support both Python2 and
-# Python3... but once we migrate dmedia to Python3, we'll drop Python2 support
-# in microfiber and clean this up a bit.
-
-import sys
 from unittest import TestCase
 import os
 from os import path
@@ -40,15 +35,12 @@ import io
 import tempfile
 import shutil
 from hashlib import md5
-if sys.version_info >= (3, 0):
-    from urllib.parse import urlparse, urlencode
-    from http.client import HTTPConnection, HTTPSConnection
-else:
-    from urlparse import urlparse
-    from httplib import HTTPConnection, HTTPSConnection
+from urllib.parse import urlparse, urlencode
+from http.client import HTTPConnection, HTTPSConnection
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
+
 
 # OAuth test string from http://oauth.net/core/1.0a/#anchor46
 BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
@@ -68,10 +60,7 @@ class TestFunctions(TestCase):
 
     def test_random_id(self):
         _id = microfiber.random_id()
-        if sys.version_info >= (3, 0):
-            self.assertIsInstance(_id, str)
-        else:
-            self.assertIsInstance(_id, unicode)
+        self.assertIsInstance(_id, str)
         self.assertEqual(len(_id), 24)
         b = b32decode(_id.encode('ascii'))
         self.assertIsInstance(b, bytes)
@@ -79,10 +68,7 @@ class TestFunctions(TestCase):
 
     def test_random_id2(self):
         _id = microfiber.random_id2()
-        if sys.version_info >= (3, 0):
-            self.assertIsInstance(_id, str)
-        else:
-            self.assertIsInstance(_id, unicode)
+        self.assertIsInstance(_id, str)
         self.assertEqual(len(_id), 27)
         (t, r) = _id.split('.')
         self.assertEqual(len(t), 10)
@@ -139,10 +125,7 @@ class TestFunctions(TestCase):
             self.assertIs(microfiber._json_body(fp), fp)
         finally:
             shutil.rmtree(d)
-            
-        # FIXME: There is no way to do this correctly in Python2
-        if sys.version_info < (3, 0):
-            return
+
         # Test when obj is pre-encoded bytes
         self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
 
