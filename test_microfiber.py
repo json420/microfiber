@@ -30,7 +30,6 @@ from os import path
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
-import subprocess
 import time
 import io
 import tempfile
@@ -38,6 +37,11 @@ import shutil
 from hashlib import md5
 from urllib.parse import urlparse, urlencode
 from http.client import HTTPConnection, HTTPSConnection
+
+try:
+    import usercouch.misc
+except ImportError:
+    usercouch = None
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -481,27 +485,20 @@ class TestDatabase(TestCase):
 
 
 class LiveTestCase(TestCase):
-
-    def getvar(self, key):
-        try:
-            return os.environ[key]
-        except KeyError:
-            self.skipTest('{} not set'.format(key))
+    db = 'test_microfiber'
 
     def setUp(self):
-        self.db = self.getvar('MICROFIBER_TEST_DB')
-        if os.environ.get('MICROFIBER_TEST_DC3') == 'true':
-            self.env = microfiber.dc3_env()
-            if os.environ.get('MICROFIBER_TEST_BASIC_AUTH') == 'true':
-                # Force use of basic auth even if env['oauth'] exists
-                self.env['oauth'] = None
-        else:
-            self.env = {'url': self.getvar('MICROFIBER_TEST_URL')}
-        cb = microfiber.CouchBase(self.env)
-        try:
-            cb.delete(self.db)
-        except microfiber.NotFound:
-            pass
+        if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
+            self.skipTest('called with --no-live')
+        if usercouch is None:
+            self.skipTest('`usercouch` not installed')
+        self.oauth = (os.environ.get('MICROFIBER_TEST_OAUTH') == 'true')
+        self.tmpcouch = usercouch.misc.TempCouch()
+        self.env = self.tmpcouch.bootstrap(self.oauth)
+
+    def tearDown(self):
+        self.tmpcouch = None
+        self.env = None
 
 
 class TestCouchBaseLive(LiveTestCase):
