@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 
-# Authors:
-#   Jason Gerard DeRose <jderose@novacut.com>
-#
 # microfiber: fabric for a lightweight Couch
-# Copyright (C) 2011 Jason Gerard DeRose <jderose@novacut.com>
+# Copyright (C) 2011 Novacut Inc
 #
 # This file is part of `microfiber`.
 #
@@ -20,6 +17,10 @@
 #
 # You should have received a copy of the GNU Lesser General Public License along
 # with `microfiber`.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Authors:
+#   Jason Gerard DeRose <jderose@novacut.com>
+#
 
 """
 Install `microfiber`.
