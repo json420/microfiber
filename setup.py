@@ -39,46 +39,28 @@ from urllib.parse import urlparse
 import microfiber
 
 
-TEST_DB = 'test_microfiber'
-
-
 class Test(Command):
     description = 'run unit tests and doc tests'
 
     user_options = [
-        ('live', None, 'also run live tests against running CouchDB'),
-        ('dc3', None, 'test with dc3 using `dc3-control GetEnv`'),
-        ('basic', None, 'force dc3 couch tests to use basic auth'),
-        ('url=', None,
-            'live test server URL; default is {!r}'.format(microfiber.SERVER)
-        ),
-        ('db=', None,
-            'live test database name; default is {!r}'.format(TEST_DB)
-        ),
+        ('no-live', None, 'skip live tests against tmp CouchDB instances'),
+        ('oauth', None, 'run live tests using oauth instead of basic auth'),
     ]
 
     def initialize_options(self):
-        self.live = 0
-        self.dc3 = 0
-        self.basic = 0
-        self.url = microfiber.SERVER
-        self.db = TEST_DB
+        self.no_live = 0
+        self.oauth = 0
 
     def finalize_options(self):
-        t = urlparse(self.url)
-        if t.scheme not in ('http', 'https') or t.netloc == '':
-            raise SystemExit('ERROR: invalid url: {!r}'.format(self.url))
+        pass
 
     def run(self):
         # Possibly set environ variables for live test:
-        if self.live or self.dc3:
-            os.environ['MICROFIBER_TEST_DB'] = self.db
-        if self.live:
-            os.environ['MICROFIBER_TEST_URL'] = self.url
-        if self.dc3:
-            os.environ['MICROFIBER_TEST_DC3'] = 'true'
-        if self.basic:
-            os.environ['MICROFIBER_TEST_BASIC_AUTH'] = 'true'
+        if self.no_live:
+            os.environ['MICROFIBER_TEST_NO_LIVE'] = 'true'
+
+        if self.oauth:
+            os.environ['MICROFIBER_TEST_OAUTH'] = 'true'
 
         pynames = ['microfiber', 'test_microfiber']
 
