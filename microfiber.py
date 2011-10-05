@@ -75,7 +75,7 @@ __all__ = (
 __version__ = '11.10.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
-DC3_CMD = ('/usr/bin/dc3-control', 'GetEnv')
+DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
 
 RANDOM_BITS = 120
 RANDOM_BYTES = RANDOM_BITS // 8
