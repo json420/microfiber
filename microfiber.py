@@ -107,7 +107,7 @@ def random_id2():
     '1313567384.67DFPERIOU66CT56'
 
     """
-    return '.'.join([
+    return '-'.join([
         str(int(time.time())),
         b32encode(urandom(10)).decode('utf-8')
     ])

@@ -75,7 +75,7 @@ class TestFunctions(TestCase):
         _id = microfiber.random_id2()
         self.assertIsInstance(_id, str)
         self.assertEqual(len(_id), 27)
-        (t, r) = _id.split('.')
+        (t, r) = _id.split('-')
         self.assertEqual(len(t), 10)
         self.assertTrue(int(t) > 1234567890)
         self.assertEqual(len(r), 16)
