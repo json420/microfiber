@@ -120,6 +120,7 @@ setup(
     author_email='jderose@novacut.com',
     license='LGPLv3+',
     py_modules=['microfiber'],
+    scripts=['microfiber-changes'],
     cmdclass={
         'test': Test,
         'build': build_with_docs,
