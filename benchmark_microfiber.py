@@ -1,12 +1,11 @@
 #!/usr/bin/python3
 
-import os
-from base64 import b32encode
 import time
 import platform
 import json
 import optparse
 
+from usercouch.misc import TempCouch
 import microfiber
 
 name = 'test_benchmark_microfiber'
@@ -15,42 +14,25 @@ keys = 50
 
 
 parser = optparse.OptionParser()
-parser.add_option('--dc3',
-    help='benchmark against dc3',
-    action='store_true',
-    default=False,
-)
-parser.add_option('--basic',
-    help='when used with --dc3, forces basic auth',
+parser.add_option('--oauth',
+    help='configure TempCouch with oauth',
     action='store_true',
     default=False,
 )
 (options, args) = parser.parse_args()
-if options.dc3:
-    env = microfiber.dc3_env()
-    if options.basic:
-        env['oauth'] = None
-else:
-    env = microfiber.SERVER
 
 
-s = microfiber.Server(env)
-try:
-    s.delete(name)
-except microfiber.NotFound:
-    pass
-db = s.database(name)
-db.ensure()
-
-
-def random_id():
-    return b32encode(os.urandom(15)).decode('ascii')
-
+tmpcouch = TempCouch()
+env = tmpcouch.bootstrap(options.oauth)
+print('\nenv = {!r}\n'.format(env))
+time.sleep(2)  # Let CouchDB settle a moment
+db = microfiber.Database(name, env)
+db.put(None)
 
 master = dict(
     ('a' * i, 'b' * i) for i in range(1, keys)
 )
-ids = tuple(random_id() for i in range(count))
+ids = tuple(microfiber.random_id() for i in range(count))
 docs = []
 total = 0
 
