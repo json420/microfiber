@@ -40,7 +40,7 @@ Launchpad project:
 """
 
 from os import urandom
-import io
+from io import BufferedReader
 from base64 import b32encode, b64encode
 from json import dumps, loads
 import time
@@ -122,7 +122,7 @@ def dc3_env():
 def _json_body(obj):
     if obj is None:
         return None
-    if isinstance(obj, (bytes, io.BufferedReader, io.BytesIO)):
+    if isinstance(obj, (bytes, BufferedReader)):
         return obj
     return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 

@@ -116,10 +116,6 @@ class TestFunctions(TestCase):
             microfiber._json_body(['one', True, 3]),
             b'["one",true,3]'
         )
-
-        # Test when obj is an io.BytesIO
-        obj = io.BytesIO(json_bytes)
-        self.assertIs(microfiber._json_body(obj), obj)
         
         # Test when obj in an open file
         d = tempfile.mkdtemp()
