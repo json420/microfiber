@@ -101,7 +101,7 @@ class build_with_docs(build):
         doctrees = path.join(tree, 'doc', '_build', 'doctrees')
         cmd = [
             sphinx,
-            '-W',  # Turn  warnings  into  errors
+            #'-W',  # Turn  warnings  into  errors
             '-E',  # Don't  use a saved environment
             '-b', 'html',
             '-d', doctrees,

@@ -72,7 +72,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '11.10.0'
+__version__ = '11.10.1'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
