@@ -42,7 +42,7 @@ Launchpad project:
 from os import urandom
 from io import BufferedReader
 from base64 import b32encode, b64encode
-from json import dumps, loads
+import json
 import time
 from hashlib import sha1
 import hmac
@@ -116,7 +116,7 @@ def random_id2():
 def dc3_env():
     import subprocess
     env_s = subprocess.check_output(DC3_CMD)
-    return loads(env_s.decode('utf-8'))
+    return json.loads(env_s.decode('utf-8'))
 
 
 def _json_body(obj):
@@ -124,7 +124,7 @@ def _json_body(obj):
         return None
     if isinstance(obj, (bytes, BufferedReader)):
         return obj
-    return dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+    return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
 
 
 def _queryiter(options):
@@ -137,7 +137,7 @@ def _queryiter(options):
     for key in sorted(options):
         value = options[key]
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
-            value = dumps(value)
+            value = json.dumps(value)
         yield (key, value)
 
 
@@ -202,7 +202,7 @@ class HTTPError(Exception):
         )
 
     def loads(self):
-        return loads(self.data.decode('utf-8'))
+        return json.loads(self.data.decode('utf-8'))
 
 
 class ClientError(HTTPError):
@@ -300,6 +300,22 @@ errors = {
     416: BadRangeRequest,
     417: ExpectationFailed,
 }
+
+
+class AllDocsIter(list):
+    __slots__ = ('_db', '_rows')
+
+    def __init__(self, db, rows):
+        super().__init__()
+        self._db = db
+        self._rows = rows
+
+    def __iter__(self):
+        for r in self._rows:
+            yield self._db.get(r['id'], rev=r['value']['rev'], attachments=True)
+ 
+    def __len__(self):
+        return len(self._rows)
 
 
 class CouchBase(object):
@@ -413,7 +429,7 @@ class CouchBase(object):
             body=_json_body(obj),
             headers={'Content-Type': 'application/json'},
         )
-        return loads(data.decode('utf-8'))
+        return json.loads(data.decode('utf-8'))
 
     def put(self, obj, *parts, **options):
         """
@@ -435,7 +451,7 @@ class CouchBase(object):
             body=_json_body(obj),
             headers={'Content-Type': 'application/json'},
         )
-        return loads(data.decode('utf-8'))
+        return json.loads(data.decode('utf-8'))
 
     def get(self, *parts, **options):
         """
@@ -454,7 +470,7 @@ class CouchBase(object):
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
         (response, data) = self._request('GET', parts, options)
-        return loads(data.decode('utf-8'))
+        return json.loads(data.decode('utf-8'))
 
     def delete(self, *parts, **options):
         """
@@ -473,7 +489,7 @@ class CouchBase(object):
 
         """
         (response, data) = self._request('DELETE', parts, options)
-        return loads(data.decode('utf-8'))
+        return json.loads(data.decode('utf-8'))
 
     def head(self, *parts, **options):
         """
@@ -509,7 +525,7 @@ class CouchBase(object):
             body=data,
             headers={'Content-Type': mime},
         )
-        return loads(data.decode('utf-8'))
+        return json.loads(data.decode('utf-8'))
 
     def get_att(self, *parts, **options):
         """
@@ -686,3 +702,8 @@ class Database(CouchBase):
             ``Database.get('_design', design, '_view', view, **options)``
         """
         return self.get('_design', design, '_view', view, **options)
+
+    def dump(self, fp):
+        rows = self.get('_all_docs')['rows']
+        docs = AllDocsIter(self, rows)
+        json.dump(docs, fp, sort_keys=True, separators=(',', ':'))
