@@ -302,20 +302,25 @@ errors = {
 }
 
 
-class AllDocsIter(list):
-    __slots__ = ('_db', '_rows')
+class FakeList(list):
+    __slots__ = ('_count', '_iterable')
 
-    def __init__(self, db, rows):
+    def __init__(self, count, iterable):
         super().__init__()
-        self._db = db
-        self._rows = rows
+        self._count = count
+        self._iterable = iterable
+
+    def __len__(self):
+        return self._count
 
     def __iter__(self):
-        for r in self._rows:
-            yield self._db.get(r['id'], rev=r['value']['rev'], attachments=True)
- 
-    def __len__(self):
-        return len(self._rows)
+        for doc in self._iterable:
+            yield doc
+
+
+def iter_all_docs(rows, db, attachments=True):
+    for r in rows:
+        yield db.get(r['id'], rev=r['value']['rev'], attachments=attachments)
 
 
 class CouchBase(object):
@@ -703,7 +708,8 @@ class Database(CouchBase):
         """
         return self.get('_design', design, '_view', view, **options)
 
-    def dump(self, fp):
+    def dump(self, fp, attachments=True):
         rows = self.get('_all_docs')['rows']
-        docs = AllDocsIter(self, rows)
-        json.dump(docs, fp, sort_keys=True, separators=(',', ':'))
+        iterable = iter_all_docs(rows, self, attachments)
+        docs = FakeList(len(rows), iterable)
+        json.dump(docs, fp, sort_keys=True, indent=4, separators=(',', ': '))
