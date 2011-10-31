@@ -320,7 +320,9 @@ class FakeList(list):
 
 def iter_all_docs(rows, db, attachments=True):
     for r in rows:
-        yield db.get(r['id'], rev=r['value']['rev'], attachments=attachments)
+        doc = db.get(r['id'], rev=r['value']['rev'], attachments=attachments)
+        del doc['_rev']
+        yield doc
 
 
 class CouchBase(object):
@@ -712,4 +714,8 @@ class Database(CouchBase):
         rows = self.get('_all_docs')['rows']
         iterable = iter_all_docs(rows, self, attachments)
         docs = FakeList(len(rows), iterable)
-        json.dump(docs, fp, sort_keys=True, indent=4, separators=(',', ': '))
+        json.dump({'docs': docs}, fp, sort_keys=True, indent=4, separators=(',', ': '))
+        
+    def load(self, fp):
+        return self.post(fp, '_bulk_docs')
+        
