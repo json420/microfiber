@@ -3,7 +3,6 @@ Section: python
 Priority: optional
 Maintainer: Jason Gerard DeRose <jderose@novacut.com>
 Build-Depends: debhelper (>= 8.9), python3 (>= 3.2),
-    python3-usercouch,
     python-sphinx,    
 Standards-Version: 3.9.2
 X-Python-Version: 3.2
