@@ -44,12 +44,14 @@ class Test(Command):
 
     user_options = [
         ('no-live', None, 'skip live tests against tmp CouchDB instances'),
-        ('oauth', None, 'run live tests using oauth instead of basic auth'),
+        ('auth=', None,
+            "live test with 'open', 'basic', or 'oauth'; default is 'basic'"
+        ),
     ]
 
     def initialize_options(self):
         self.no_live = 0
-        self.oauth = 0
+        self.auth = 'basic'
 
     def finalize_options(self):
         pass
@@ -58,9 +60,8 @@ class Test(Command):
         # Possibly set environ variables for live test:
         if self.no_live:
             os.environ['MICROFIBER_TEST_NO_LIVE'] = 'true'
-
-        if self.oauth:
-            os.environ['MICROFIBER_TEST_OAUTH'] = 'true'
+        else:
+            os.environ['MICROFIBER_TEST_AUTH'] = self.auth
 
         pynames = ['microfiber', 'test_microfiber']
 

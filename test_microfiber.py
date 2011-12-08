@@ -488,9 +488,9 @@ class LiveTestCase(TestCase):
             self.skipTest('called with --no-live')
         if usercouch is None:
             self.skipTest('`usercouch` not installed')
-        self.oauth = (os.environ.get('MICROFIBER_TEST_OAUTH') == 'true')
+        self.auth = os.environ.get('MICROFIBER_TEST_AUTH', 'basic')
         self.tmpcouch = usercouch.misc.TempCouch()
-        self.env = self.tmpcouch.bootstrap(self.oauth)
+        self.env = self.tmpcouch.bootstrap(self.auth)
 
     def tearDown(self):
         self.tmpcouch = None
