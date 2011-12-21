@@ -448,14 +448,31 @@ Functions
 .. function:: dc3_env()
 
     Return the dc3 environment information.
-    
+
     For example, to create a :class:`Database` with the correct per-user `dc3`_
     environment:
-    
+
     >>> from microfiber import dc3_env, Database
     >>> db = Database('dmedia', dc3_env())
     >>> db.url
     'http://localhost:41289/'
+
+
+.. function:: dmedia_env()
+
+    Return the Dmedia environment information.
+
+    For example, to create a :class:`Database` with the correct per-user
+    `Dmedia`_ environment:
+
+    >>> from microfiber import dmedia_env, Database
+    >>> db = Database('dmedia', dmedia_env())
+    >>> db.url
+    'http://localhost:41289/'
+
+    If you're using Microfiber to work with Dmedia or Novacut, please use this
+    function instead of :func:`dc3_env()` as starting with the Dmedia 12.01
+    release, Dmedia itself will be what starts CouchDB. 
 
 
 Exceptions
@@ -552,6 +569,7 @@ Exceptions
 .. _`Novacut`: https://wiki.ubuntu.com/Novacut
 .. _`desktopcouch`: https://launchpad.net/desktopcouch
 .. _`dc3`: https://launchpad.net/dc3
+.. _`Dmedia`: https://launchpad.net/dmedia
 .. _`python-couchdb`: http://packages.python.org/CouchDB/client.html#database
 
 

@@ -76,6 +76,7 @@ __version__ = '11.12.0'
 USER_AGENT = 'microfiber ' + __version__
 SERVER = 'http://localhost:5984/'
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
+DMEDIA_CMD = ('/usr/bin/dmedia-cli', 'GetEnv')
 
 RANDOM_BITS = 120
 RANDOM_BYTES = RANDOM_BITS // 8
@@ -117,6 +118,14 @@ def dc3_env():
     import subprocess
     env_s = subprocess.check_output(DC3_CMD)
     return json.loads(env_s.decode('utf-8'))
+
+
+def dmedia_env():
+    from gi.repository import Gio
+    conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+    bus = 'org.freedesktop.DMedia'
+    proxy = Gio.DBusProxy.new_sync(conn, 0, None, bus, '/', bus, None)
+    return json.loads(proxy.GetEnv())
 
 
 def _json_body(obj):

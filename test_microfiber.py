@@ -607,11 +607,11 @@ class TestCouchBaseLive(LiveTestCase):
         self.assertRaises(MethodNotAllowed, inst.post, None)
         self.assertRaises(MethodNotAllowed, inst.put, None)
         self.assertRaises(MethodNotAllowed, inst.delete)
-        self.assertEqual(
-            inst.get(),
-            {'couchdb': 'Welcome', 'version': '1.1.0'}
-        )
-
+        ret = inst.get()
+        self.assertIsInstance(ret, dict)
+        self.assertEqual(set(ret), set(['couchdb', 'version']))
+        self.assertEqual(ret['couchdb'], 'Welcome')
+        self.assertIsInstance(ret['version'], str)
 
         #####################
         # Create the database
