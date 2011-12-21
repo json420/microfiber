@@ -12,6 +12,9 @@ Microfiber is being developed as part of the `Novacut`_ project.  Microfiber
 packages are available for Ubuntu in the `Novacut Stable Releases PPA`_ and the
 `Novacut Daily Builds PPA`_.
 
+If you have questions or need help getting started with Microfiber, please stop
+by the `#novacut`_ IRC channel on freenode.
+
 Microfiber is licensed `LGPLv3+`_.
 
 
@@ -33,4 +36,5 @@ Contents:
 .. _`Novacut`: https://wiki.ubuntu.com/Novacut
 .. _`Novacut Stable Releases PPA`: https://launchpad.net/~novacut/+archive/stable
 .. _`Novacut Daily Builds PPA`: https://launchpad.net/~novacut/+archive/daily
+.. _`#novacut`: http://webchat.freenode.net/?channels=novacut
 
