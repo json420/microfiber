@@ -470,7 +470,7 @@ Functions
     >>> db.url
     'http://localhost:41289/'
 
-    If you are using Microfiber to work with Dmedia or Novacut, please use this
+    If you're using Microfiber to work with Dmedia or Novacut, please use this
     function instead of :func:`dc3_env()` as starting with the Dmedia 12.01
     release, Dmedia itself will be what starts CouchDB. 
 
