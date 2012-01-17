@@ -121,11 +121,9 @@ def dc3_env():
 
 
 def dmedia_env():
-    from gi.repository import Gio
-    conn = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-    bus = 'org.freedesktop.DMedia'
-    proxy = Gio.DBusProxy.new_sync(conn, 0, None, bus, '/', bus, None)
-    return json.loads(proxy.GetEnv())
+    import subprocess
+    env_s = subprocess.check_output(DC3_CMD)
+    return json.loads(env_s.decode('utf-8'))
 
 
 def _json_body(obj):
