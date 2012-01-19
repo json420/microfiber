@@ -122,7 +122,7 @@ def dc3_env():
 
 def dmedia_env():
     import subprocess
-    env_s = subprocess.check_output(DC3_CMD)
+    env_s = subprocess.check_output(DMEDIA_CMD)
     return json.loads(env_s.decode('utf-8'))
 
 
