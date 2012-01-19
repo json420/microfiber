@@ -1,5 +1,5 @@
-microfiber (12.01.0-0~precise) precise; urgency=low
+microfiber (12.01.1-0~precise) precise; urgency=low
 
-  * Upstream 12.01.0 pre-release
+  * Upstream 12.01.1 pre-release
 
  -- Jason Gerard DeRose <jderose@novacut.com>  Tue, 27 Dec 2011 06:22:13 +0000
