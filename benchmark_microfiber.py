@@ -23,7 +23,8 @@ parser.add_option('--oauth',
 
 
 tmpcouch = TempCouch()
-env = tmpcouch.bootstrap(options.oauth)
+auth = ('oauth' if options.oauth else 'basic')
+env = tmpcouch.bootstrap(auth)
 print('\nenv = {!r}\n'.format(env))
 time.sleep(2)  # Let CouchDB settle a moment
 db = microfiber.Database(name, env)
