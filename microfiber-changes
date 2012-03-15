@@ -3,14 +3,14 @@
 import sys
 import json
 
-from microfiber import Database, dc3_env
+from microfiber import Database, dmedia_env
 
 
 if len(sys.argv) != 2:
     print('takes exactly one argument DBNAME')
     sys.exit(1)
 name = sys.argv[1]
-db = Database(name, dc3_env())
+db = Database(name, dmedia_env())
 
 last_seq = db.get()['update_seq']
 print('[monitoring changes from update_seq {}]'.format(last_seq))
