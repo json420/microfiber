@@ -379,8 +379,8 @@ class CouchBase(object):
         self.url = self._full_url(self.basepath)
         self._oauth = self.env.get('oauth')
         self._basic = self.env.get('basic')
-        klass = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
-        self.conn = klass(t.netloc)
+        self.Conn = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
+        self.conn = self.Conn(t.netloc)
 
     def _full_url(self, path):
         return ''.join([self.scheme, '://', self.netloc, path])
