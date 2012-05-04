@@ -4,6 +4,7 @@ import time
 import platform
 import json
 import optparse
+from subprocess import check_call
 
 from usercouch.misc import TempCouch
 import microfiber
@@ -26,9 +27,10 @@ tmpcouch = TempCouch()
 auth = ('oauth' if options.oauth else 'basic')
 env = tmpcouch.bootstrap(auth)
 print('\nenv = {!r}\n'.format(env))
-time.sleep(2)  # Let CouchDB settle a moment
 db = microfiber.Database(name, env)
 db.put(None)
+time.sleep(3)  # Let CouchDB settle a moment
+check_call(['/bin/sync'])  # Flush any pending IO so test is more consistent
 
 master = dict(
     ('a' * i, 'b' * i) for i in range(1, keys)
