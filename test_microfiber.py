@@ -37,6 +37,7 @@ import shutil
 from hashlib import md5
 from urllib.parse import urlparse, urlencode
 from http.client import HTTPConnection, HTTPSConnection
+import threading
 
 try:
     import usercouch.misc
@@ -354,6 +355,15 @@ class TestCouchBase(TestCase):
 
         inst = self.klass({'basic': 'bar'})
         self.assertEqual(inst._basic, 'bar')
+
+    def test_conn(self):
+        inst = microfiber.CouchBase()
+        self.assertIsInstance(inst._threadlocal, threading.local)
+        value = random_id()
+        inst._threadlocal.conn = value
+        self.assertEqual(inst.conn, value)
+        delattr(inst._threadlocal, 'conn')
+        self.assertIsInstance(inst.conn, HTTPConnection)
 
     def test_full_url(self):
         inst = self.klass('https://localhost:5003/')

@@ -48,6 +48,7 @@ from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
+import threading
 
 
 __all__ = (
@@ -380,7 +381,13 @@ class CouchBase(object):
         self._oauth = self.env.get('oauth')
         self._basic = self.env.get('basic')
         self.Conn = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
-        self.conn = self.Conn(t.netloc)
+        self._threadlocal = threading.local()
+
+    @property
+    def conn(self):
+        if not hasattr(self._threadlocal, 'conn'):
+            self._threadlocal.conn = self.Conn(self.netloc)
+        return self._threadlocal.conn
 
     def _full_url(self, path):
         return ''.join([self.scheme, '://', self.netloc, path])
