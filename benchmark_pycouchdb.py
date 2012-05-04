@@ -6,6 +6,7 @@ from base64 import b32encode
 import time
 import platform
 import json
+from subprocess import check_call
 
 import couchdb
 
@@ -19,6 +20,9 @@ try:
 except couchdb.ResourceNotFound:
     pass
 db = s.create(name)
+
+time.sleep(3)  # Let CouchDB settle a moment
+check_call(['/bin/sync'])  # Flush any pending IO so test is more consistent
 
 
 def random_id():

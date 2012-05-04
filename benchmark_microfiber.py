@@ -29,7 +29,7 @@ env = tmpcouch.bootstrap(auth)
 print('\nenv = {!r}\n'.format(env))
 db = microfiber.Database(name, env)
 db.put(None)
-time.sleep(2)  # Let CouchDB settle a moment
+time.sleep(3)  # Let CouchDB settle a moment
 check_call(['/bin/sync'])  # Flush any pending IO so test is more consistent
 
 master = dict(
