@@ -544,7 +544,6 @@ class TestDatabase(TestCase):
 
 class LiveTestCase(TestCase):
     db = 'test_microfiber'
-    dbname = 'test_microfiber'
 
     def setUp(self):
         if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
@@ -859,7 +858,7 @@ class TestDatabaseLive(LiveTestCase):
 
         Pro tip: use this!
         """
-        db = microfiber.Database(self.dbname, self.env)
+        db = microfiber.Database(self.db, self.env)
         db.ensure()
         db.post({'_id': 'example'})
         me = db.get('example')
@@ -925,7 +924,7 @@ class TestDatabaseLive(LiveTestCase):
 
         Pro tip: these are not the semantics you're looking for!
         """
-        db = microfiber.Database(self.dbname, self.env)
+        db = microfiber.Database(self.db, self.env)
         db.ensure()
         db.post({'_id': 'example'})
         me = db.get('example')
@@ -1012,7 +1011,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
     def test_bulksave(self):
-        db = microfiber.Database(self.dbname, self.env)
+        db = microfiber.Database(self.db, self.env)
         self.assertTrue(db.ensure())
 
         # Test that doc['_id'] gets set automatically
@@ -1088,7 +1087,7 @@ class TestDatabaseLive(LiveTestCase):
                 self.assertEqual(real, doc)
 
     def test_bulksave2(self):
-        db = microfiber.Database(self.dbname, self.env)
+        db = microfiber.Database(self.db, self.env)
         self.assertTrue(db.ensure())
 
         # Test that doc['_id'] gets set automatically
@@ -1174,7 +1173,7 @@ class TestDatabaseLive(LiveTestCase):
                 self.assertEqual(doc, real)
 
     def test_bulk_get(self):
-        db = microfiber.Database(self.dbname, self.env)
+        db = microfiber.Database(self.db, self.env)
         self.assertTrue(db.ensure())
 
         ids = tuple(test_id() for i in range(50))
