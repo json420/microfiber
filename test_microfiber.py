@@ -822,31 +822,81 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulk_assumptions(self):
-        db = microfiber.Database('one', self.env)
-        self.assertTrue(db.ensure())
-        id1 = random_id()
-        id2 = random_id()
-        doc1 = {'_id': id1, 'x': 'foo'}
-        doc2 = {'_id': id2, 'x': 'foo'}
+        ########################################################################
+        # Test "non-atomic"
+        # Result: a conflict causes no update, and we know of the conflict
+        db = microfiber.Database('non-atomic', self.env)
+        db.ensure()
+        db.post({'_id': 'example'})
+        me = db.get('example')
+        you = db.get('example')
+        self.assertEqual(me,
+            {
+                '_id': 'example',
+                '_rev': '1-967a00dff5e02add41819138abb3284d',
+            }
+        )
+        self.assertEqual(me, you)
 
-        db.post({'docs': [doc1, doc2]}, '_bulk_docs')
-        self.assertEqual(db.get(id1)['x'], 'foo')
-        self.assertEqual(db.get(id2)['x'], 'foo')
+        # you make a change, creating a conflict for me
+        you['x'] = 'foo'
+        db.post({'docs': [you]}, '_bulk_docs')
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
 
-        doc1 = db.get(id1)
-        doc2 = db.get(id2)
+        # me makes a change, what happens?
+        me['y'] = 'bar'
+        db.post({'docs': [me]}, '_bulk_docs')
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
 
-        doc = db.get(id2)
-        doc['y'] = 'hello'
-        db.save(doc)
+        ########################################################################
+        # Test "all-or-nothing"
+        # Result: a conflicting document silently replaces the previous
+        db = microfiber.Database('all-or-nothing', self.env)
+        db.ensure()
+        db.post({'_id': 'example'})
+        me = db.get('example')
+        you = db.get('example')
+        self.assertEqual(me,
+            {
+                '_id': 'example',
+                '_rev': '1-967a00dff5e02add41819138abb3284d',
+            }
+        )
+        self.assertEqual(me, you)
 
-        doc1['x'] = 'bar'
-        doc2['x'] = 'bar'
-        db.post({'docs': [doc1, doc2]}, '_bulk_docs')
-        self.assertEqual(db.get(id1)['x'], 'bar')
-        self.assertEqual(db.get(id2)['x'], 'foo')
-        self.assertEqual(db.get(id2), doc)
-        
+        # you make a change, creating a conflict for me
+        you['x'] = 'foo'
+        db.post({'docs': [you], 'all_or_nothing': True}, '_bulk_docs')
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
+
+        # me makes a change, what happens?
+        me['y'] = 'bar'
+        db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-34e30c39538299cfed3958f6692f794d',
+                'y': 'bar',
+            }
+        )
 
     def test_bulksave(self):
         inst = self.klass(self.db, self.env)
