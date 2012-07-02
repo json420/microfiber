@@ -1172,7 +1172,7 @@ class TestDatabaseLive(LiveTestCase):
                 self.assertEqual(row['rev'], real['_rev'])
                 self.assertEqual(doc, real)
 
-    def test_bulk_get(self):
+    def test_get_many(self):
         db = microfiber.Database(self.db, self.env)
         self.assertTrue(db.ensure())
 
@@ -1181,24 +1181,24 @@ class TestDatabaseLive(LiveTestCase):
         db.bulksave(docs)
 
         # Test an empty doc_ids list
-        self.assertEqual(db.bulk_get([]), [])
+        self.assertEqual(db.get_many([]), [])
 
-        # Test a bulk_get on all the docs
-        self.assertEqual(db.bulk_get(ids), docs)
+        # Test a get_many on all the docs
+        self.assertEqual(db.get_many(ids), docs)
 
         # Test with some random subsets
         rdocs = random.sample(docs, 40)
-        self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
+        self.assertEqual(db.get_many([d['_id'] for d in rdocs]), rdocs)
 
         rdocs = random.sample(docs, 20)
-        self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
+        self.assertEqual(db.get_many([d['_id'] for d in rdocs]), rdocs)
 
         rdocs = random.sample(docs, 10)
-        self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
+        self.assertEqual(db.get_many([d['_id'] for d in rdocs]), rdocs)
 
         # Test with duplicate ids
         self.assertEqual(
-            db.bulk_get([ids[7], ids[7], ids[7]]),
+            db.get_many([ids[7], ids[7], ids[7]]),
             [docs[7], docs[7], docs[7]]
         )
             

@@ -750,7 +750,7 @@ class Database(CouchBase):
             doc['_rev'] = row['rev']
         return rows
 
-    def bulk_get(self, doc_ids):
+    def get_many(self, doc_ids):
         """
         Convenience method to retrieve multiple documents at once.
 
