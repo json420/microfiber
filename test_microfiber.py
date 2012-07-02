@@ -848,14 +848,16 @@ class TestDatabaseLive(LiveTestCase):
             self.assertTrue(d['_rev'].startswith('1-'))
             self.assertEqual(d['n'], i)
 
-    def test_bulk_assumptions(self):
+    def test_bulk_non_atomic(self):
         """
-        Verify our assumptions about CouchDB bulk update semantics.
+        Verify our assumptions about CouchDB "non-atomic" bulk semantics.
+
+        Results: conflicting docs are not updated, and we now which docs were
+        conflicting; non-conflicting doc get updated normally.
+
+        Pro tip: use this!
         """
-        ###################
-        # Test "non-atomic"
-        # Result: a conflict causes no update, and we know about the conflict
-        db = microfiber.Database('non-atomic', self.env)
+        db = microfiber.Database(self.dbname, self.env)
         db.ensure()
         db.post({'_id': 'example'})
         me = db.get('example')
@@ -870,7 +872,7 @@ class TestDatabaseLive(LiveTestCase):
 
         # you make a change, creating a conflict for me
         you['x'] = 'foo'
-        db.post({'docs': [you]}, '_bulk_docs')
+        db.save(you)
         self.assertEqual(db.get('example'),
             {
                 '_id': 'example',
@@ -881,7 +883,11 @@ class TestDatabaseLive(LiveTestCase):
 
         # me makes a change, what happens?
         me['y'] = 'bar'
-        db.post({'docs': [me]}, '_bulk_docs')
+        rows = db.post({'docs': [me]}, '_bulk_docs')
+        self.assertEqual(
+            rows,
+            [{'id': 'example', 'error': 'conflict', 'reason': 'Document update conflict.'}]
+        )
         self.assertEqual(db.get('example'),
             {
                 '_id': 'example',
@@ -890,10 +896,34 @@ class TestDatabaseLive(LiveTestCase):
             }
         )
 
-        #######################
-        # Test "all-or-nothing"
-        # Result: a conflicting document silently replaces the previous
-        db = microfiber.Database('all-or-nothing', self.env)
+    def test_bulk_all_or_nothing(self):
+        """
+        Verify our assumptions about CouchDB "all-or-nothing" bulk semantics.
+
+        Results: subtle and surprising, unlikely what you want!  Totally
+        different behavior when both ends are at the same revision number vs
+        when one is ahead in revision number!
+
+        For example, in this case the last change wins:
+
+            1. Sue and Ann both get the "1-" rev of the "foo" doc
+            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
+            3. Ann bulksaves a change in "foo"
+            4. Ann has the winning "2-" rev of "foo"
+
+        But in this case, something totally different happens:
+
+            1. Sue and Ann both get the "1-" rev of the "foo" doc
+            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
+            3. Sue saves/bulksaves a *2nd* change in "foo", now at rev "3-"
+            4. Ann bulksaves a change in "foo"
+            5. Ann thinks she has the winning "2-" rev of "foo", but Ann didn't
+               make the last change according to rest of the world, and worse,
+               Ann thinks her "2-" rev is the lastest, when it's actually "3-"
+
+        Pro tip: these are not the semantics you're looking for!
+        """
+        db = microfiber.Database(self.dbname, self.env)
         db.ensure()
         db.post({'_id': 'example'})
         me = db.get('example')
@@ -908,7 +938,7 @@ class TestDatabaseLive(LiveTestCase):
 
         # you make a change, creating a conflict for me
         you['x'] = 'foo'
-        db.post({'docs': [you], 'all_or_nothing': True}, '_bulk_docs')
+        db.save(you)
         self.assertEqual(db.get('example'),
             {
                 '_id': 'example',
@@ -919,12 +949,63 @@ class TestDatabaseLive(LiveTestCase):
 
         # me makes a change, what happens?
         me['y'] = 'bar'
-        db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
+        rows = db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
+        self.assertEqual(
+            rows,
+            [{'id': 'example', 'rev': '2-34e30c39538299cfed3958f6692f794d'}]
+        )
         self.assertEqual(db.get('example'),
             {
                 '_id': 'example',
                 '_rev': '2-34e30c39538299cfed3958f6692f794d',
                 'y': 'bar',
+            }
+        )
+
+        # Seems like reasonable last-one-wins, right? Not so fast! Let's try
+        # another example:
+        db.post({'_id': 'example2'})
+        me = db.get('example2')
+        you = db.get('example2')
+        self.assertEqual(me,
+            {
+                '_id': 'example2',
+                '_rev': '1-967a00dff5e02add41819138abb3284d',
+            }
+        )
+        self.assertEqual(me, you)
+
+        # you make *two* changes, creating a conflict for me
+        you['x'] = 'foo'
+        db.save(you)
+        self.assertEqual(db.get('example2'),
+            {
+                '_id': 'example2',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
+        db.save(you)
+        self.assertEqual(db.get('example2'),
+            {
+                '_id': 'example2',
+                '_rev': '3-074e07f92324e448702162e585e718fb',
+                'x': 'foo',
+            }
+        )
+
+        # me makes a change, what happens?
+        me['y'] = 'bar'
+        rows = db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
+        self.assertEqual(
+            rows,
+            [{'id': 'example2', 'rev': '2-34e30c39538299cfed3958f6692f794d'}]
+        )
+        self.assertEqual(db.get('example2'),
+            {
+                '_id': 'example2',
+                '_rev': '3-074e07f92324e448702162e585e718fb',
+                'x': 'foo',
             }
         )
 
