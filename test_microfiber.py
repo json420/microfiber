@@ -38,6 +38,7 @@ from hashlib import md5
 from urllib.parse import urlparse, urlencode
 from http.client import HTTPConnection, HTTPSConnection
 import threading
+from random import SystemRandom
 
 try:
     import usercouch.misc
@@ -48,9 +49,10 @@ import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
+random = SystemRandom()
+
 # OAuth test string from http://oauth.net/core/1.0a/#anchor46
 BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
-
 
 B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
@@ -1170,3 +1172,34 @@ class TestDatabaseLive(LiveTestCase):
                 self.assertTrue(real['_rev'].startswith('4-'))
                 self.assertEqual(row['rev'], real['_rev'])
                 self.assertEqual(doc, real)
+
+    def test_bulk_get(self):
+        db = microfiber.Database(self.dbname, self.env)
+        self.assertTrue(db.ensure())
+
+        ids = tuple(test_id() for i in range(50))
+        docs = [{'_id': _id} for _id in ids]
+        db.bulksave(docs)
+
+        # Test an empty doc_ids list
+        self.assertEqual(db.bulk_get([]), [])
+
+        # Test a bulk_get on all the docs
+        self.assertEqual(db.bulk_get(ids), docs)
+
+        # Test with some sample subsets
+        rdocs = random.sample(docs, 40)
+        self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
+
+        rdocs = random.sample(docs, 20)
+        self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
+
+        rdocs = random.sample(docs, 10)
+        self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
+
+        # Test with duplicate ids
+        self.assertEqual(
+            db.bulk_get([ids[7], ids[7], ids[7]]),
+            [docs[7], docs[7], docs[7]]
+        )
+            

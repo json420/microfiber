@@ -739,8 +739,8 @@ class Database(CouchBase):
         This method is similar `Database.save()`, except this method operates on
         a list of many docs at once.
 
-        If there are conflicts, the docs here will silently replace the previous
-        revision, without you being alerted.
+        Note: for subtle reasons that take a while to explain, you probably
+        don't want to use this method.
         """
         for doc in filter(lambda d: '_id' not in d, docs):
             doc['_id'] = random_id()
@@ -749,6 +749,14 @@ class Database(CouchBase):
             assert doc['_id'] == row['id']
             doc['_rev'] = row['rev']
         return rows
+
+    def bulk_get(self, doc_ids):
+        """
+
+        """
+        obj = {'keys': doc_ids}
+        result = self.post(obj, '_all_docs', include_docs=True)
+        return [row['doc'] for row in result['rows']]
 
     def view(self, design, view, **options):
         """
