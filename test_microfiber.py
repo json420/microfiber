@@ -1006,8 +1006,6 @@ class TestDatabaseLive(LiveTestCase):
 
     def test_bulksave2(self):
         db = microfiber.Database(self.dbname, self.env)
-
-        db = microfiber.Database(self.dbname, self.env)
         self.assertTrue(db.ensure())
 
         # Test that doc['_id'] gets set automatically
@@ -1049,7 +1047,7 @@ class TestDatabaseLive(LiveTestCase):
             if i % 2 == 0:
                 d = deepcopy(doc)
                 d['x'] = 'gotcha'
-                db.post(d)
+                db.save(d)
 
         # Now lets update all the docs, test all-or-nothing behaviour
         for doc in docs:
@@ -1062,3 +1060,32 @@ class TestDatabaseLive(LiveTestCase):
             self.assertTrue(doc['_rev'].startswith('3-'))
             self.assertEqual(doc['x'], 'bar')
             self.assertEqual(db.get(_id), doc)
+
+        # Again update half the docs out-of-band, but this time saving twice
+        # so the conflict is ahead in revision number:
+        for (i, doc) in enumerate(docs):
+            if i % 2 == 0:
+                d = deepcopy(doc)
+                d['x'] = 'gotcha'
+                db.save(d)
+                db.save(d)
+                self.assertTrue(d['_rev'].startswith('5-'))
+
+        # Now update all the docs again, realize all-or-nothing is a bad idea:
+        for doc in docs:
+            doc['x'] = 'baz'    
+        rows = db.bulksave2(docs)
+        for (i, row) in enumerate(rows):
+            _id = ids[i]
+            doc = docs[i]
+            real = db.get(_id)
+            self.assertEqual(row['id'], _id)
+            if i % 2 == 0:
+                self.assertEqual(real['x'], 'gotcha')
+                self.assertTrue(real['_rev'].startswith('5-'))
+                self.assertTrue(row['rev'].startswith('4-'))
+            else:
+                self.assertEqual(real['x'], 'baz')
+                self.assertTrue(real['_rev'].startswith('4-'))
+                self.assertEqual(row['rev'], real['_rev'])
+                self.assertEqual(doc, real)
