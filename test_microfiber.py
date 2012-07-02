@@ -52,8 +52,32 @@ from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
 
 
+B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+
+def is_microfiber_id(_id):
+    assert isinstance(_id, str)
+    return (
+        len(_id) == microfiber.RANDOM_B32LEN
+        and set(_id).issubset(B32ALPHABET)
+    )
+
+
 def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
+
+
+def test_id():
+    """
+    So we can tell our random test IDs from the ones microfiber.random_id()
+    makes, we use 160-bit IDs instead of 120-bit.
+    """
+    return b32encode(os.urandom(20)).decode('ascii')
+
+
+assert is_microfiber_id(microfiber.random_id())
+assert not is_microfiber_id(random_id())
+assert not is_microfiber_id(test_id())
 
 
 class FakeResponse(object):
@@ -518,6 +542,7 @@ class TestDatabase(TestCase):
 
 class LiveTestCase(TestCase):
     db = 'test_microfiber'
+    dbname = 'test_microfiber'
 
     def setUp(self):
         if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
@@ -537,8 +562,10 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
+        if os.environ.get('MICROFIBER_TEST_SKIP_SLOW') == 'true':
+            self.skipTest('called with --skip-slow')
+
         inst = self.klass(self.env)
-        return
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -822,9 +849,12 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(d['n'], i)
 
     def test_bulk_assumptions(self):
-        ########################################################################
+        """
+        Verify our assumptions about CouchDB bulk update semantics.
+        """
+        #####################################################################
         # Test "non-atomic"
-        # Result: a conflict causes no update, and we know of the conflict
+        # Result: a conflict causes no update, and we know about the conflict
         db = microfiber.Database('non-atomic', self.env)
         db.ensure()
         db.post({'_id': 'example'})
@@ -860,7 +890,7 @@ class TestDatabaseLive(LiveTestCase):
             }
         )
 
-        ########################################################################
+        ###############################################################
         # Test "all-or-nothing"
         # Result: a conflicting document silently replaces the previous
         db = microfiber.Database('all-or-nothing', self.env)
@@ -899,71 +929,46 @@ class TestDatabaseLive(LiveTestCase):
         )
 
     def test_bulksave(self):
-        inst = self.klass(self.db, self.env)
-        return
+        db = microfiber.Database(self.dbname, self.env)
+        self.assertTrue(db.ensure())
 
-        self.assertRaises(NotFound, inst.get)
-        self.assertEqual(inst.put(None), {'ok': True})
-        self.assertEqual(inst.get()['db_name'], self.db)
-        self.assertRaises(PreconditionFailed, inst.put, None)
+        # Test that doc['_id'] gets set automatically
+        markers = tuple(test_id() for i in range(10))
+        docs = [{'marker': m} for m in markers]
+        rows = db.bulksave(docs)
+        for (marker, doc, row) in zip(markers, docs, rows):
+            self.assertEqual(doc['marker'], marker)
+            self.assertEqual(doc['_id'], row['id'])
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertTrue(is_microfiber_id(doc['_id']))
 
-        docs = [{'_id': random_id(), 'foo': i} for i in range(1000)]
-        copy = deepcopy(docs)
-        rows = inst.bulksave(copy)
-        self.assertIsInstance(rows, list)
-        for (d, c) in zip(docs, copy):
-            self.assertEqual(d['_id'], c['_id'])
-            self.assertEqual(d['foo'], c['foo'])
-        for (r, c) in zip(rows, copy):
-            self.assertEqual(r['id'], c['_id'])
-            self.assertEqual(r['rev'], c['_rev'])
-            self.assertTrue(c['_rev'].startswith('1-'))
+        # Test when doc['_id'] is already present
+        ids = tuple(test_id() for i in range(10))
+        docs = [{'_id': _id} for _id in ids]
+        rows = db.bulksave(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertEqual(db.get(_id), doc)
 
-        old = docs
-        docs = copy
-        for d in docs:
-            d['bar'] = random_id()
-        copy = deepcopy(docs)
-        rows = inst.bulksave(copy)
-        for (d, c) in zip(docs, copy):
-            self.assertEqual(d['_id'], c['_id'])
-            self.assertLess(d['_rev'], c['_rev'])
-            self.assertEqual(d['foo'], c['foo'])
-            self.assertEqual(d['bar'], c['bar'])
-        for (r, c) in zip(rows, copy):
-            self.assertEqual(r['id'], c['_id'])
-            self.assertEqual(r['rev'], c['_rev'])
-            self.assertTrue(c['_rev'].startswith('2-'))
+        # Lets update all the docs
+        for doc in docs:
+            doc['x'] = 'foo'    
+        rows = db.bulksave(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('2-'))
+            self.assertEqual(doc['x'], 'foo')
+            self.assertEqual(db.get(_id), doc)
 
-        # Test that all these conflict
-        with self.assertRaises(microfiber.BulkConflict) as cm:
-            inst.bulksave(old)
-        self.assertEqual(str(cm.exception),
-            'conflict on 1000 docs'
-        )
-        self.assertIs(cm.exception.conflicts, old)
-        return
+        # Lets update half the docs out-of-band to create conflicts
+        
+        
 
-        # Test compacting the db
-        oldsize = inst.get()['disk_size']
-        self.assertEqual(inst.post(None, '_compact'), {'ok': True})
-        while True:
-            time.sleep(1)
-            if inst.get()['compact_running'] is False:
-                break
-        newsize = inst.get()['disk_size']
-        self.assertLess(newsize, oldsize)
-
-        # Test that _id is generated if missing:
-        docs = [{'n': i} for i in range(1000)]
-        rows = inst.bulksave(docs)
-        self.assertEqual(len(docs), len(rows))
-        i = 0
-        for (d, r) in zip(docs, rows):
-            self.assertEqual(set(d), set(['_id', '_rev', 'n']))
-            self.assertEqual(d['_id'], r['id'])
-            self.assertEqual(len(d['_id']), 24)
-            self.assertEqual(d['_rev'], r['rev'])
-            self.assertTrue(d['_rev'].startswith('1-'))
-            self.assertEqual(d['n'], i)
-            i += 1
+    def test_bulksave2(self):
+        db = microfiber.Database(self.dbname, self.env)

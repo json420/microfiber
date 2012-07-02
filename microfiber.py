@@ -705,10 +705,18 @@ class Database(CouchBase):
 
     def bulksave(self, docs):
         """
-        POST a list of docs to _bulk_docs, update all _rev in place.
+        Bulk-save using non-atomic semantics, updates all _rev in-place.
 
-        This method works just like `Database.save()`, except on a whole list
-        of docs all at once.
+        This method is similar `Database.save()`, except this method operates on
+        a list of many docs at once.
+
+        If there are conflicts, a `BulkConflict` exception will be raised, whose
+        ``conflicts`` attribute will be a list of the documents for which there
+        were conflicts.  Your request will *not* have modified these conflicting
+        documents in the database, similar to `Database.save()`.
+
+        However, all non-conflicting documents will have been saved and their
+        _rev updated in-place.
         """
         for doc in filter(lambda d: '_id' not in d, docs):
             doc['_id'] = random_id()
@@ -722,6 +730,24 @@ class Database(CouchBase):
                 conflicts.append(doc)
         if conflicts:
             raise BulkConflict(conflicts, rows)
+        return rows
+
+    def bulksave2(self, docs):
+        """
+        Bulk-save using all-or-nothing semantics, updates all _rev in-place.
+
+        This method is similar `Database.save()`, except this method operates on
+        a list of many docs at once.
+
+        If there are conflicts, the docs here will silently replace the previous
+        revision, without you being alerted.
+        """
+        for doc in filter(lambda d: '_id' not in d, docs):
+            doc['_id'] = random_id()
+        rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
+        for (doc, row) in zip(docs, rows):
+            assert doc['_id'] == row['id']
+            doc['_rev'] = row['rev']
         return rows
 
     def view(self, design, view, **options):
