@@ -38,6 +38,7 @@ from hashlib import md5
 from urllib.parse import urlparse, urlencode
 from http.client import HTTPConnection, HTTPSConnection
 import threading
+from random import SystemRandom
 
 try:
     import usercouch.misc
@@ -48,12 +49,37 @@ import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
+random = SystemRandom()
+
 # OAuth test string from http://oauth.net/core/1.0a/#anchor46
 BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
+
+B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+
+def is_microfiber_id(_id):
+    assert isinstance(_id, str)
+    return (
+        len(_id) == microfiber.RANDOM_B32LEN
+        and set(_id).issubset(B32ALPHABET)
+    )
 
 
 def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
+
+
+def test_id():
+    """
+    So we can tell our random test IDs from the ones microfiber.random_id()
+    makes, we use 160-bit IDs instead of 120-bit.
+    """
+    return b32encode(os.urandom(20)).decode('ascii')
+
+
+assert is_microfiber_id(microfiber.random_id())
+assert not is_microfiber_id(random_id())
+assert not is_microfiber_id(test_id())
 
 
 class FakeResponse(object):
@@ -284,6 +310,22 @@ class TestErrors(TestCase):
                 str(inst),
                 '{} {}: {} {}'.format(status, reason, method, url)
             )
+
+
+class TestBulkConflict(TestCase):
+    def test_init(self):
+        conflicts = ['foo', 'bar']
+        rows = ['raz', 'jaz']
+        inst = microfiber.BulkConflict(conflicts, rows)
+        self.assertEqual(str(inst), 'conflict on 2 docs')
+        self.assertIs(inst.conflicts, conflicts)
+        self.assertIs(inst.rows, rows)
+
+        conflicts = ['hello']
+        inst = microfiber.BulkConflict(conflicts, rows)
+        self.assertEqual(str(inst), 'conflict on 1 doc')
+        self.assertIs(inst.conflicts, conflicts)
+        self.assertIs(inst.rows, rows)
 
 
 class TestCouchBase(TestCase):
@@ -521,6 +563,9 @@ class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
+        if os.environ.get('MICROFIBER_TEST_SKIP_SLOW') == 'true':
+            self.skipTest('called with --skip-slow')
+
         inst = self.klass(self.env)
 
         # Create database
@@ -804,66 +849,356 @@ class TestDatabaseLive(LiveTestCase):
             self.assertTrue(d['_rev'].startswith('1-'))
             self.assertEqual(d['n'], i)
 
+    def test_bulk_non_atomic(self):
+        """
+        Verify our assumptions about CouchDB "non-atomic" bulk semantics.
+
+        Results: conflicting docs are not updated, and we know which docs were
+        conflicting; non-conflicting doc get updated normally.
+
+        Pro tip: use this!
+        """
+        db = microfiber.Database(self.db, self.env)
+        db.ensure()
+        db.post({'_id': 'example'})
+        me = db.get('example')
+        you = db.get('example')
+        self.assertEqual(me,
+            {
+                '_id': 'example',
+                '_rev': '1-967a00dff5e02add41819138abb3284d',
+            }
+        )
+        self.assertEqual(me, you)
+
+        # you make a change, creating a conflict for me
+        you['x'] = 'foo'
+        db.save(you)
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
+
+        # me makes a change, what happens?
+        me['y'] = 'bar'
+        rows = db.post({'docs': [me]}, '_bulk_docs')
+        self.assertEqual(
+            rows,
+            [{'id': 'example', 'error': 'conflict', 'reason': 'Document update conflict.'}]
+        )
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
+
+    def test_bulk_all_or_nothing(self):
+        """
+        Verify our assumptions about CouchDB "all-or-nothing" bulk semantics.
+
+        Results: subtle and surprising, unlikely what you want!  Totally
+        different behavior when both ends are at the same revision number vs
+        when one is ahead in revision number!
+
+        For example, in this case the last change wins:
+
+            1. Sue and Ann both get the "1-" rev of the "foo" doc
+            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
+            3. Ann bulksaves a change in "foo"
+            4. Ann has the winning "2-" rev of "foo"
+
+        But in this case, something totally different happens:
+
+            1. Sue and Ann both get the "1-" rev of the "foo" doc
+            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
+            3. Sue saves/bulksaves a *2nd* change in "foo", now at rev "3-"
+            4. Ann bulksaves a change in "foo"
+            5. Ann thinks she has the winning "2-" rev of "foo", but Ann didn't
+               make the last change according to rest of the world, and worse,
+               Ann thinks her "2-" rev is the lastest, when it's actually "3-"
+
+        Pro tip: these are not the semantics you're looking for!
+        """
+        db = microfiber.Database(self.db, self.env)
+        db.ensure()
+        db.post({'_id': 'example'})
+        me = db.get('example')
+        you = db.get('example')
+        self.assertEqual(me,
+            {
+                '_id': 'example',
+                '_rev': '1-967a00dff5e02add41819138abb3284d',
+            }
+        )
+        self.assertEqual(me, you)
+
+        # you make a change, creating a conflict for me
+        you['x'] = 'foo'
+        db.save(you)
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
+
+        # me makes a change, what happens?
+        me['y'] = 'bar'
+        rows = db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
+        self.assertEqual(
+            rows,
+            [{'id': 'example', 'rev': '2-34e30c39538299cfed3958f6692f794d'}]
+        )
+        self.assertEqual(db.get('example'),
+            {
+                '_id': 'example',
+                '_rev': '2-34e30c39538299cfed3958f6692f794d',
+                'y': 'bar',
+            }
+        )
+
+        # Seems like reasonable last-one-wins, right? Not so fast! Let's try
+        # another example:
+        db.post({'_id': 'example2'})
+        me = db.get('example2')
+        you = db.get('example2')
+        self.assertEqual(me,
+            {
+                '_id': 'example2',
+                '_rev': '1-967a00dff5e02add41819138abb3284d',
+            }
+        )
+        self.assertEqual(me, you)
+
+        # you make *two* changes, creating a conflict for me
+        you['x'] = 'foo'
+        db.save(you)
+        self.assertEqual(db.get('example2'),
+            {
+                '_id': 'example2',
+                '_rev': '2-047387155f2bb8c7cd80b0a5da505e9a',
+                'x': 'foo',
+            }
+        )
+        db.save(you)
+        self.assertEqual(db.get('example2'),
+            {
+                '_id': 'example2',
+                '_rev': '3-074e07f92324e448702162e585e718fb',
+                'x': 'foo',
+            }
+        )
+
+        # me makes a change, what happens?
+        me['y'] = 'bar'
+        rows = db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
+        self.assertEqual(
+            rows,
+            [{'id': 'example2', 'rev': '2-34e30c39538299cfed3958f6692f794d'}]
+        )
+        self.assertEqual(db.get('example2'),
+            {
+                '_id': 'example2',
+                '_rev': '3-074e07f92324e448702162e585e718fb',
+                'x': 'foo',
+            }
+        )
+
     def test_bulksave(self):
-        inst = self.klass(self.db, self.env)
+        db = microfiber.Database(self.db, self.env)
+        self.assertTrue(db.ensure())
 
-        self.assertRaises(NotFound, inst.get)
-        self.assertEqual(inst.put(None), {'ok': True})
-        self.assertEqual(inst.get()['db_name'], self.db)
-        self.assertRaises(PreconditionFailed, inst.put, None)
+        # Test that doc['_id'] gets set automatically
+        markers = tuple(test_id() for i in range(10))
+        docs = [{'marker': m} for m in markers]
+        rows = db.bulksave(docs)
+        for (marker, doc, row) in zip(markers, docs, rows):
+            self.assertEqual(doc['marker'], marker)
+            self.assertEqual(doc['_id'], row['id'])
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertTrue(is_microfiber_id(doc['_id']))
 
-        docs = [{'_id': random_id(), 'foo': i} for i in range(1000)]
-        copy = deepcopy(docs)
-        rows = inst.bulksave(copy)
-        self.assertIsInstance(rows, list)
-        for (d, c) in zip(docs, copy):
-            self.assertEqual(d['_id'], c['_id'])
-            self.assertEqual(d['foo'], c['foo'])
-        for (r, c) in zip(rows, copy):
-            self.assertEqual(r['id'], c['_id'])
-            self.assertEqual(r['rev'], c['_rev'])
-            self.assertTrue(c['_rev'].startswith('1-'))
+        # Test when doc['_id'] is already present
+        ids = tuple(test_id() for i in range(10))
+        docs = [{'_id': _id} for _id in ids]
+        rows = db.bulksave(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertEqual(db.get(_id), doc)
 
-        old = docs
-        docs = copy
-        for d in docs:
-            d['bar'] = random_id()
-        copy = deepcopy(docs)
-        rows = inst.bulksave(copy)
-        for (d, c) in zip(docs, copy):
-            self.assertEqual(d['_id'], c['_id'])
-            self.assertLess(d['_rev'], c['_rev'])
-            self.assertEqual(d['foo'], c['foo'])
-            self.assertEqual(d['bar'], c['bar'])
-        for (r, c) in zip(rows, copy):
-            self.assertEqual(r['id'], c['_id'])
-            self.assertEqual(r['rev'], c['_rev'])
-            self.assertTrue(c['_rev'].startswith('2-'))
+        # Let's update all the docs
+        for doc in docs:
+            doc['x'] = 'foo'    
+        rows = db.bulksave(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('2-'))
+            self.assertEqual(doc['x'], 'foo')
+            self.assertEqual(db.get(_id), doc)
 
-        # FIXME: Is CouchDB 1.0.1 broken in this regard... shouldn't this raise
-        # ExpectationFailed?
-        inst.bulksave(old)
+        # Let's update half the docs out-of-band to create conflicts
+        for (i, doc) in enumerate(docs):
+            if i % 2 == 0:
+                d = deepcopy(doc)
+                d['x'] = 'gotcha'
+                db.post(d)
 
-        # Test compacting the db
-        oldsize = inst.get()['disk_size']
-        self.assertEqual(inst.post(None, '_compact'), {'ok': True})
-        while True:
-            time.sleep(1)
-            if inst.get()['compact_running'] is False:
-                break
-        newsize = inst.get()['disk_size']
-        self.assertLess(newsize, oldsize)
+        # Now let's update all the docs, test for BulkConflict
+        good = []
+        bad = []
+        for (i, doc) in enumerate(docs):
+            doc['x'] = 'bar'
+            if i % 2 == 0:
+                bad.append(doc)
+            else:
+                good.append(doc)
 
-        # Test that _id is generated if missing:
-        docs = [{'n': i} for i in range(1000)]
-        rows = inst.bulksave(docs)
-        self.assertEqual(len(docs), len(rows))
-        i = 0
-        for (d, r) in zip(docs, rows):
-            self.assertEqual(set(d), set(['_id', '_rev', 'n']))
-            self.assertEqual(d['_id'], r['id'])
-            self.assertEqual(len(d['_id']), 24)
-            self.assertEqual(d['_rev'], r['rev'])
-            self.assertTrue(d['_rev'].startswith('1-'))
-            self.assertEqual(d['n'], i)
-            i += 1
+        with self.assertRaises(microfiber.BulkConflict) as cm:
+            rows = db.bulksave(docs)
+        self.assertEqual(str(cm.exception), 'conflict on 5 docs')
+        self.assertEqual(cm.exception.conflicts, bad)
+        self.assertEqual(len(cm.exception.rows), 10)
+        for (i, row) in enumerate(cm.exception.rows):
+            _id = ids[i]
+            doc = docs[i]
+            real = db.get(_id)
+            self.assertEqual(row['id'], _id)
+            self.assertTrue(real['_rev'].startswith('3-'))
+            if i % 2 == 0:
+                self.assertEqual(real['x'], 'gotcha')
+                self.assertEqual(doc['x'], 'bar')
+                self.assertNotIn('rev', row)
+                self.assertTrue(doc['_rev'].startswith('2-'))
+            else:
+                self.assertEqual(real['x'], 'bar')
+                self.assertEqual(row['rev'], doc['_rev'])
+                self.assertEqual(real, doc)
+
+    def test_bulksave2(self):
+        db = microfiber.Database(self.db, self.env)
+        self.assertTrue(db.ensure())
+
+        # Test that doc['_id'] gets set automatically
+        markers = tuple(test_id() for i in range(10))
+        docs = [{'marker': m} for m in markers]
+        rows = db.bulksave2(docs)
+        for (marker, doc, row) in zip(markers, docs, rows):
+            self.assertEqual(doc['marker'], marker)
+            self.assertEqual(doc['_id'], row['id'])
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertTrue(is_microfiber_id(doc['_id']))
+
+        # Test when doc['_id'] is already present
+        ids = tuple(test_id() for i in range(10))
+        docs = [{'_id': _id} for _id in ids]
+        rows = db.bulksave2(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertEqual(db.get(_id), doc)
+
+        # Let's update all the docs
+        for doc in docs:
+            doc['x'] = 'foo'    
+        rows = db.bulksave2(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('2-'))
+            self.assertEqual(doc['x'], 'foo')
+            self.assertEqual(db.get(_id), doc)
+
+        # Let's update half the docs out-of-band to create conflicts
+        for (i, doc) in enumerate(docs):
+            if i % 2 == 0:
+                d = deepcopy(doc)
+                d['x'] = 'gotcha'
+                db.save(d)
+
+        # Now let's update all the docs, test all-or-nothing behavior
+        for doc in docs:
+            doc['x'] = 'bar'    
+        rows = db.bulksave2(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('3-'))
+            self.assertEqual(doc['x'], 'bar')
+            self.assertEqual(db.get(_id), doc)
+
+        # Again update half the docs out-of-band, but this time saving twice
+        # so the conflict is ahead in revision number:
+        for (i, doc) in enumerate(docs):
+            if i % 2 == 0:
+                d = deepcopy(doc)
+                d['x'] = 'gotcha'
+                db.save(d)
+                db.save(d)
+                self.assertTrue(d['_rev'].startswith('5-'))
+
+        # Now update all the docs again, realize all-or-nothing is a bad idea:
+        for doc in docs:
+            doc['x'] = 'baz'    
+        rows = db.bulksave2(docs)
+        for (i, row) in enumerate(rows):
+            _id = ids[i]
+            doc = docs[i]
+            real = db.get(_id)
+            self.assertEqual(row['id'], _id)
+            if i % 2 == 0:
+                self.assertEqual(real['x'], 'gotcha')
+                self.assertTrue(real['_rev'].startswith('5-'))
+                self.assertTrue(row['rev'].startswith('4-'))
+            else:
+                self.assertEqual(real['x'], 'baz')
+                self.assertTrue(real['_rev'].startswith('4-'))
+                self.assertEqual(row['rev'], real['_rev'])
+                self.assertEqual(doc, real)
+
+    def test_get_many(self):
+        db = microfiber.Database(self.db, self.env)
+        self.assertTrue(db.ensure())
+
+        ids = tuple(test_id() for i in range(50))
+        docs = [{'_id': _id} for _id in ids]
+        db.bulksave(docs)
+
+        # Test an empty doc_ids list
+        self.assertEqual(db.get_many([]), [])
+
+        # Test a get_many on all the docs
+        self.assertEqual(db.get_many(ids), docs)
+
+        # Test with some random subsets
+        rdocs = random.sample(docs, 40)
+        self.assertEqual(db.get_many([d['_id'] for d in rdocs]), rdocs)
+
+        rdocs = random.sample(docs, 20)
+        self.assertEqual(db.get_many([d['_id'] for d in rdocs]), rdocs)
+
+        rdocs = random.sample(docs, 10)
+        self.assertEqual(db.get_many([d['_id'] for d in rdocs]), rdocs)
+
+        # Test with duplicate ids
+        self.assertEqual(
+            db.get_many([ids[7], ids[7], ids[7]]),
+            [docs[7], docs[7], docs[7]]
+        )
+            

@@ -44,6 +44,7 @@ class Test(Command):
 
     user_options = [
         ('no-live', None, 'skip live tests against tmp CouchDB instances'),
+        ('skip-slow', None, 'skip only the slow 30 second live timeout test'),
         ('auth=', None,
             "live test with 'open', 'basic', or 'oauth'; default is 'basic'"
         ),
@@ -51,6 +52,7 @@ class Test(Command):
 
     def initialize_options(self):
         self.no_live = 0
+        self.skip_slow = 0
         self.auth = 'basic'
 
     def finalize_options(self):
@@ -62,6 +64,8 @@ class Test(Command):
             os.environ['MICROFIBER_TEST_NO_LIVE'] = 'true'
         else:
             os.environ['MICROFIBER_TEST_AUTH'] = self.auth
+        if self.skip_slow:
+            os.environ['MICROFIBER_TEST_SKIP_SLOW'] = 'true'
 
         pynames = ['microfiber', 'test_microfiber']
 

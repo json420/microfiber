@@ -310,6 +310,15 @@ errors = {
 }
 
 
+class BulkConflict(Exception):
+    def __init__(self, conflicts, rows):
+        self.conflicts = conflicts
+        self.rows = rows
+        count = len(conflicts)
+        msg = ('conflict on {} doc' if count == 1 else 'conflict on {} docs')
+        super().__init__(msg.format(count))
+
+
 class FakeList(list):
     __slots__ = ('_count', '_iterable')
 
@@ -659,7 +668,6 @@ class Database(CouchBase):
         try:
             self.put(None)
             return True
-
         except PreconditionFailed:
             return False
 
@@ -697,17 +705,60 @@ class Database(CouchBase):
 
     def bulksave(self, docs):
         """
-        POST a list of docs to _bulk_docs, update all _rev in place.
+        Bulk-save using non-atomic semantics, updates all _rev in-place.
 
-        This method works just like `Database.save()`, except on a whole list
-        of docs all at once.
+        This method is similar `Database.save()`, except this method operates on
+        a list of many docs at once.
+
+        If there are conflicts, a `BulkConflict` exception will be raised, whose
+        ``conflicts`` attribute will be a list of the documents for which there
+        were conflicts.  Your request will *not* have modified these conflicting
+        documents in the database, similar to `Database.save()`.
+
+        However, all non-conflicting documents will have been saved and their
+        _rev updated in-place.
+        """
+        for doc in filter(lambda d: '_id' not in d, docs):
+            doc['_id'] = random_id()
+        rows = self.post({'docs': docs}, '_bulk_docs')
+        conflicts = []
+        for (doc, row) in zip(docs, rows):
+            assert doc['_id'] == row['id']
+            if 'rev' in row:
+                doc['_rev'] = row['rev']
+            else:
+                conflicts.append(doc)
+        if conflicts:
+            raise BulkConflict(conflicts, rows)
+        return rows
+
+    def bulksave2(self, docs):
+        """
+        Bulk-save using all-or-nothing semantics, updates all _rev in-place.
+
+        This method is similar `Database.save()`, except this method operates on
+        a list of many docs at once.
+
+        Note: for subtle reasons that take a while to explain, you probably
+        don't want to use this method.
         """
         for doc in filter(lambda d: '_id' not in d, docs):
             doc['_id'] = random_id()
         rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
         for (doc, row) in zip(docs, rows):
+            assert doc['_id'] == row['id']
             doc['_rev'] = row['rev']
         return rows
+
+    def get_many(self, doc_ids):
+        """
+        Convenience method to retrieve multiple documents at once.
+
+        As CouchDB has a rather large per-request overhead, retrieving multiple
+        documents at once can greatly improve performance.
+        """
+        result = self.post({'keys': doc_ids}, '_all_docs', include_docs=True)
+        return [row['doc'] for row in result['rows']]
 
     def view(self, design, view, **options):
         """
