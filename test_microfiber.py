@@ -967,8 +967,41 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(db.get(_id), doc)
 
         # Lets update half the docs out-of-band to create conflicts
-        
-        
+        for (i, doc) in enumerate(docs):
+            if i % 2 == 0:
+                d = deepcopy(doc)
+                d['x'] = 'gotcha'
+                db.post(d)
+
+        # Now lets update all the docs, test for BulkConflict
+        good = []
+        bad = []
+        for (i, doc) in enumerate(docs):
+            doc['x'] = 'bar'
+            if i % 2 == 0:
+                bad.append(doc)
+            else:
+                good.append(doc)
+
+        with self.assertRaises(microfiber.BulkConflict) as cm:
+            rows = db.bulksave(docs)
+        self.assertEqual(str(cm.exception), 'conflict on 5 docs')
+        self.assertEqual(cm.exception.conflicts, bad)
+        self.assertEqual(len(cm.exception.rows), 10)
+        for (i, row) in enumerate(cm.exception.rows):
+            _id = ids[i]
+            doc = docs[i]
+            real = db.get(_id)
+            self.assertEqual(row['id'], _id)
+            self.assertTrue(real['_rev'].startswith('3-'))
+            if i % 2 == 0:
+                self.assertEqual(real['x'], 'gotcha')
+                self.assertNotIn('rev', row)
+                self.assertTrue(doc['_rev'].startswith('2-'))
+            else:
+                self.assertEqual(real['x'], 'bar')
+                self.assertEqual(row['rev'], doc['_rev'])
+                self.assertEqual(real, doc)
 
     def test_bulksave2(self):
         db = microfiber.Database(self.dbname, self.env)
