@@ -852,7 +852,7 @@ class TestDatabaseLive(LiveTestCase):
         """
         Verify our assumptions about CouchDB "non-atomic" bulk semantics.
 
-        Results: conflicting docs are not updated, and we now which docs were
+        Results: conflicting docs are not updated, and we know which docs were
         conflicting; non-conflicting doc get updated normally.
 
         Pro tip: use this!
