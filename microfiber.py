@@ -310,6 +310,15 @@ errors = {
 }
 
 
+class BulkConflict(Exception):
+    def __init__(self, conflicts, rows):
+        self.conflicts = conflicts
+        self.rows = rows
+        count = len(conflicts)
+        msg = ('conflict on {} doc' if count == 1 else 'conflict on {} docs')
+        super().__init__(msg.format(count))
+
+
 class FakeList(list):
     __slots__ = ('_count', '_iterable')
 
@@ -659,7 +668,6 @@ class Database(CouchBase):
         try:
             self.put(None)
             return True
-
         except PreconditionFailed:
             return False
 
@@ -704,9 +712,16 @@ class Database(CouchBase):
         """
         for doc in filter(lambda d: '_id' not in d, docs):
             doc['_id'] = random_id()
-        rows = self.post({'docs': docs, 'all_or_nothing': True}, '_bulk_docs')
+        rows = self.post({'docs': docs}, '_bulk_docs')
+        conflicts = []
         for (doc, row) in zip(docs, rows):
-            doc['_rev'] = row['rev']
+            assert doc['_id'] == row['id']
+            if 'rev' in row:
+                doc['_rev'] = row['rev']
+            else:
+                conflicts.append(doc)
+        if conflicts:
+            raise BulkConflict(conflicts, rows)
         return rows
 
     def view(self, design, view, **options):

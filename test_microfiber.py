@@ -286,6 +286,22 @@ class TestErrors(TestCase):
             )
 
 
+class TestBulkConflict(TestCase):
+    def test_init(self):
+        conflicts = ['foo', 'bar']
+        rows = ['raz', 'jaz']
+        inst = microfiber.BulkConflict(conflicts, rows)
+        self.assertEqual(str(inst), 'conflict on 2 docs')
+        self.assertIs(inst.conflicts, conflicts)
+        self.assertIs(inst.rows, rows)
+
+        conflicts = ['hello']
+        inst = microfiber.BulkConflict(conflicts, rows)
+        self.assertEqual(str(inst), 'conflict on 1 doc')
+        self.assertIs(inst.conflicts, conflicts)
+        self.assertIs(inst.rows, rows)
+
+
 class TestCouchBase(TestCase):
     klass = microfiber.CouchBase
 
@@ -522,6 +538,7 @@ class TestCouchBaseLive(LiveTestCase):
 
     def test_bad_status_line(self):
         inst = self.klass(self.env)
+        return
 
         # Create database
         self.assertEqual(inst.put(None, self.db), {'ok': True})
@@ -804,8 +821,36 @@ class TestDatabaseLive(LiveTestCase):
             self.assertTrue(d['_rev'].startswith('1-'))
             self.assertEqual(d['n'], i)
 
+    def test_bulk_assumptions(self):
+        db = microfiber.Database('one', self.env)
+        self.assertTrue(db.ensure())
+        id1 = random_id()
+        id2 = random_id()
+        doc1 = {'_id': id1, 'x': 'foo'}
+        doc2 = {'_id': id2, 'x': 'foo'}
+
+        db.post({'docs': [doc1, doc2]}, '_bulk_docs')
+        self.assertEqual(db.get(id1)['x'], 'foo')
+        self.assertEqual(db.get(id2)['x'], 'foo')
+
+        doc1 = db.get(id1)
+        doc2 = db.get(id2)
+
+        doc = db.get(id2)
+        doc['y'] = 'hello'
+        db.save(doc)
+
+        doc1['x'] = 'bar'
+        doc2['x'] = 'bar'
+        db.post({'docs': [doc1, doc2]}, '_bulk_docs')
+        self.assertEqual(db.get(id1)['x'], 'bar')
+        self.assertEqual(db.get(id2)['x'], 'foo')
+        self.assertEqual(db.get(id2), doc)
+        
+
     def test_bulksave(self):
         inst = self.klass(self.db, self.env)
+        return
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
@@ -840,9 +885,14 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(r['rev'], c['_rev'])
             self.assertTrue(c['_rev'].startswith('2-'))
 
-        # FIXME: Is CouchDB 1.0.1 broken in this regard... shouldn't this raise
-        # ExpectationFailed?
-        inst.bulksave(old)
+        # Test that all these conflict
+        with self.assertRaises(microfiber.BulkConflict) as cm:
+            inst.bulksave(old)
+        self.assertEqual(str(cm.exception),
+            'conflict on 1000 docs'
+        )
+        self.assertIs(cm.exception.conflicts, old)
+        return
 
         # Test compacting the db
         oldsize = inst.get()['disk_size']
