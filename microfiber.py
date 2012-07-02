@@ -752,10 +752,12 @@ class Database(CouchBase):
 
     def bulk_get(self, doc_ids):
         """
+        Convenience method to retrieve multiple documents at once.
 
+        As CouchDB has a rather large per-request overhead, retrieving multiple
+        documents at once can greatly improve performance.
         """
-        obj = {'keys': doc_ids}
-        result = self.post(obj, '_all_docs', include_docs=True)
+        result = self.post({'keys': doc_ids}, '_all_docs', include_docs=True)
         return [row['doc'] for row in result['rows']]
 
     def view(self, design, view, **options):
