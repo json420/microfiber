@@ -1187,7 +1187,7 @@ class TestDatabaseLive(LiveTestCase):
         # Test a bulk_get on all the docs
         self.assertEqual(db.bulk_get(ids), docs)
 
-        # Test with some sample subsets
+        # Test with some random subsets
         rdocs = random.sample(docs, 40)
         self.assertEqual(db.bulk_get([d['_id'] for d in rdocs]), rdocs)
 
