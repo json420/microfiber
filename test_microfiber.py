@@ -1036,7 +1036,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertTrue(doc['_rev'].startswith('1-'))
             self.assertEqual(db.get(_id), doc)
 
-        # Lets update all the docs
+        # Let's update all the docs
         for doc in docs:
             doc['x'] = 'foo'    
         rows = db.bulksave(docs)
@@ -1048,14 +1048,14 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(doc['x'], 'foo')
             self.assertEqual(db.get(_id), doc)
 
-        # Lets update half the docs out-of-band to create conflicts
+        # Let's update half the docs out-of-band to create conflicts
         for (i, doc) in enumerate(docs):
             if i % 2 == 0:
                 d = deepcopy(doc)
                 d['x'] = 'gotcha'
                 db.post(d)
 
-        # Now lets update all the docs, test for BulkConflict
+        # Now let's update all the docs, test for BulkConflict
         good = []
         bad = []
         for (i, doc) in enumerate(docs):
@@ -1112,7 +1112,7 @@ class TestDatabaseLive(LiveTestCase):
             self.assertTrue(doc['_rev'].startswith('1-'))
             self.assertEqual(db.get(_id), doc)
 
-        # Lets update all the docs
+        # Let's update all the docs
         for doc in docs:
             doc['x'] = 'foo'    
         rows = db.bulksave2(docs)
@@ -1124,14 +1124,14 @@ class TestDatabaseLive(LiveTestCase):
             self.assertEqual(doc['x'], 'foo')
             self.assertEqual(db.get(_id), doc)
 
-        # Lets update half the docs out-of-band to create conflicts
+        # Let's update half the docs out-of-band to create conflicts
         for (i, doc) in enumerate(docs):
             if i % 2 == 0:
                 d = deepcopy(doc)
                 d['x'] = 'gotcha'
                 db.save(d)
 
-        # Now lets update all the docs, test all-or-nothing behaviour
+        # Now let's update all the docs, test all-or-nothing behavior
         for doc in docs:
             doc['x'] = 'bar'    
         rows = db.bulksave2(docs)
