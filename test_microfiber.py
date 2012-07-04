@@ -328,21 +328,21 @@ class TestFunctions(TestCase):
 
     def test_replication_peer(self):
         url = 'http://' + random_id().lower() + ':5984/'
-        dbname = 'db-' + random_id().lower()
+        name = 'db-' + random_id().lower()
 
         # Test with no auth
         self.assertEqual(
-            microfiber.replication_peer({'url': url}, dbname),
-            {'url': url + dbname}
+            microfiber.replication_peer(name, {'url': url}),
+            {'url': url + name}
         )
 
         # Test with OAuth
         tokens = random_oauth()
         env = {'url': url, 'oauth': deepcopy(tokens)}
         self.assertEqual(
-            microfiber.replication_peer(env, dbname),
+            microfiber.replication_peer(name, env),
             {
-                'url': url + dbname,
+                'url': url + name,
                 'auth': {'oauth': tokens},
             }
         )
@@ -352,9 +352,9 @@ class TestFunctions(TestCase):
         headers = microfiber._basic_auth_header(basic)
         env = {'url': url, 'basic': basic}
         self.assertEqual(
-            microfiber.replication_peer(env, dbname),
+            microfiber.replication_peer(name, env),
             {
-                'url': url + dbname,
+                'url': url + name,
                 'headers': headers,
             }
         )
@@ -362,9 +362,9 @@ class TestFunctions(TestCase):
         # Test that OAuth takes precedence over basic auth
         env['oauth'] = deepcopy(tokens)
         self.assertEqual(
-            microfiber.replication_peer(env, dbname),
+            microfiber.replication_peer(name, env),
             {
-                'url': url + dbname,
+                'url': url + name,
                 'auth': {'oauth': tokens},
             }
         )
@@ -376,7 +376,7 @@ class TestFunctions(TestCase):
         # Test with no auth
         env = {'url': url}
         self.assertEqual(
-            microfiber.push_replication(env, name),
+            microfiber.push_replication(name, env),
             {
                 'source': name,
                 'target': {
@@ -386,7 +386,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, cancel=True),
+            microfiber.push_replication(name, env, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -397,7 +397,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False),
+            microfiber.push_replication(name, env, continuous=False),
             {
                 'source': name,
                 'target': {
@@ -406,7 +406,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=False, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -420,7 +420,7 @@ class TestFunctions(TestCase):
         tokens = random_oauth()
         env = {'url': url, 'oauth': deepcopy(tokens)}
         self.assertEqual(
-            microfiber.push_replication(env, name),
+            microfiber.push_replication(name, env),
             {
                 'source': name,
                 'target': {
@@ -431,7 +431,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, cancel=True),
+            microfiber.push_replication(name, env, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -443,7 +443,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False),
+            microfiber.push_replication(name, env, continuous=False),
             {
                 'source': name,
                 'target': {
@@ -453,7 +453,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=False, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -469,7 +469,7 @@ class TestFunctions(TestCase):
         headers = microfiber._basic_auth_header(basic)
         env = {'url': url, 'basic': basic}
         self.assertEqual(
-            microfiber.push_replication(env, name),
+            microfiber.push_replication(name, env),
             {
                 'source': name,
                 'target': {
@@ -480,7 +480,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, cancel=True),
+            microfiber.push_replication(name, env, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -492,7 +492,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False),
+            microfiber.push_replication(name, env, continuous=False),
             {
                 'source': name,
                 'target': {
@@ -502,7 +502,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=False, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -516,7 +516,7 @@ class TestFunctions(TestCase):
         # Test that OAuth takes precedence over basic auth
         env['oauth'] = deepcopy(tokens)
         self.assertEqual(
-            microfiber.push_replication(env, name),
+            microfiber.push_replication(name, env),
             {
                 'source': name,
                 'target': {
@@ -527,7 +527,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, cancel=True),
+            microfiber.push_replication(name, env, cancel=True),
             {
                 'source': name,
                 'target': {
@@ -539,7 +539,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False),
+            microfiber.push_replication(name, env, continuous=False),
             {
                 'source': name,
                 'target': {
@@ -549,7 +549,7 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(
-            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=False, cancel=True),
             {
                 'source': name,
                 'target': {

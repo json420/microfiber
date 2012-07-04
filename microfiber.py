@@ -204,7 +204,7 @@ def replication_body(source, target, continuous=True, cancel=False):
     return body
 
 
-def replication_peer(env, name):
+def replication_peer(name, env):
     peer =  {'url': env['url'] + name}
     if env.get('oauth'):
         peer['auth'] = {'oauth': env['oauth']}
@@ -213,8 +213,8 @@ def replication_peer(env, name):
     return peer
 
 
-def push_replication(env, name, continuous=True, cancel=False):
-    peer = replication_peer(env, name)
+def push_replication(name, env, continuous=True, cancel=False):
+    peer = replication_peer(name, env)
     return replication_body(name, peer, continuous, cancel)
 
 
