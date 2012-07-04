@@ -192,6 +192,32 @@ def _basic_auth_header(basic):
     return {'Authorization': 'Basic ' + b64}
 
 
+def replication_body(source, target, continuous=True, cancel=False):
+    body = {
+        'source': source,
+        'target': target,
+    }
+    if continuous:
+        body['continuous'] = True
+    if cancel:
+        body['cancel'] = True
+    return body
+
+
+def replication_peer(env, name):
+    peer =  {'url': env['url'] + name}
+    if env.get('oauth'):
+        peer['auth'] = {'oauth': env['oauth']}
+    elif env.get('basic'):
+        peer['headers'] = _basic_auth_header(env['basic'])
+    return peer
+
+
+def push_replication(env, name, continuous=True, cancel=False):
+    peer = replication_peer(env, name)
+    return replication_body(name, peer, continuous, cancel)
+
+
 class HTTPError(Exception):
     """
     Base class for custom `microfiber` exceptions.

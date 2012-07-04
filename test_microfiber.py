@@ -69,6 +69,20 @@ def random_id():
     return b32encode(os.urandom(10)).decode('ascii')
 
 
+def random_oauth():
+    return dict(
+        (k, random_id())
+        for k in ('consumer_key', 'consumer_secret', 'token', 'token_secret')
+    )
+
+
+def random_basic():
+    return dict(
+        (k, random_id())
+        for k in ('username', 'password')
+    )
+
+
 def test_id():
     """
     So we can tell our random test IDs from the ones microfiber.random_id()
@@ -274,6 +288,276 @@ class TestFunctions(TestCase):
         self.assertEqual(
             f(basic),
             {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+        )
+
+    def test_replication_body(self):
+        src = test_id()
+        dst = test_id()
+        self.assertEqual(
+            microfiber.replication_body(src, dst),
+            {
+                'source': src,
+                'target': dst,
+                'continuous': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.replication_body(src, dst, continuous=False),
+            {
+                'source': src,
+                'target': dst,  
+            }
+        )
+        self.assertEqual(
+            microfiber.replication_body(src, dst, cancel=True),
+            {
+                'source': src,
+                'target': dst,
+                'continuous': True,
+                'cancel': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.replication_body(src, dst, continuous=False, cancel=True),
+            {
+                'source': src,
+                'target': dst,
+                'cancel': True,
+            }
+        )
+
+    def test_replication_peer(self):
+        url = 'http://' + random_id().lower() + ':5984/'
+        dbname = 'db-' + random_id().lower()
+
+        # Test with no auth
+        self.assertEqual(
+            microfiber.replication_peer({'url': url}, dbname),
+            {'url': url + dbname}
+        )
+
+        # Test with OAuth
+        tokens = random_oauth()
+        env = {'url': url, 'oauth': deepcopy(tokens)}
+        self.assertEqual(
+            microfiber.replication_peer(env, dbname),
+            {
+                'url': url + dbname,
+                'auth': {'oauth': tokens},
+            }
+        )
+
+        # Test with basic HTTP auth
+        basic = random_basic()
+        headers = microfiber._basic_auth_header(basic)
+        env = {'url': url, 'basic': basic}
+        self.assertEqual(
+            microfiber.replication_peer(env, dbname),
+            {
+                'url': url + dbname,
+                'headers': headers,
+            }
+        )
+
+        # Test that OAuth takes precedence over basic auth
+        env['oauth'] = deepcopy(tokens)
+        self.assertEqual(
+            microfiber.replication_peer(env, dbname),
+            {
+                'url': url + dbname,
+                'auth': {'oauth': tokens},
+            }
+        )
+
+    def test_push_replication(self):
+        url = 'http://' + random_id().lower() + ':5984/'
+        name = 'db-' + random_id().lower()
+
+        # Test with no auth
+        env = {'url': url}
+        self.assertEqual(
+            microfiber.push_replication(env, name),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                },
+                'continuous': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                },
+                'continuous': True,
+                'cancel': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                },
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                },
+                'cancel': True,
+            }
+        )
+
+        # Test with OAuth
+        tokens = random_oauth()
+        env = {'url': url, 'oauth': deepcopy(tokens)}
+        self.assertEqual(
+            microfiber.push_replication(env, name),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+                'continuous': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+                'continuous': True,
+                'cancel': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+                'cancel': True,
+            }
+        )
+
+        # Test with basic HTTP auth
+        basic = random_basic()
+        headers = microfiber._basic_auth_header(basic)
+        env = {'url': url, 'basic': basic}
+        self.assertEqual(
+            microfiber.push_replication(env, name),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'headers': headers,
+                },
+                'continuous': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'headers': headers,
+                },
+                'continuous': True,
+                'cancel': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'headers': headers,
+                },
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'headers': headers,
+                },
+                'cancel': True,
+            }
+        )
+
+        # Test that OAuth takes precedence over basic auth
+        env['oauth'] = deepcopy(tokens)
+        self.assertEqual(
+            microfiber.push_replication(env, name),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+                'continuous': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+                'continuous': True,
+                'cancel': True,
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+            }
+        )
+        self.assertEqual(
+            microfiber.push_replication(env, name, continuous=False, cancel=True),
+            {
+                'source': name,
+                'target': {
+                    'url': url + name,
+                    'auth': {'oauth': tokens},
+                },
+                'cancel': True,
+            }
         )
 
 
