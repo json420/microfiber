@@ -298,14 +298,14 @@ class TestFunctions(TestCase):
             {
                 'source': src,
                 'target': dst,
-                'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.replication_body(src, dst, continuous=False),
+            microfiber.replication_body(src, dst, continuous=True),
             {
                 'source': src,
-                'target': dst,  
+                'target': dst,
+                'continuous': True, 
             }
         )
         self.assertEqual(
@@ -313,15 +313,15 @@ class TestFunctions(TestCase):
             {
                 'source': src,
                 'target': dst,
-                'continuous': True,
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.replication_body(src, dst, continuous=False, cancel=True),
+            microfiber.replication_body(src, dst, continuous=True, cancel=True),
             {
                 'source': src,
                 'target': dst,
+                'continuous': True,
                 'cancel': True,
             }
         )
@@ -382,7 +382,6 @@ class TestFunctions(TestCase):
                 'target': {
                     'url': url + name,
                 },
-                'continuous': True,
             }
         )
         self.assertEqual(
@@ -392,26 +391,27 @@ class TestFunctions(TestCase):
                 'target': {
                     'url': url + name,
                 },
-                'continuous': True,
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False),
+            microfiber.push_replication(name, env, continuous=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                 },
+                'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=True, cancel=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                 },
+                'continuous': True,
                 'cancel': True,
             }
         )
@@ -427,7 +427,6 @@ class TestFunctions(TestCase):
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
-                'continuous': True,
             }
         )
         self.assertEqual(
@@ -438,28 +437,29 @@ class TestFunctions(TestCase):
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
-                'continuous': True,
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False),
+            microfiber.push_replication(name, env, continuous=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
+                'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=True, cancel=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
+                'continuous': True,
                 'cancel': True,
             }
         )
@@ -476,7 +476,6 @@ class TestFunctions(TestCase):
                     'url': url + name,
                     'headers': headers,
                 },
-                'continuous': True,
             }
         )
         self.assertEqual(
@@ -487,28 +486,29 @@ class TestFunctions(TestCase):
                     'url': url + name,
                     'headers': headers,
                 },
-                'continuous': True,
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False),
+            microfiber.push_replication(name, env, continuous=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                     'headers': headers,
                 },
+                'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=True, cancel=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                     'headers': headers,
                 },
+                'continuous': True,
                 'cancel': True,
             }
         )
@@ -523,7 +523,6 @@ class TestFunctions(TestCase):
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
-                'continuous': True,
             }
         )
         self.assertEqual(
@@ -534,28 +533,29 @@ class TestFunctions(TestCase):
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
-                'continuous': True,
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False),
+            microfiber.push_replication(name, env, continuous=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
+                'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=False, cancel=True),
+            microfiber.push_replication(name, env, continuous=True, cancel=True),
             {
                 'source': name,
                 'target': {
                     'url': url + name,
                     'auth': {'oauth': tokens},
                 },
+                'continuous': True,
                 'cancel': True,
             }
         )

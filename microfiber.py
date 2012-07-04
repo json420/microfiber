@@ -192,15 +192,12 @@ def _basic_auth_header(basic):
     return {'Authorization': 'Basic ' + b64}
 
 
-def replication_body(source, target, continuous=True, cancel=False):
+def replication_body(source, target, **kw):
     body = {
         'source': source,
         'target': target,
     }
-    if continuous:
-        body['continuous'] = True
-    if cancel:
-        body['cancel'] = True
+    body.update(kw)
     return body
 
 
@@ -213,9 +210,9 @@ def replication_peer(name, env):
     return peer
 
 
-def push_replication(name, env, continuous=True, cancel=False):
+def push_replication(name, env, **kw):
     peer = replication_peer(name, env)
-    return replication_body(name, peer, continuous, cancel)
+    return replication_body(name, peer, **kw)
 
 
 class HTTPError(Exception):
