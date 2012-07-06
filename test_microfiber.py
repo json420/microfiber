@@ -826,6 +826,60 @@ class TestDatabase(TestCase):
         self.assertEqual(s._oauth, 'bar')
 
 
+class ReplicationTestCase(TestCase):
+    def setUp(self):
+        if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
+            self.skipTest('called with --no-live')
+        if usercouch is None:
+            self.skipTest('`usercouch` not installed')
+        self.tmp1 = usercouch.misc.TempCouch()
+        self.env1 = self.tmp1.bootstrap()
+        self.tmp2 = usercouch.misc.TempCouch()
+        self.env2 = self.tmp2.bootstrap()
+
+    def tearDown(self):
+        self.tmp1 = None
+        self.env1 = None
+        self.tmp2 = None
+        self.env2 = None
+
+
+class TestServerReplication(ReplicationTestCase):
+    def test_push(self):
+        s1 = microfiber.Server(self.env1)
+        s2 = microfiber.Server(self.env2)
+
+        # Create databases
+        self.assertEqual(s1.put(None, 'foo'), {'ok': True})
+        self.assertEqual(s2.put(None, 'foo'), {'ok': True})
+
+        # Start continuous s1 => s2 replication of foo
+        result = s1.push('foo', self.env2, continuous=True)
+        self.assertEqual(set(result), set(['_local_id', 'ok']))
+        self.assertIs(result['ok'], True)
+
+        # Save docs in s1, make sure they show up in s2
+        docs1 = [{'_id': test_id()} for i in range(100)]
+        for doc in docs1:
+            doc['_rev'] = s1.post(doc, 'foo')['rev']
+        time.sleep(1)
+        for doc in docs1:
+            self.assertEqual(s2.get('foo', doc['_id']), doc)
+
+        # Start continuous s2 => s1 replication of foo
+        result = s2.push('foo', self.env1, continuous=True)
+        self.assertEqual(set(result), set(['_local_id', 'ok']))
+        self.assertIs(result['ok'], True)
+
+        # Save docs in s2, make sure they show up in s1
+        docs2 = [{'_id': test_id(), 'two': True} for i in range(100)]
+        for doc in docs2:
+            doc['_rev'] = s2.post(doc, 'foo')['rev']
+        time.sleep(1)
+        for doc in docs2:
+            self.assertEqual(s1.get('foo', doc['_id']), doc)
+
+
 class LiveTestCase(TestCase):
     db = 'test_microfiber'
 

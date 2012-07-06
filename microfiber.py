@@ -192,7 +192,19 @@ def _basic_auth_header(basic):
     return {'Authorization': 'Basic ' + b64}
 
 
+REPLICATION_KW = frozenset([
+    'cancel', 
+    'continuous',
+    'create_target',
+    'doc_ids',
+    'filter',
+    'proxy',
+    'query_params',
+])
+
+
 def replication_body(source, target, **kw):
+    assert REPLICATION_KW.issuperset(kw), kw
     body = {
         'source': source,
         'target': target,
@@ -211,6 +223,13 @@ def replication_peer(name, env):
 
 
 def push_replication(name, env, **kw):
+    """
+    Build the object to POST for push replication.
+    
+    For details on what keyword arguments you might want to use, see:
+
+        http://wiki.apache.org/couchdb/Replication
+    """
     peer = replication_peer(name, env)
     return replication_body(name, peer, **kw)
 
@@ -635,6 +654,10 @@ class Server(CouchBase):
         if ensure:
             db.ensure()
         return db
+
+    def push(self, name, env, **kw):
+        obj = push_replication(name, env, **kw)
+        return self.post(obj, '_replicate')
 
 
 class Database(CouchBase):
