@@ -46,6 +46,7 @@ except ImportError:
     usercouch = None
 
 import microfiber
+from microfiber import random_id
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
@@ -63,10 +64,6 @@ def is_microfiber_id(_id):
         len(_id) == microfiber.RANDOM_B32LEN
         and set(_id).issubset(B32ALPHABET)
     )
-
-
-def random_id():
-    return b32encode(os.urandom(10)).decode('ascii')
 
 
 def random_oauth():
@@ -92,7 +89,6 @@ def test_id():
 
 
 assert is_microfiber_id(microfiber.random_id())
-assert not is_microfiber_id(random_id())
 assert not is_microfiber_id(test_id())
 
 
@@ -559,6 +555,44 @@ class TestFunctions(TestCase):
                 'cancel': True,
             }
         )
+
+    def test_id_slice_iter(self):
+        ids = [random_id() for i in range(74)]
+        rows = [{'id': _id} for _id in ids]
+        chunks = list(microfiber.id_slice_iter(rows))
+        self.assertEqual(len(chunks), 3)
+        self.assertEqual(len(chunks[0]), 25)
+        self.assertEqual(len(chunks[1]), 25)
+        self.assertEqual(len(chunks[2]), 24)
+        accum = []
+        for chunk in chunks:
+            accum.extend(chunk)
+        self.assertEqual(accum, ids)
+
+        ids = [random_id() for i in range(75)]
+        rows = [{'id': _id} for _id in ids]
+        chunks = list(microfiber.id_slice_iter(rows))
+        self.assertEqual(len(chunks), 3)
+        self.assertEqual(len(chunks[0]), 25)
+        self.assertEqual(len(chunks[1]), 25)
+        self.assertEqual(len(chunks[2]), 25)
+        accum = []
+        for chunk in chunks:
+            accum.extend(chunk)
+        self.assertEqual(accum, ids)
+
+        ids = [random_id() for i in range(76)]
+        rows = [{'id': _id} for _id in ids]
+        chunks = list(microfiber.id_slice_iter(rows))
+        self.assertEqual(len(chunks), 4)
+        self.assertEqual(len(chunks[0]), 25)
+        self.assertEqual(len(chunks[1]), 25)
+        self.assertEqual(len(chunks[2]), 25)
+        self.assertEqual(len(chunks[3]), 1)
+        accum = []
+        for chunk in chunks:
+            accum.extend(chunk)
+        self.assertEqual(accum, ids)
 
 
 class TestErrors(TestCase):

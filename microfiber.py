@@ -49,6 +49,7 @@ import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 import threading
+import math
 
 
 __all__ = (
@@ -232,6 +233,11 @@ def push_replication(name, env, **kw):
     """
     peer = replication_peer(name, env)
     return replication_body(name, peer, **kw)
+
+
+def id_slice_iter(rows, size=25):
+    for i in range(math.ceil(len(rows) / size)):
+        yield [row['id'] for row in rows[i*size : (i+1)*size]]
 
 
 class HTTPError(Exception):
