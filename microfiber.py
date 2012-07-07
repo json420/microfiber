@@ -688,7 +688,8 @@ class Database(CouchBase):
         * `Database.server()` - return a `Server` pointing at same URL
         * `Database.ensure()` - ensure the database exists
         * `Database.save(doc)` - save to CouchDB, update doc _id & _rev in place
-        * `Database.bulksave(docs)` - as above, but with a list of docs
+        * `Database.save_many(docs)` - as above, but with a list of docs
+        * `Database.get_many(doc_ids)` - retrieve many docs at once
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, env=SERVER):
@@ -755,7 +756,7 @@ class Database(CouchBase):
         doc['_rev'] = r['rev']
         return r
 
-    def bulksave(self, docs):
+    def save_many(self, docs):
         """
         Bulk-save using non-atomic semantics, updates all _rev in-place.
 
@@ -784,7 +785,7 @@ class Database(CouchBase):
             raise BulkConflict(conflicts, rows)
         return rows
 
-    def bulksave2(self, docs):
+    def bulksave(self, docs):
         """
         Bulk-save using all-or-nothing semantics, updates all _rev in-place.
 

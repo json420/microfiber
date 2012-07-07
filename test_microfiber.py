@@ -1312,16 +1312,16 @@ class TestDatabaseLive(LiveTestCase):
         For example, in this case the last change wins:
 
             1. Sue and Ann both get the "1-" rev of the "foo" doc
-            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
-            3. Ann bulksaves a change in "foo"
+            2. Sue saves/save_manys a change in "foo", now at rev "2-"
+            3. Ann save_manys a change in "foo"
             4. Ann has the winning "2-" rev of "foo"
 
         But in this case, something totally different happens:
 
             1. Sue and Ann both get the "1-" rev of the "foo" doc
-            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
-            3. Sue saves/bulksaves a *2nd* change in "foo", now at rev "3-"
-            4. Ann bulksaves a change in "foo"
+            2. Sue saves/save_manys a change in "foo", now at rev "2-"
+            3. Sue saves/save_manys a *2nd* change in "foo", now at rev "3-"
+            4. Ann save_manys a change in "foo"
             5. Ann thinks she has the winning "2-" rev of "foo", but Ann didn't
                make the last change according to rest of the world, and worse,
                Ann thinks her "2-" rev is the lastest, when it's actually "3-"
@@ -1414,6 +1414,82 @@ class TestDatabaseLive(LiveTestCase):
             }
         )
 
+    def test_save_many(self):
+        db = microfiber.Database(self.db, self.env)
+        self.assertTrue(db.ensure())
+
+        # Test that doc['_id'] gets set automatically
+        markers = tuple(test_id() for i in range(10))
+        docs = [{'marker': m} for m in markers]
+        rows = db.save_many(docs)
+        for (marker, doc, row) in zip(markers, docs, rows):
+            self.assertEqual(doc['marker'], marker)
+            self.assertEqual(doc['_id'], row['id'])
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertTrue(is_microfiber_id(doc['_id']))
+
+        # Test when doc['_id'] is already present
+        ids = tuple(test_id() for i in range(10))
+        docs = [{'_id': _id} for _id in ids]
+        rows = db.save_many(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('1-'))
+            self.assertEqual(db.get(_id), doc)
+
+        # Let's update all the docs
+        for doc in docs:
+            doc['x'] = 'foo'    
+        rows = db.save_many(docs)
+        for (_id, doc, row) in zip(ids, docs, rows):
+            self.assertEqual(doc['_id'], _id)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(doc['_rev'], row['rev'])
+            self.assertTrue(doc['_rev'].startswith('2-'))
+            self.assertEqual(doc['x'], 'foo')
+            self.assertEqual(db.get(_id), doc)
+
+        # Let's update half the docs out-of-band to create conflicts
+        for (i, doc) in enumerate(docs):
+            if i % 2 == 0:
+                d = deepcopy(doc)
+                d['x'] = 'gotcha'
+                db.post(d)
+
+        # Now let's update all the docs, test for BulkConflict
+        good = []
+        bad = []
+        for (i, doc) in enumerate(docs):
+            doc['x'] = 'bar'
+            if i % 2 == 0:
+                bad.append(doc)
+            else:
+                good.append(doc)
+
+        with self.assertRaises(microfiber.BulkConflict) as cm:
+            rows = db.save_many(docs)
+        self.assertEqual(str(cm.exception), 'conflict on 5 docs')
+        self.assertEqual(cm.exception.conflicts, bad)
+        self.assertEqual(len(cm.exception.rows), 10)
+        for (i, row) in enumerate(cm.exception.rows):
+            _id = ids[i]
+            doc = docs[i]
+            real = db.get(_id)
+            self.assertEqual(row['id'], _id)
+            self.assertTrue(real['_rev'].startswith('3-'))
+            if i % 2 == 0:
+                self.assertEqual(real['x'], 'gotcha')
+                self.assertEqual(doc['x'], 'bar')
+                self.assertNotIn('rev', row)
+                self.assertTrue(doc['_rev'].startswith('2-'))
+            else:
+                self.assertEqual(real['x'], 'bar')
+                self.assertEqual(row['rev'], doc['_rev'])
+                self.assertEqual(real, doc)
+
     def test_bulksave(self):
         db = microfiber.Database(self.db, self.env)
         self.assertTrue(db.ensure())
@@ -1457,88 +1533,12 @@ class TestDatabaseLive(LiveTestCase):
             if i % 2 == 0:
                 d = deepcopy(doc)
                 d['x'] = 'gotcha'
-                db.post(d)
-
-        # Now let's update all the docs, test for BulkConflict
-        good = []
-        bad = []
-        for (i, doc) in enumerate(docs):
-            doc['x'] = 'bar'
-            if i % 2 == 0:
-                bad.append(doc)
-            else:
-                good.append(doc)
-
-        with self.assertRaises(microfiber.BulkConflict) as cm:
-            rows = db.bulksave(docs)
-        self.assertEqual(str(cm.exception), 'conflict on 5 docs')
-        self.assertEqual(cm.exception.conflicts, bad)
-        self.assertEqual(len(cm.exception.rows), 10)
-        for (i, row) in enumerate(cm.exception.rows):
-            _id = ids[i]
-            doc = docs[i]
-            real = db.get(_id)
-            self.assertEqual(row['id'], _id)
-            self.assertTrue(real['_rev'].startswith('3-'))
-            if i % 2 == 0:
-                self.assertEqual(real['x'], 'gotcha')
-                self.assertEqual(doc['x'], 'bar')
-                self.assertNotIn('rev', row)
-                self.assertTrue(doc['_rev'].startswith('2-'))
-            else:
-                self.assertEqual(real['x'], 'bar')
-                self.assertEqual(row['rev'], doc['_rev'])
-                self.assertEqual(real, doc)
-
-    def test_bulksave2(self):
-        db = microfiber.Database(self.db, self.env)
-        self.assertTrue(db.ensure())
-
-        # Test that doc['_id'] gets set automatically
-        markers = tuple(test_id() for i in range(10))
-        docs = [{'marker': m} for m in markers]
-        rows = db.bulksave2(docs)
-        for (marker, doc, row) in zip(markers, docs, rows):
-            self.assertEqual(doc['marker'], marker)
-            self.assertEqual(doc['_id'], row['id'])
-            self.assertEqual(doc['_rev'], row['rev'])
-            self.assertTrue(doc['_rev'].startswith('1-'))
-            self.assertTrue(is_microfiber_id(doc['_id']))
-
-        # Test when doc['_id'] is already present
-        ids = tuple(test_id() for i in range(10))
-        docs = [{'_id': _id} for _id in ids]
-        rows = db.bulksave2(docs)
-        for (_id, doc, row) in zip(ids, docs, rows):
-            self.assertEqual(doc['_id'], _id)
-            self.assertEqual(row['id'], _id)
-            self.assertEqual(doc['_rev'], row['rev'])
-            self.assertTrue(doc['_rev'].startswith('1-'))
-            self.assertEqual(db.get(_id), doc)
-
-        # Let's update all the docs
-        for doc in docs:
-            doc['x'] = 'foo'    
-        rows = db.bulksave2(docs)
-        for (_id, doc, row) in zip(ids, docs, rows):
-            self.assertEqual(doc['_id'], _id)
-            self.assertEqual(row['id'], _id)
-            self.assertEqual(doc['_rev'], row['rev'])
-            self.assertTrue(doc['_rev'].startswith('2-'))
-            self.assertEqual(doc['x'], 'foo')
-            self.assertEqual(db.get(_id), doc)
-
-        # Let's update half the docs out-of-band to create conflicts
-        for (i, doc) in enumerate(docs):
-            if i % 2 == 0:
-                d = deepcopy(doc)
-                d['x'] = 'gotcha'
                 db.save(d)
 
         # Now let's update all the docs, test all-or-nothing behavior
         for doc in docs:
             doc['x'] = 'bar'    
-        rows = db.bulksave2(docs)
+        rows = db.bulksave(docs)
         for (_id, doc, row) in zip(ids, docs, rows):
             self.assertEqual(doc['_id'], _id)
             self.assertEqual(row['id'], _id)
@@ -1560,7 +1560,7 @@ class TestDatabaseLive(LiveTestCase):
         # Now update all the docs again, realize all-or-nothing is a bad idea:
         for doc in docs:
             doc['x'] = 'baz'    
-        rows = db.bulksave2(docs)
+        rows = db.bulksave(docs)
         for (i, row) in enumerate(rows):
             _id = ids[i]
             doc = docs[i]
@@ -1582,7 +1582,7 @@ class TestDatabaseLive(LiveTestCase):
 
         ids = tuple(test_id() for i in range(50))
         docs = [{'_id': _id} for _id in ids]
-        db.bulksave(docs)
+        db.save_many(docs)
 
         # Test an empty doc_ids list
         self.assertEqual(db.get_many([]), [])
