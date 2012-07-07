@@ -49,6 +49,7 @@ import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 import threading
+import math
 
 
 __all__ = (
@@ -232,6 +233,11 @@ def push_replication(name, env, **kw):
     """
     peer = replication_peer(name, env)
     return replication_body(name, peer, **kw)
+
+
+def id_slice_iter(rows, size=25):
+    for i in range(math.ceil(len(rows) / size)):
+        yield [row['id'] for row in rows[i*size : (i+1)*size]]
 
 
 class HTTPError(Exception):
@@ -682,7 +688,8 @@ class Database(CouchBase):
         * `Database.server()` - return a `Server` pointing at same URL
         * `Database.ensure()` - ensure the database exists
         * `Database.save(doc)` - save to CouchDB, update doc _id & _rev in place
-        * `Database.bulksave(docs)` - as above, but with a list of docs
+        * `Database.save_many(docs)` - as above, but with a list of docs
+        * `Database.get_many(doc_ids)` - retrieve many docs at once
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
     def __init__(self, name, env=SERVER):
@@ -749,7 +756,7 @@ class Database(CouchBase):
         doc['_rev'] = r['rev']
         return r
 
-    def bulksave(self, docs):
+    def save_many(self, docs):
         """
         Bulk-save using non-atomic semantics, updates all _rev in-place.
 
@@ -778,7 +785,7 @@ class Database(CouchBase):
             raise BulkConflict(conflicts, rows)
         return rows
 
-    def bulksave2(self, docs):
+    def bulksave(self, docs):
         """
         Bulk-save using all-or-nothing semantics, updates all _rev in-place.
 
@@ -819,6 +826,8 @@ class Database(CouchBase):
 
             ``Database.get('_design', design, '_view', view, **options)``
         """
+        if 'reduce' not in options:
+            options['reduce'] = False
         return self.get('_design', design, '_view', view, **options)
 
     def dump(self, fp, attachments=True):
