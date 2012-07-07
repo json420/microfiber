@@ -859,6 +859,38 @@ class TestDatabase(TestCase):
         self.assertEqual(s._basic, 'foo')
         self.assertEqual(s._oauth, 'bar')
 
+    def test_view(self):
+        class Mock(microfiber.Database):
+            def get(self, *parts, **options):
+                self._parts = parts
+                self._options = options
+                assert not hasattr(self, '_return')
+                self._return = random_id()
+                return self._return
+
+        db = Mock('mydb')
+        self.assertEqual(db.view('foo', 'bar'), db._return)
+        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
+        self.assertEqual(db._options, {'reduce': False})
+
+        db = Mock('mydb')
+        self.assertEqual(db.view('foo', 'bar', reduce=True), db._return)
+        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
+        self.assertEqual(db._options, {'reduce': True})
+
+        db = Mock('mydb')
+        self.assertEqual(db.view('foo', 'bar', include_docs=True), db._return)
+        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
+        self.assertEqual(db._options, {'reduce': False, 'include_docs': True})
+
+        db = Mock('mydb')
+        self.assertEqual(
+            db.view('foo', 'bar', include_docs=True, reduce=True),
+            db._return
+        )
+        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
+        self.assertEqual(db._options, {'reduce': True, 'include_docs': True})
+
 
 class ReplicationTestCase(TestCase):
     def setUp(self):
