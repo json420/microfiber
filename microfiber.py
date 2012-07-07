@@ -819,6 +819,8 @@ class Database(CouchBase):
 
             ``Database.get('_design', design, '_view', view, **options)``
         """
+        if 'reduce' not in options:
+            options['reduce'] = False
         return self.get('_design', design, '_view', view, **options)
 
     def dump(self, fp, attachments=True):
