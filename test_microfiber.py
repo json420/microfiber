@@ -1312,7 +1312,7 @@ class TestDatabaseLive(LiveTestCase):
         For example, in this case the last change wins:
 
             1. Sue and Ann both get the "1-" rev of the "foo" doc
-            2. Sue saves/busksaves a change in "foo", now at rev "2-"
+            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
             3. Ann bulksaves a change in "foo"
             4. Ann has the winning "2-" rev of "foo"
 
