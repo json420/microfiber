@@ -1312,16 +1312,16 @@ class TestDatabaseLive(LiveTestCase):
         For example, in this case the last change wins:
 
             1. Sue and Ann both get the "1-" rev of the "foo" doc
-            2. Sue saves/save_manys a change in "foo", now at rev "2-"
-            3. Ann save_manys a change in "foo"
+            2. Sue saves/busksaves a change in "foo", now at rev "2-"
+            3. Ann bulksaves a change in "foo"
             4. Ann has the winning "2-" rev of "foo"
 
         But in this case, something totally different happens:
 
             1. Sue and Ann both get the "1-" rev of the "foo" doc
-            2. Sue saves/save_manys a change in "foo", now at rev "2-"
-            3. Sue saves/save_manys a *2nd* change in "foo", now at rev "3-"
-            4. Ann save_manys a change in "foo"
+            2. Sue saves/bulksaves a change in "foo", now at rev "2-"
+            3. Sue saves/bulksaves a *2nd* change in "foo", now at rev "3-"
+            4. Ann bulksaves a change in "foo"
             5. Ann thinks she has the winning "2-" rev of "foo", but Ann didn't
                make the last change according to rest of the world, and worse,
                Ann thinks her "2-" rev is the lastest, when it's actually "3-"
