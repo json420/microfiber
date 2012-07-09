@@ -6,7 +6,8 @@ PYTHON3=$(shell py3versions -vr)
 	dh $@ --with=python3
 
 test-python%:
-	python$* setup.py test -vv
+	python$* setup.py test --auth=basic
+	python$* setup.py test --auth=oauth
 
 override_dh_auto_install:
 	for pyvers in $(shell py3versions -vr); do \
