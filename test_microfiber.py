@@ -1357,7 +1357,7 @@ class TestDatabaseLive(LiveTestCase):
         rows = db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
         self.assertEqual(
             rows,
-            [{'id': 'example', 'rev': '2-34e30c39538299cfed3958f6692f794d'}]
+            [{'id': 'example', 'rev': '2-34e30c39538299cfed3958f6692f794d', 'ok': True}]
         )
         self.assertEqual(db.get('example'),
             {
@@ -1404,7 +1404,7 @@ class TestDatabaseLive(LiveTestCase):
         rows = db.post({'docs': [me], 'all_or_nothing': True}, '_bulk_docs')
         self.assertEqual(
             rows,
-            [{'id': 'example2', 'rev': '2-34e30c39538299cfed3958f6692f794d'}]
+            [{'id': 'example2', 'rev': '2-34e30c39538299cfed3958f6692f794d', 'ok': True}]
         )
         self.assertEqual(db.get('example2'),
             {
