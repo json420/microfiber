@@ -1,6 +1,9 @@
-=================
-microfiber module
-=================
+========================
+:mod:`microfiber` module
+========================
+
+.. py:module:: microfiber
+    :synopsis: fabric for a lightweight couch
 
 In a nutshell, the Microfiber API is the CouchDB API, nothing more.  For
 example:
@@ -28,10 +31,9 @@ Actually, the point is that you don't have to know your *env*, you just pass it
 around and let Microfiber handle the details.
 
 As Microfiber is being developed for the `Novacut`_ project, it needs to work
-equally well with a system-wide CouchDB or a per-user CouchDB launched by
-`desktopcouch`_ or `dc3`_.  Some example *env* will help make it clear why we
-want to describe the CouchDB environment with a single, extensible data
-structure.
+equally well with a system-wide CouchDB or a per-user CouchDB started with
+`UserCouch`_.  Some example *env* will help make it clear why we want to
+describe the CouchDB environment with a single, extensible data structure.
 
 For example, this is the default *env*, what would be typical for system-wide
 CouchDB:
@@ -54,7 +56,7 @@ This is the same *env*, but in its normalized form:
 'http://localhost:5984/'
 
 
-This is a typical *env* for `desktopcouch`_ or `dc3`_:
+This is a typical *env* for `UserCouch`_:
 
 >>> env3 = {
 ...     'oauth': {
@@ -72,8 +74,8 @@ True
 'http://localhost:41289/'
 
 
-And this is also a typical *env* for `desktopcouch`_ or `dc3`_, except this time
-using basic auth instead of OAuth:
+And this is also a typical *env* for `UserCouch`_, except this time using
+basic-auth instead of OAuth:
 
 >>> env4 = {
 ...     'basic': {
@@ -98,9 +100,9 @@ that only 2 places need to understand the details:
     1. Microfiber - it obviously needs to understand *env* so that it can make
        correctly authenticated requests to CouchDB
        
-    2. The process entry point - for example, the dmedia DBus service knows it
-       needs a per-user CouchDB, so it will get the appropriate *env* from
-       `desktopcouch`_ or `dc3`_
+    2. The process entry point - for example, the `Dmedia`_ DBus service knows
+       it needs a per-user CouchDB, so it will get the appropriate *env* from
+       `UserCouch`_
 
 Because of this design, all the code in the middle (which is the vast majority
 of the code) just needs to take the *env* and pass it to Microfiber, without
@@ -294,13 +296,15 @@ Database class
 ==============
 
 In addition to the seven REST adapter methods inherited from :class:`CouchBase`,
-the :class:`Database` class provides five convenience methods:
+the :class:`Database` class provides these convenience methods:
 
     * :meth:`Database.server()`
     * :meth:`Database.ensure()`
     * :meth:`Database.save()`
-    * :meth:`Database.bulksave()`
+    * :meth:`Database.save_many()`
+    * :meth:`Database.get_many()`
     * :meth:`Database.view()`
+    * :meth:`Database.bulksave()`
 
 
 .. class:: Database(name, env='http://localhost:5984/')
@@ -342,8 +346,7 @@ the :class:`Database` class provides five convenience methods:
 
         Higher level code can safely call this method at any time, and it only
         results in a single PUT /db request being made.
-    
-    
+
     .. method:: save(doc)
     
         POST *doc* to CouchDB and update ``doc['_rev']`` in-place.
@@ -368,29 +371,27 @@ the :class:`Database` class provides five convenience methods:
         This method is inspired by the identical (and highly useful) method in
         `python-couchdb`_.
 
+    .. method:: save_many(docs)
 
-    .. method:: bulksave(docs)
-    
-        POST a list of docs to _bulk_docs, update all _rev in place.
+        Bulk-save using non-atomic semantics, updating all ``_rev`` in-place.
 
-        For example:
+        This method is similar :meth:`Database.save()`, except this method
+        operates on a list of many docs at once.
 
-        >>> db = Database('foo')
-        >>> doc1 = {'_id': 'bar'}
-        >>> doc2 = {'_id': 'baz'}
-        >>> db.bulksave([doc1, doc2])
-        [{'rev': '1-967a00dff5e02add41819138abb3284d', 'id': 'bar'}, {'rev': '1-967a00dff5e02add41819138abb3284d', 'id': 'baz'}]
-        >>> doc1
-        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
-        >>> doc2
-        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'baz'}
+        If there are conflicts, a :exc:`BulkConflict` exception is raised, whose
+        ``conflicts`` attribute will be a list of the documents for which there
+        were conflicts.  Your request will *not* have modified these conflicting
+        documents in the database.
 
+        However, all non-conflicting documents will have been saved and their
+        ``_rev`` updated in-place.
+        
+    .. method:: get_many(doc_ids)
 
-        This method works just like :meth:`Database.save()`, except on a whole
-        list of docs all at once.  As only a single request is made to CouchDB,
-        this is a high-performance way to update a large number of documents.
+        Convenience method to retrieve multiple documents at once.
 
-
+        As CouchDB has a rather large per-request overhead, retrieving multiple
+        documents at once can greatly improve performance.
 
     .. method:: view(design, view, **options)
     
@@ -407,11 +408,22 @@ the :class:`Database` class provides five convenience methods:
     
         For example:
     
-        >>> db = Database('dmedia')
+        >>> db = Database('dmedia-0')
         >>> db.view('file', 'bytes')  #doctest: +SKIP
         {u'rows': []}
         >>> db.get('_design', 'file', '_view', 'bytes')  #doctest: +SKIP
         {u'rows': []}
+
+    .. method:: bulksave(docs)
+
+        Bulk-save using all-or-nothing semantics, updating all ``_rev`` in-place.
+
+        This method is similar :meth:`Database.save()`, except this method
+        operates on a list of many docs at once.
+
+        *Note:* for subtle reasons that take a while to explain, you probably
+        don't want to use this method.  Instead use
+        :meth:`Database.save_many()`.
 
 
 
@@ -428,7 +440,7 @@ Functions
     >>> random_id()  #doctest: +SKIP
     'OVRHK3TUOUQCWIDMNFXGC4TP'
 
-    This is how dmedia/Novacut random IDs are created, so this is "Jason
+    This is how Dmedia/Novacut random IDs are created, so this is "Jason
     approved", for what that's worth.
 
 
@@ -439,10 +451,10 @@ Functions
     The ID will be 27-characters long, URL and filesystem safe.  For example:
 
     >>> random_id2()  #doctest: +SKIP
-    '1313567384.67DFPERIOU66CT56'
+    '1313567384-67DFPERIOU66CT56'
     
     The idea with this 2nd type of random ID is that it will be used for the
-    dmedia activity log.
+    Dmedia activity log.
 
 
 .. function:: dc3_env()
@@ -453,7 +465,7 @@ Functions
     environment:
 
     >>> from microfiber import dc3_env, Database
-    >>> db = Database('dmedia', dc3_env())
+    >>> db = Database('dmedia-0', dc3_env())
     >>> db.url
     'http://localhost:41289/'
 
@@ -466,12 +478,12 @@ Functions
     `Dmedia`_ environment:
 
     >>> from microfiber import dmedia_env, Database
-    >>> db = Database('dmedia', dmedia_env())
+    >>> db = Database('dmedia-0', dmedia_env())
     >>> db.url
     'http://localhost:41289/'
 
-    If you're using Microfiber to work with Dmedia or Novacut, please use this
-    function instead of :func:`dc3_env()` as starting with the Dmedia 12.01
+    If you're using Microfiber to work with `Dmedia`_ or `Novacut`_, please use
+    this function instead of :func:`dc3_env()` as starting with the Dmedia 12.01
     release, Dmedia itself will be what starts CouchDB. 
 
 
@@ -480,7 +492,7 @@ Exceptions
 
 .. exception:: HTTPError
 
-    Base class for custom all microfiber exceptions.
+    Base class for all custom microfiber exceptions.
 
 
 
@@ -563,18 +575,26 @@ Exceptions
 .. exception:: ServerError
 
     Used to raise exceptions for any 5xx Server Errors.
+    
+
+.. exception:: BulkConflict(conflicts, rows)
+
+    Raised by :meth:`Database.save_many()` when one or more docs have conflicts.
+
+    .. attribute:: conflicts
+
+        A list of docs for which conflicts occurred.  The docs will be
+        unmodified, will have the exact value and ``_rev`` as they did prior to
+        calling :meth:`Database.save_many()`.
+
+    .. attribute:: rows
+
+        The exact return value from the CouchDB request.
 
 
 
 .. _`Novacut`: https://wiki.ubuntu.com/Novacut
-.. _`desktopcouch`: https://launchpad.net/desktopcouch
+.. _`UserCouch`: https://launchpad.net/usercouch
 .. _`dc3`: https://launchpad.net/dc3
 .. _`Dmedia`: https://launchpad.net/dmedia
 .. _`python-couchdb`: http://packages.python.org/CouchDB/client.html#database
-
-
-
-
-
-
-
