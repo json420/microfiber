@@ -811,7 +811,7 @@ class Database(CouchBase):
         documents at once can greatly improve performance.
         """
         result = self.post({'keys': doc_ids}, '_all_docs', include_docs=True)
-        return [row['doc'] for row in result['rows']]
+        return [row.get('doc') for row in result['rows']]
 
     def view(self, design, view, **options):
         """

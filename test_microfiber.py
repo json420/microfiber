@@ -1605,4 +1605,14 @@ class TestDatabaseLive(LiveTestCase):
             db.get_many([ids[7], ids[7], ids[7]]),
             [docs[7], docs[7], docs[7]]
         )
-            
+
+        # Test with unknown ids
+        nope = random_id()
+        self.assertEqual(
+            db.get_many([nope]), 
+            [None]
+        )
+        self.assertEqual(
+            db.get_many([ids[17], nope, ids[18]]),
+            [docs[17], None, docs[18]]
+        )
