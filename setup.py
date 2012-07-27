@@ -28,7 +28,6 @@ Install `microfiber`.
 
 from distutils.core import setup
 from distutils.cmd import Command
-from distutils.command.build import build
 from unittest import TestLoader, TextTestRunner
 from doctest import DocTestSuite
 import os
@@ -84,38 +83,6 @@ class Test(Command):
             raise SystemExit(2)
 
 
-class build_with_docs(build):
-
-    def find_sphinx_path(self):
-        for prefix in os.environ['PATH'].split(':'):
-            file_path = os.path.join(prefix, 'sphinx-build')
-            if path.isfile(file_path) and os.access(file_path, os.X_OK):
-                return file_path
-
-        return None
-
-    def run(self):
-        super().run()
-        sphinx = self.find_sphinx_path() 
-        if sphinx is None:
-            print("WARNING: Documentation not generated. python-sphinx missing")
-            return
-        tree = path.dirname(path.abspath(__file__))
-        src = path.join(tree, 'doc')
-        dst = path.join(tree, 'doc', '_build', 'html')
-        doctrees = path.join(tree, 'doc', '_build', 'doctrees')
-        cmd = [
-            sphinx,
-            #'-W',  # Turn  warnings  into  errors
-            '-E',  # Don't  use a saved environment
-            '-b', 'html',
-            '-d', doctrees,
-            src,
-            dst
-        ]
-        subprocess.check_call(cmd)
-
-
 setup(
     name='microfiber',
     description='fabric for a lightweight Couch',
@@ -126,8 +93,5 @@ setup(
     license='LGPLv3+',
     py_modules=['microfiber'],
     scripts=['microfiber-changes'],
-    cmdclass={
-        'test': Test,
-        'build': build_with_docs,
-    },
+    cmdclass={'test': Test},
 )
