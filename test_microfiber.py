@@ -1252,6 +1252,15 @@ class TestDatabaseLive(LiveTestCase):
         self.assertEqual(inst.delete(), {'ok': True})
         self.assertRaises(NotFound, inst.get)
 
+    def test_non_ascii(self):
+        inst = self.klass(self.db, self.env)
+        self.assertTrue(inst.ensure())
+        _id = test_id()
+        name = '*safe solvent™'
+        doc = {'_id': _id, 'name': name}
+        inst.save(doc)
+        self.assertEqual(inst.get(_id)['name'], name)
+
     def test_save(self):
         inst = self.klass(self.db, self.env)
 
