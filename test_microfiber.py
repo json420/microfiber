@@ -121,18 +121,28 @@ class TestFunctions(TestCase):
         self.assertEqual(len(b) * 8, 80)
 
     def test_json_body(self):
-        # Test our assumptions about json.dumps()
+        # Test our assumptions about json.dumps():
         tm = '™'
         self.assertEqual(json.dumps(tm), '"\\u2122"')
         self.assertEqual(json.dumps(tm, ensure_ascii=False), '"™"')
 
+        # Now test _json_body():
         doc = {
             '_id': 'foo',
             'bar': 'baz',
             'hello': 'world',
+            'name': 'Jon Åslund',
         }
-        json_str = json.dumps(doc, sort_keys=True, separators=(',',':'))
-        json_str2 = json.dumps(json_str, sort_keys=True, separators=(',',':'))
+        json_str = json.dumps(doc,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(',',':'),
+        )
+        json_str2 = json.dumps(json_str,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(',',':'),
+        )
         json_bytes = json_str.encode('utf-8')
 
         # Test with obj=None
@@ -146,7 +156,7 @@ class TestFunctions(TestCase):
             microfiber._json_body(json_str),
             json_str2.encode('utf-8')
         )
-        
+
         # Test other stuff that should get JSON encoded:
         self.assertEqual(microfiber._json_body(True), b'true')
         self.assertEqual(microfiber._json_body(False), b'false')
@@ -162,7 +172,7 @@ class TestFunctions(TestCase):
             microfiber._json_body(['one', True, 3]),
             b'["one",true,3]'
         )
-        
+
         # Test when obj in an open file
         d = tempfile.mkdtemp()
         try:

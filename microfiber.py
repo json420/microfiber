@@ -133,7 +133,11 @@ def _json_body(obj):
         return None
     if isinstance(obj, (bytes, BufferedReader)):
         return obj
-    return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+    return json.dumps(obj,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(',',':'),
+    ).encode('utf-8')
 
 
 def _queryiter(options):
