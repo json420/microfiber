@@ -150,7 +150,7 @@ def _queryiter(options):
     for key in sorted(options):
         value = options[key]
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
-            value = json.dumps(value)
+            value = json.dumps(value, ensure_ascii=False)
         yield (key, value)
 
 
