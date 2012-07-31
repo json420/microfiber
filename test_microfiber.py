@@ -121,6 +121,11 @@ class TestFunctions(TestCase):
         self.assertEqual(len(b) * 8, 80)
 
     def test_json_body(self):
+        # Test our assumptions about json.dumps()
+        tm = '™'
+        self.assertEqual(json.dumps(tm), '"\\u2122"')
+        self.assertEqual(json.dumps(tm, ensure_ascii=False), '"™"')
+
         doc = {
             '_id': 'foo',
             'bar': 'baz',
@@ -146,6 +151,10 @@ class TestFunctions(TestCase):
         self.assertEqual(microfiber._json_body(True), b'true')
         self.assertEqual(microfiber._json_body(False), b'false')
         self.assertEqual(microfiber._json_body('hello'), b'"hello"')
+        self.assertEqual(
+            microfiber._json_body('*safe solvent™'),
+            b'"*safe solvent\xe2\x84\xa2"'
+        )   
         self.assertEqual(microfiber._json_body(18), b'18')
         self.assertEqual(microfiber._json_body(17.9), b'17.9')
         self.assertEqual(microfiber._json_body({}), b'{}')
