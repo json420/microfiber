@@ -133,7 +133,11 @@ def _json_body(obj):
         return None
     if isinstance(obj, (bytes, BufferedReader)):
         return obj
-    return json.dumps(obj, sort_keys=True, separators=(',',':')).encode('utf-8')
+    return json.dumps(obj,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(',',':'),
+    ).encode('utf-8')
 
 
 def _queryiter(options):
@@ -146,7 +150,7 @@ def _queryiter(options):
     for key in sorted(options):
         value = options[key]
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
-            value = json.dumps(value)
+            value = json.dumps(value, ensure_ascii=False)
         yield (key, value)
 
 
@@ -834,7 +838,7 @@ class Database(CouchBase):
         rows = self.get('_all_docs')['rows']
         iterable = iter_all_docs(rows, self, attachments)
         docs = FakeList(len(rows), iterable)
-        json.dump({'docs': docs}, fp, sort_keys=True, indent=4, separators=(',', ': '))
+        json.dump({'docs': docs}, fp, ensure_ascii=False, sort_keys=True, indent=4, separators=(',', ': '))
         
     def load(self, fp):
         return self.post(fp, '_bulk_docs')
