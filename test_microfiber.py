@@ -120,13 +120,15 @@ class TestFunctions(TestCase):
         self.assertIsInstance(b, bytes)
         self.assertEqual(len(b) * 8, 80)
 
-    def test_json_body(self):
-        # Test our assumptions about json.dumps():
+    def test_json(self):
+        """
+        Test our assumptions about json.dumps().
+        """
         tm = '™'
         self.assertEqual(json.dumps(tm), '"\\u2122"')
         self.assertEqual(json.dumps(tm, ensure_ascii=False), '"™"')
 
-        # Now test _json_body():
+    def test_json_body(self):
         doc = {
             '_id': 'foo',
             'bar': 'baz',
@@ -235,6 +237,21 @@ class TestFunctions(TestCase):
                 ('startkey', '"bar"'),
                 ('startkey_docid', '6BLRBJKV2J3COTUPJCU57UNA'),
                 ('update_seq', 'true'),
+            ]
+        )
+
+        # Test key, startkey, endkey with non-ascii values
+        options = dict(
+            key='Hanna Sköld',
+            startkey='Matias Särs',
+            endkey='Paweł Moll',
+        )
+        self.assertEqual(
+            list(microfiber._queryiter(options)),
+            [
+                ('endkey', '"Paweł Moll"'),
+                ('key', '"Hanna Sköld"'),
+                ('startkey', '"Matias Särs"'),
             ]
         )
 
