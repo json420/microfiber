@@ -16,8 +16,8 @@ override_dh_auto_build:
 	sphinx-build -b html doc doc/_build/html
 
 override_dh_auto_install:
-	for pyvers in $(shell py3versions -vr); do \
-		python$$pyvers setup.py install \
+	set -ex; for python in $(shell py3versions -r); do \
+		$$python setup.py install \
 				--install-layout=deb \
 				--root $(CURDIR)/debian/python3-microfiber; \
 	done
