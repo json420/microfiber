@@ -2,11 +2,11 @@ Source: microfiber
 Section: python
 Priority: optional
 Maintainer: Jason Gerard DeRose <jderose@novacut.com>
-Build-Depends: debhelper (>= 8.9),
+Build-Depends: debhelper (>= 9.20120115),
     python3 (>= 3.2),
     python3-sphinx,
     python3-usercouch (>= 12.07), 
-Standards-Version: 3.9.2
+Standards-Version: 3.9.3
 X-Python3-Version: 3.2
 Homepage: https://launchpad.net/microfiber
 
