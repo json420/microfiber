@@ -3,22 +3,24 @@
 PYTHON3=$(shell py3versions -vr)
 
 %:
-	dh $@ --with=python3
+	dh $@ --with=python3 --with=sphinxdoc
 
 test-python%:
 	python$* setup.py test --auth=basic
 	python$* setup.py test --auth=oauth
 
+override_dh_auto_clean:
+	python3 setup.py clean
+
+override_dh_auto_build:
+	sphinx-build -b html doc doc/_build/html
+
 override_dh_auto_install:
-	for pyvers in $(shell py3versions -vr); do \
-		python$$pyvers setup.py install \
+	set -ex; for python in $(shell py3versions -r); do \
+		$$python setup.py install \
 				--install-layout=deb \
 				--root $(CURDIR)/debian/python3-microfiber; \
 	done
 
 override_dh_auto_test: $(PYTHON3:%=test-python%)
 
-
-override_dh_auto_build:
-	dh_auto_build
-	sphinx-build -b html doc doc/_build/html
