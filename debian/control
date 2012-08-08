@@ -25,7 +25,7 @@ Description: fabric for a lightweight Couch
 Package: python3-microfiber-doc
 Architecture: all
 Section: doc
-Depends: ${misc:Depends}, libjs-jquery
+Depends: ${sphinxdoc:Depends}, ${misc:Depends}
 Suggests: python3-microfiber
 Description: documentation for python3-microfiber
  Microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON

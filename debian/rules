@@ -3,7 +3,7 @@
 PYTHON3=$(shell py3versions -vr)
 
 %:
-	dh $@ --with=python3
+	dh $@ --with=python3 --with=sphinxdoc
 
 test-python%:
 	python$* setup.py test --auth=basic
