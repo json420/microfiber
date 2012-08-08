@@ -7,12 +7,12 @@ Build-Depends: debhelper (>= 9.20120115),
     python3-sphinx,
     python3-usercouch (>= 12.07), 
 Standards-Version: 3.9.3
-X-Python3-Version: 3.2
+X-Python3-Version: >= 3.2
 Homepage: https://launchpad.net/microfiber
 
 Package: python3-microfiber
 Architecture: all
-Depends: ${misc:Depends}, python3 (>= 3.2)
+Depends: ${python3:Depends}, ${misc:Depends}
 Suggests: python3-microfiber-doc, python3-usercouch
 Description: fabric for a lightweight Couch
  Microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON
