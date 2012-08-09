@@ -10,16 +10,20 @@ test-python%:
 	python$* setup.py test --auth=oauth
 
 override_dh_auto_clean:
-	python3 setup.py clean
+	rm -rf build/ doc/_build/
 
 override_dh_auto_build:
 	sphinx-build -b html doc doc/_build/html
+	set -ex; for python in $(shell py3versions -r); do \
+		$$python setup.py build \
+				--executable=/usr/bin/python3; \
+	done
 
 override_dh_auto_install:
 	set -ex; for python in $(shell py3versions -r); do \
 		$$python setup.py install \
 				--install-layout=deb \
-				--root $(CURDIR)/debian/python3-microfiber; \
+				--root=$(CURDIR)/debian/python3-microfiber; \
 	done
 
 override_dh_auto_test: $(PYTHON3:%=test-python%)
