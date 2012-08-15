@@ -140,15 +140,15 @@ def dumps(obj, pretty=False):
 
     >>> doc = {
     ...     'hello': 'мир',
-    ...     'welcome': 'каждый',
+    ...     'welcome': 'все',
     ... }
     >>> dumps(doc)
-    '{"hello":"мир","welcome":"каждый"}'
+    '{"hello":"мир","welcome":"все"}'
 
     Whereas if you directly call ``json.dumps()`` without *ensure_ascii=False*:
 
     >>> json.dumps(doc, sort_keys=True)
-    '{"hello": "\\\\u043c\\\\u0438\\\\u0440", "welcome": "\\\\u043a\\\\u0430\\\\u0436\\\\u0434\\\\u044b\\\\u0439"}'
+    '{"hello": "\\\\u043c\\\\u0438\\\\u0440", "welcome": "\\\\u0432\\\\u0441\\\\u0435"}'
 
     By default compact encoding is used, but if you supply *pretty=True*,
     4-space indentation will be used:
@@ -156,7 +156,7 @@ def dumps(obj, pretty=False):
     >>> print(dumps(doc, pretty=True))
     {
         "hello": "мир",
-        "welcome": "каждый"
+        "welcome": "все"
     }
 
     """
