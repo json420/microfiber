@@ -2,11 +2,13 @@
 CouchDB REST API
 ================
 
+.. py:currentmodule:: microfiber
+
 This is a quick tour of the CouchDB REST API, as you would use it from
 Microfiber.  This is indented as a quick reference, and as such not all the API
 is documented here.  For more details, see the full `CouchDB REST API`_.
 
-.. _`CouchDB REST API`: http://www.couchbase.org/sites/default/files/uploads/all/documentation/couchbase-api.html
+.. _`CouchDB REST API`: http://wiki.apache.org/couchdb/Reference
 
 
 Databases
