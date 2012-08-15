@@ -116,6 +116,7 @@ def random_id2():
     ])
 
 
+
 def dc3_env():
     import subprocess
     env_s = subprocess.check_output(DC3_CMD)
@@ -128,16 +129,57 @@ def dmedia_env():
     return json.loads(env_s.decode('utf-8'))
 
 
+def dumps(obj, pretty=False):
+    """
+    Safe and opinionated use of ``json.dumps()``.
+
+    This function always calls ``json.dumps()`` with *ensure_ascii=False* and
+    *sort_keys=True*.
+
+    For example:
+
+    >>> doc = {
+    ...     'hello': 'ma',
+    ...     'naughty': 'infirmière',
+    ... }
+    >>> dumps(doc)
+    '{"hello":"ma","naughty":"infirmière"}'
+
+    Whereas if you directly call ``json.dumps()`` without *ensure_ascii=False*:
+
+    >>> json.dumps(doc, sort_keys=True)
+    '{"hello": "ma", "naughty": "infirmi\\\\u00e8re"}'
+
+    By default compact encoding is used, but if you supply *pretty=True*,
+    4-space indentation will be used:
+
+    >>> print(dumps(doc, pretty=True))
+    {
+        "hello": "ma",
+        "naughty": "infirmière"
+    }
+
+    """
+    if pretty:
+        return json.dumps(obj,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(',',': '),
+            indent=4,
+        )
+    return json.dumps(obj,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(',',':'),
+    )
+
+
 def _json_body(obj):
     if obj is None:
         return None
     if isinstance(obj, (bytes, BufferedReader)):
         return obj
-    return json.dumps(obj,
-        ensure_ascii=False,
-        sort_keys=True,
-        separators=(',',':'),
-    ).encode('utf-8')
+    return dumps(obj).encode('utf-8')
 
 
 def _queryiter(options):
@@ -150,7 +192,7 @@ def _queryiter(options):
     for key in sorted(options):
         value = options[key]
         if key in ('key', 'startkey', 'endkey') or not isinstance(value, str):
-            value = json.dumps(value, ensure_ascii=False)
+            value = dumps(value)
         yield (key, value)
 
 

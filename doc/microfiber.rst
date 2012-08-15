@@ -452,9 +452,40 @@ Functions
 
     >>> random_id2()  #doctest: +SKIP
     '1313567384-67DFPERIOU66CT56'
-    
+
     The idea with this 2nd type of random ID is that it will be used for the
     Dmedia activity log.
+
+
+.. function:: dumps(obj, pretty=False)
+
+    Safe and opinionated use of ``json.dumps()``.
+
+    This function always calls ``json.dumps()`` with *ensure_ascii=False* and
+    *sort_keys=True*.
+
+    For example:
+
+    >>> doc = {
+    ...     'hello': 'ma',
+    ...     'naughty': 'infirmière',
+    ... }
+    >>> dumps(doc)
+    '{"hello":"ma","naughty":"infirmière"}'
+
+    Whereas if you directly call ``json.dumps()`` without *ensure_ascii=False*:
+
+    >>> json.dumps(doc, sort_keys=True)
+    '{"hello": "ma", "naughty": "infirmi\\\\u00e8re"}'
+
+    By default compact encoding is used, but if you supply *pretty=True*,
+    4-space indentation will be used:
+
+    >>> print(dumps(doc, pretty=True))
+    {
+        "hello": "ma",
+        "naughty": "infirmière"
+    }
 
 
 .. function:: dc3_env()

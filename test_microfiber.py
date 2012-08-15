@@ -128,6 +128,21 @@ class TestFunctions(TestCase):
         self.assertEqual(json.dumps(tm), '"\\u2122"')
         self.assertEqual(json.dumps(tm, ensure_ascii=False), '"™"')
 
+    def test_dumps(self):
+        doc = {
+            'hello': 'ma',
+            'naughty': 'infirmière',
+        }
+        self.assertEqual(
+            microfiber.dumps(doc),
+            '{"hello":"ma","naughty":"infirmière"}'
+        )
+        self.assertEqual(
+            microfiber.dumps(doc, pretty=True),
+            '{\n    "hello": "ma",\n    "naughty": "infirmière"\n}'
+        )
+        
+
     def test_json_body(self):
         doc = {
             '_id': 'foo',
