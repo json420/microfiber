@@ -429,11 +429,17 @@ class FakeList(list):
             yield doc
 
 
-def iter_all_docs(rows, db, attachments=True):
-    for r in rows:
-        doc = db.get(r['id'], rev=r['value']['rev'], attachments=attachments)
-        del doc['_rev']
-        yield doc
+def iter_all_docs(rows, db):
+    for doc_ids in id_slice_iter(rows):
+        for doc in db.get_many(doc_ids):
+            if doc['_id'].startswith('_'):
+                continue
+            del doc['_rev']
+            try:
+                del doc['_attachments']
+            except KeyError:
+                pass
+            yield doc
 
 
 class CouchBase(object):
@@ -876,12 +882,20 @@ class Database(CouchBase):
             options['reduce'] = False
         return self.get('_design', design, '_view', view, **options)
 
-    def dump(self, fp, attachments=True):
+    def dump(self, filename):
+        fp = open(filename, 'w')
         rows = self.get('_all_docs')['rows']
-        iterable = iter_all_docs(rows, self, attachments)
+        iterable = iter_all_docs(rows, self)
         docs = FakeList(len(rows), iterable)
-        json.dump({'docs': docs}, fp, ensure_ascii=False, sort_keys=True, indent=4, separators=(',', ': '))
-        
+        obj = {'docs': docs}
+        obj = docs
+        json.dump(obj, fp,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=4,
+            separators=(',', ': '),
+        )
+
     def load(self, fp):
         return self.post(fp, '_bulk_docs')
         
