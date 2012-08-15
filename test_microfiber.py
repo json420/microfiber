@@ -130,16 +130,16 @@ class TestFunctions(TestCase):
 
     def test_dumps(self):
         doc = {
-            'hello': 'ma',
-            'naughty': 'infirmière',
+            'hello': 'мир',
+            'welcome': 'каждый',
         }
         self.assertEqual(
             microfiber.dumps(doc),
-            '{"hello":"ma","naughty":"infirmière"}'
+            '{"hello":"мир","welcome":"каждый"}'
         )
         self.assertEqual(
             microfiber.dumps(doc, pretty=True),
-            '{\n    "hello": "ma",\n    "naughty": "infirmière"\n}'
+            '{\n    "hello": "мир",\n    "welcome": "каждый"\n}'
         )
         
 
