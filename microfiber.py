@@ -49,6 +49,7 @@ import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 import threading
+from queue import Queue
 import math
 
 
@@ -413,33 +414,62 @@ class BulkConflict(Exception):
         super().__init__(msg.format(count))
 
 
-class FakeList(list):
-    __slots__ = ('_count', '_iterable')
+def _start_thread(target, *args):
+    thread = threading.Thread(target=target, args=args)
+    thread.daemon = True
+    thread.start()
+    return thread
 
-    def __init__(self, count, iterable):
+
+class SmartQueue(Queue):
+    """
+    Queue with custom get() that raises exception instances from the queue.
+    """
+
+    def get(self, block=True, timeout=None):
+        item = super().get(block, timeout)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+def _fakelist_worker(rows, db, queue):
+    try:
+        for doc_ids in id_slice_iter(rows, 25):
+            queue.put(db.get_many(doc_ids))
+        queue.put(None)
+    except Exception as e:
+        queue.put(e)
+
+
+class FakeList(list):
+    __slots__ = ('_rows', '_db')
+
+    def __init__(self, rows, db):
         super().__init__()
-        self._count = count
-        self._iterable = iterable
+        self._rows = rows
+        self._db = db
 
     def __len__(self):
-        return self._count
+        return len(self._rows)
 
     def __iter__(self):
-        for doc in self._iterable:
-            yield doc
-
-
-def iter_all_docs(rows, db):
-    for doc_ids in id_slice_iter(rows):
-        for doc in db.get_many(doc_ids):
-            if doc['_id'].startswith('_'):
-                continue
-            del doc['_rev']
-            try:
-                del doc['_attachments']
-            except KeyError:
-                pass
-            yield doc
+        queue = SmartQueue(2)
+        thread = _start_thread(_fakelist_worker, self._rows, self._db, queue)
+        while True:
+            docs = queue.get()
+            if docs is None:
+                break
+            for doc in docs:
+                if doc['_id'].startswith('_'):
+                    continue
+                del doc['_rev']
+                try:
+                    del doc['_attachments']
+                except KeyError:
+                    pass
+                yield doc
+        thread.join()  # Make sure reader() terminates
 
 
 class CouchBase(object):
@@ -885,11 +915,8 @@ class Database(CouchBase):
     def dump(self, filename):
         fp = open(filename, 'w')
         rows = self.get('_all_docs')['rows']
-        iterable = iter_all_docs(rows, self)
-        docs = FakeList(len(rows), iterable)
-        obj = {'docs': docs}
-        obj = docs
-        json.dump(obj, fp,
+        docs = FakeList(rows, self)
+        json.dump(docs, fp,
             ensure_ascii=False,
             sort_keys=True,
             indent=4,
