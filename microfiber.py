@@ -926,6 +926,3 @@ class Database(CouchBase):
             separators=(',', ': '),
         )
 
-    def load(self, fp):
-        return self.post(fp, '_bulk_docs')
-
