@@ -1704,13 +1704,13 @@ class TestDatabaseLive(LiveTestCase):
         # Test with .json.gz
         dst = path.join(self.tmpcouch.paths.bzr, 'foo.json.gz')
         db.dump(dst)
+        gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
         self.assertEqual(
             md5(gzip.GzipFile(dst, 'rb').read()).hexdigest(),
             checksum
         )
 
-        # Test that gzipping is done in a way that gives consistent hash values:
-        gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
+        # Test that timestamp doesn't change gz_checksum
         time.sleep(2)
         db.dump(dst)
         self.assertEqual(
@@ -1718,3 +1718,10 @@ class TestDatabaseLive(LiveTestCase):
             gz_checksum
         )
 
+        # Test that filename doesn't change gz_checksum
+        dst = path.join(self.tmpcouch.paths.bzr, 'bar.json.gz')
+        db.dump(dst)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            gz_checksum
+        )

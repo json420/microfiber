@@ -39,7 +39,7 @@ Launchpad project:
     https://launchpad.net/microfiber
 """
 
-from os import urandom, path
+from os import urandom
 from io import BufferedReader, TextIOWrapper
 from base64 import b32encode, b64encode
 import json
@@ -914,12 +914,10 @@ class Database(CouchBase):
         return self.get('_design', design, '_view', view, **options)
 
     def dump(self, filename):
-        name = path.basename(filename)
-        if name.endswith('.json.gz'):
+        if filename.endswith('.json.gz'):
             _fp = open(filename, 'wb')
-            fp = TextIOWrapper(GzipFile(name, fileobj=_fp, mtime=1234567890))
+            fp = TextIOWrapper(GzipFile('docs.json', fileobj=_fp, mtime=1))
         else:
-            assert name.endswith('.json')
             fp = open(filename, 'w')
         rows = self.get('_all_docs')['rows']
         docs = FakeList(rows, self)
