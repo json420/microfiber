@@ -48,7 +48,7 @@ copyright = u'2011, Novacut Inc'
 # built documents.
 #
 # The short X.Y version.
-version = '12.08'
+version = '12.09'
 # The full version, including alpha/beta/rc tags.
 release = version
 
