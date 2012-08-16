@@ -462,8 +462,6 @@ class FakeList(list):
             if docs is None:
                 break
             for doc in docs:
-                if doc['_id'].startswith('_'):
-                    continue
                 del doc['_rev']
                 try:
                     del doc['_attachments']
@@ -919,7 +917,7 @@ class Database(CouchBase):
             fp = TextIOWrapper(GzipFile('docs.json', fileobj=_fp, mtime=1))
         else:
             fp = open(filename, 'w')
-        rows = self.get('_all_docs')['rows']
+        rows = self.get('_all_docs', endkey='_')['rows']
         docs = FakeList(rows, self)
         json.dump(docs, fp,
             ensure_ascii=False,

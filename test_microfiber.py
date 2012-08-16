@@ -59,6 +59,26 @@ BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%
 B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
 
+# A sample view from Dmedia:
+doc_type = """
+function(doc) {
+    emit(doc.type, null);
+}
+"""
+doc_time = """
+function(doc) {
+    emit(doc.time, null);
+}
+"""
+doc_design = {
+    '_id': '_design/doc',
+    'views': {
+        'type': {'map': doc_type, 'reduce': '_count'},
+        'time': {'map': doc_time},
+    },
+}
+
+
 def is_microfiber_id(_id):
     assert isinstance(_id, str)
     return (
@@ -1689,6 +1709,7 @@ class TestDatabaseLive(LiveTestCase):
             sorted(docs, key=lambda d: d['_id']),
             pretty=True
         )
+        docs.append(deepcopy(doc_design))
         checksum = md5(docs_s.encode('utf-8')).hexdigest()
         db.save_many(docs)
 
