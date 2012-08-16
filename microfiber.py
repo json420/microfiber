@@ -39,10 +39,11 @@ Launchpad project:
     https://launchpad.net/microfiber
 """
 
-from os import urandom
-from io import BufferedReader
+from os import urandom, path
+from io import BufferedReader, TextIOWrapper
 from base64 import b32encode, b64encode
 import json
+import gzip
 import time
 from hashlib import sha1
 import hmac
@@ -435,7 +436,7 @@ class SmartQueue(Queue):
 
 def _fakelist_worker(rows, db, queue):
     try:
-        for doc_ids in id_slice_iter(rows, 25):
+        for doc_ids in id_slice_iter(rows, 50):
             queue.put(db.get_many(doc_ids))
         queue.put(None)
     except Exception as e:
@@ -913,7 +914,12 @@ class Database(CouchBase):
         return self.get('_design', design, '_view', view, **options)
 
     def dump(self, filename):
-        fp = open(filename, 'w')
+        name = path.basename(filename)
+        if name.endswith('.json.gz'):
+            fp = TextIOWrapper(gzip.GzipFile(name, 'wb'))
+        else:
+            assert name.endswith('.json')
+            fp = open(filename, 'w')
         rows = self.get('_all_docs')['rows']
         docs = FakeList(rows, self)
         json.dump(docs, fp,
