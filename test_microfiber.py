@@ -30,6 +30,7 @@ from os import path
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
+import gzip
 import time
 import io
 import tempfile
@@ -1688,9 +1689,32 @@ class TestDatabaseLive(LiveTestCase):
             sorted(docs, key=lambda d: d['_id']),
             pretty=True
         )
+        checksum = md5(docs_s.encode('utf-8')).hexdigest()
         db.save_many(docs)
 
+        # Test with .json
         dst = path.join(self.tmpcouch.paths.bzr, 'foo.json')
         db.dump(dst)
         self.assertEqual(open(dst, 'r').read(), docs_s)
-  
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            checksum
+        )
+
+        # Test with .json.gz
+        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json.gz')
+        db.dump(dst)
+        self.assertEqual(
+            md5(gzip.GzipFile(dst, 'rb').read()).hexdigest(),
+            checksum
+        )
+
+        # Test that gzipping is done in a way that gives consistent hash values:
+        gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
+        time.sleep(1)
+        db.dump(dst)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            gz_checksum
+        )
+

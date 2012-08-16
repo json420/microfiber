@@ -916,7 +916,7 @@ class Database(CouchBase):
     def dump(self, filename):
         name = path.basename(filename)
         if name.endswith('.json.gz'):
-            fp = TextIOWrapper(gzip.GzipFile(name, 'wb'))
+            fp = TextIOWrapper(gzip.GzipFile(filename, 'wb'))
         else:
             assert name.endswith('.json')
             fp = open(filename, 'w')
