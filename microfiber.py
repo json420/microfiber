@@ -926,6 +926,33 @@ class Database(CouchBase):
         return self.get('_design', design, '_view', view, **options)
 
     def dump(self, filename):
+        """
+        Dump this database to regular JSON file *filename*.
+
+        For example:
+
+        >>> db = Database('foo')  #doctest: +SKIP
+        >>> db.dump('foo.json')  #doctest: +SKIP
+
+        Or if *filename* ends with ``'.json.gz'``, the file will be
+        gzip-compressed as it is written:
+
+        >>> db.dump('foo.json.gz')  #doctest: +SKIP
+
+        CouchDB is a bit awkward in that its API doesn't offer a nice way to
+        make a request whose response is suitable for writing directly to a
+        file, without decoding/encoding.  It would be nice if that dump could
+        be loaded directly from the file as well.  One of the biggest issues is
+        that a dump really needs to have doc['_rev'] removed.
+
+        This method is a compromise on many fronts, but it was made with these
+        priorities:
+
+            1. Readability of the dumped JSON file
+
+            2. High performance and low memory usage, despite the fact that
+               we must encode and decode each doc
+        """
         if filename.lower().endswith('.json.gz'):
             _fp = open(filename, 'wb')
             fp = TextIOWrapper(GzipFile('docs.json', fileobj=_fp, mtime=1))
