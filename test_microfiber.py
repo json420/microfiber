@@ -1725,3 +1725,11 @@ class TestDatabaseLive(LiveTestCase):
             md5(open(dst, 'rb').read()).hexdigest(),
             gz_checksum
         )
+
+        # Make sure .JSON.GZ also works, that case is ignored
+        dst = path.join(self.tmpcouch.paths.bzr, 'FOO.JSON.GZ')
+        db.dump(dst)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            gz_checksum
+        )

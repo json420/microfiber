@@ -914,7 +914,7 @@ class Database(CouchBase):
         return self.get('_design', design, '_view', view, **options)
 
     def dump(self, filename):
-        if filename.endswith('.json.gz'):
+        if filename.lower().endswith('.json.gz'):
             _fp = open(filename, 'wb')
             fp = TextIOWrapper(GzipFile('docs.json', fileobj=_fp, mtime=1))
         else:
@@ -930,4 +930,4 @@ class Database(CouchBase):
 
     def load(self, fp):
         return self.post(fp, '_bulk_docs')
-        
+
