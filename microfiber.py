@@ -444,6 +444,20 @@ def _fakelist_worker(rows, db, queue):
 
 
 class FakeList(list):
+    """
+    Trick ``json.dump()`` into doing memory-efficient incremental encoding.
+
+    This is a hack to allow `Database.dump()` to dump a large database while
+    keeping the memory usage constant.
+
+    This also provides to hacks to improve the performance of `Database.dump()`:
+
+        1. Documents are retrieved 50 at a time using `Database.get_many()`
+
+        2. The CouchDB requests are made in a separate thread so `json.dump()`
+           can be busy doing work while we're waiting for a response
+    """
+
     __slots__ = ('_rows', '_db')
 
     def __init__(self, rows, db):
