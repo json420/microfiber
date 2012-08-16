@@ -1683,7 +1683,7 @@ class TestDatabaseLive(LiveTestCase):
         self.assertTrue(db.ensure())
         docs = [
             {'_id': test_id(), 'hello': 'мир', 'welcome': 'все'}
-            for i in range(100)
+            for i in range(200)
         ]
         docs_s = microfiber.dumps(
             sorted(docs, key=lambda d: d['_id']),
@@ -1711,7 +1711,7 @@ class TestDatabaseLive(LiveTestCase):
 
         # Test that gzipping is done in a way that gives consistent hash values:
         gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
-        time.sleep(1)
+        time.sleep(2)
         db.dump(dst)
         self.assertEqual(
             md5(open(dst, 'rb').read()).hexdigest(),

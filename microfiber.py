@@ -43,7 +43,7 @@ from os import urandom, path
 from io import BufferedReader, TextIOWrapper
 from base64 import b32encode, b64encode
 import json
-import gzip
+from gzip import GzipFile
 import time
 from hashlib import sha1
 import hmac
@@ -916,7 +916,8 @@ class Database(CouchBase):
     def dump(self, filename):
         name = path.basename(filename)
         if name.endswith('.json.gz'):
-            fp = TextIOWrapper(gzip.GzipFile(filename, 'wb'))
+            _fp = open(filename, 'wb')
+            fp = TextIOWrapper(GzipFile(name, fileobj=_fp, mtime=1234567890))
         else:
             assert name.endswith('.json')
             fp = open(filename, 'w')
