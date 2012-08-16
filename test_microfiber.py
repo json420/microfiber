@@ -1676,3 +1676,21 @@ class TestDatabaseLive(LiveTestCase):
             db.get_many([ids[17], nope, ids[18]]),
             [docs[17], None, docs[18]]
         )
+
+    def test_dump(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertTrue(db.ensure())
+        docs = [
+            {'_id': test_id(), 'hello': 'мир', 'welcome': 'все'}
+            for i in range(100)
+        ]
+        docs_s = microfiber.dumps(
+            sorted(docs, key=lambda d: d['_id']),
+            pretty=True
+        )
+        db.save_many(docs)
+
+        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json')
+        db.dump(dst)
+        self.assertEqual(open(dst, 'r').read(), docs_s)
+  
