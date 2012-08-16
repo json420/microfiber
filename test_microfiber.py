@@ -30,6 +30,7 @@ from os import path
 from base64 import b64encode, b64decode, b32encode, b32decode
 from copy import deepcopy
 import json
+import gzip
 import time
 import io
 import tempfile
@@ -56,6 +57,26 @@ random = SystemRandom()
 BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
 
 B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+
+# A sample view from Dmedia:
+doc_type = """
+function(doc) {
+    emit(doc.type, null);
+}
+"""
+doc_time = """
+function(doc) {
+    emit(doc.time, null);
+}
+"""
+doc_design = {
+    '_id': '_design/doc',
+    'views': {
+        'type': {'map': doc_type, 'reduce': '_count'},
+        'time': {'map': doc_time},
+    },
+}
 
 
 def is_microfiber_id(_id):
@@ -1014,6 +1035,52 @@ class LiveTestCase(TestCase):
         self.env = None
 
 
+class TestFakeList(LiveTestCase):
+    def test_init(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertTrue(db.ensure())
+
+        # Test when DB is empty
+        rows = []
+        fake = microfiber.FakeList(rows, db)
+        self.assertIsInstance(fake, list)
+        self.assertIs(fake._rows, rows)
+        self.assertIs(fake._db, db)
+        self.assertEqual(len(fake), 0)
+        self.assertEqual(list(fake), [])
+
+        # Test when there are some docs
+        ids = sorted(test_id() for i in range(201))
+        orig = [
+            {'_id': _id, 'hello': 'мир', 'welcome': 'все'}
+            for _id in ids
+        ]
+        docs = deepcopy(orig)
+        db.save_many(docs)
+        rows = db.get('_all_docs')['rows']
+        fake = microfiber.FakeList(rows, db)
+        self.assertIsInstance(fake, list)
+        self.assertIs(fake._rows, rows)
+        self.assertIs(fake._db, db)
+        self.assertEqual(len(fake), 201)
+        self.assertEqual(list(fake), orig)
+
+        # Verify that _attachments get deleted
+        for doc in docs:
+            db.put_att('application/octet-stream', b'foobar', doc['_id'], 'baz',
+                rev=doc['_rev']
+            )
+        for _id in ids:
+            self.assertIn('_attachments', db.get(_id))
+        rows = db.get('_all_docs')['rows']
+        fake = microfiber.FakeList(rows, db)
+        self.assertIsInstance(fake, list)
+        self.assertIs(fake._rows, rows)
+        self.assertIs(fake._db, db)
+        self.assertEqual(len(fake), 201)
+        self.assertEqual(list(fake), orig)
+
+
 class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
@@ -1675,4 +1742,61 @@ class TestDatabaseLive(LiveTestCase):
         self.assertEqual(
             db.get_many([ids[17], nope, ids[18]]),
             [docs[17], None, docs[18]]
+        )
+
+    def test_dump(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertTrue(db.ensure())
+        docs = [
+            {'_id': test_id(), 'hello': 'мир', 'welcome': 'все'}
+            for i in range(200)
+        ]
+        docs_s = microfiber.dumps(
+            sorted(docs, key=lambda d: d['_id']),
+            pretty=True
+        )
+        docs.append(deepcopy(doc_design))
+        checksum = md5(docs_s.encode('utf-8')).hexdigest()
+        db.save_many(docs)
+
+        # Test with .json
+        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json')
+        db.dump(dst)
+        self.assertEqual(open(dst, 'r').read(), docs_s)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            checksum
+        )
+
+        # Test with .json.gz
+        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json.gz')
+        db.dump(dst)
+        gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
+        self.assertEqual(
+            md5(gzip.GzipFile(dst, 'rb').read()).hexdigest(),
+            checksum
+        )
+
+        # Test that timestamp doesn't change gz_checksum
+        time.sleep(2)
+        db.dump(dst)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            gz_checksum
+        )
+
+        # Test that filename doesn't change gz_checksum
+        dst = path.join(self.tmpcouch.paths.bzr, 'bar.json.gz')
+        db.dump(dst)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            gz_checksum
+        )
+
+        # Make sure .JSON.GZ also works, that case is ignored
+        dst = path.join(self.tmpcouch.paths.bzr, 'FOO.JSON.GZ')
+        db.dump(dst)
+        self.assertEqual(
+            md5(open(dst, 'rb').read()).hexdigest(),
+            gz_checksum
         )

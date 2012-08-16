@@ -40,15 +40,17 @@ Launchpad project:
 """
 
 from os import urandom
-from io import BufferedReader
+from io import BufferedReader, TextIOWrapper
 from base64 import b32encode, b64encode
 import json
+from gzip import GzipFile
 import time
 from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 import threading
+from queue import Queue
 import math
 
 
@@ -413,27 +415,74 @@ class BulkConflict(Exception):
         super().__init__(msg.format(count))
 
 
-class FakeList(list):
-    __slots__ = ('_count', '_iterable')
+def _start_thread(target, *args):
+    thread = threading.Thread(target=target, args=args)
+    thread.daemon = True
+    thread.start()
+    return thread
 
-    def __init__(self, count, iterable):
+
+class SmartQueue(Queue):
+    """
+    Queue with custom get() that raises exception instances from the queue.
+    """
+
+    def get(self, block=True, timeout=None):
+        item = super().get(block, timeout)
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+
+def _fakelist_worker(rows, db, queue):
+    try:
+        for doc_ids in id_slice_iter(rows, 50):
+            queue.put(db.get_many(doc_ids))
+        queue.put(None)
+    except Exception as e:
+        queue.put(e)
+
+
+class FakeList(list):
+    """
+    Trick ``json.dump()`` into doing memory-efficient incremental encoding.
+
+    This class is a hack to allow `Database.dump()` to dump a large database
+    while keeping the memory usage constant.
+
+    It also provides two hacks to improve the performance of `Database.dump()`:
+
+        1. Documents are retrieved 50 at a time using `Database.get_many()`
+
+        2. The CouchDB requests are made in a separate thread so `json.dump()`
+           can be busy doing work while we're waiting for a response
+    """
+
+    __slots__ = ('_rows', '_db')
+
+    def __init__(self, rows, db):
         super().__init__()
-        self._count = count
-        self._iterable = iterable
+        self._rows = rows
+        self._db = db
 
     def __len__(self):
-        return self._count
+        return len(self._rows)
 
     def __iter__(self):
-        for doc in self._iterable:
-            yield doc
-
-
-def iter_all_docs(rows, db, attachments=True):
-    for r in rows:
-        doc = db.get(r['id'], rev=r['value']['rev'], attachments=attachments)
-        del doc['_rev']
-        yield doc
+        queue = SmartQueue(2)
+        thread = _start_thread(_fakelist_worker, self._rows, self._db, queue)
+        while True:
+            docs = queue.get()
+            if docs is None:
+                break
+            for doc in docs:
+                del doc['_rev']
+                try:
+                    del doc['_attachments']
+                except KeyError:
+                    pass
+                yield doc
+        thread.join()  # Make sure reader() terminates
 
 
 class CouchBase(object):
@@ -876,12 +925,45 @@ class Database(CouchBase):
             options['reduce'] = False
         return self.get('_design', design, '_view', view, **options)
 
-    def dump(self, fp, attachments=True):
-        rows = self.get('_all_docs')['rows']
-        iterable = iter_all_docs(rows, self, attachments)
-        docs = FakeList(len(rows), iterable)
-        json.dump({'docs': docs}, fp, ensure_ascii=False, sort_keys=True, indent=4, separators=(',', ': '))
-        
-    def load(self, fp):
-        return self.post(fp, '_bulk_docs')
-        
+    def dump(self, filename):
+        """
+        Dump this database to regular JSON file *filename*.
+
+        For example:
+
+        >>> db = Database('foo')  #doctest: +SKIP
+        >>> db.dump('foo.json')  #doctest: +SKIP
+
+        Or if *filename* ends with ``'.json.gz'``, the file will be
+        gzip-compressed as it is written:
+
+        >>> db.dump('foo.json.gz')  #doctest: +SKIP
+
+        CouchDB is a bit awkward in that its API doesn't offer a nice way to
+        make a request whose response is suitable for writing directly to a
+        file, without decoding/encoding.  It would be nice if that dump could
+        be loaded directly from the file as well.  One of the biggest issues is
+        that a dump really needs to have doc['_rev'] removed.
+
+        This method is a compromise on many fronts, but it was made with these
+        priorities:
+
+            1. Readability of the dumped JSON file
+
+            2. High performance and low memory usage, despite the fact that
+               we must encode and decode each doc
+        """
+        if filename.lower().endswith('.json.gz'):
+            _fp = open(filename, 'wb')
+            fp = TextIOWrapper(GzipFile('docs.json', fileobj=_fp, mtime=1))
+        else:
+            fp = open(filename, 'w')
+        rows = self.get('_all_docs', endkey='_')['rows']
+        docs = FakeList(rows, self)
+        json.dump(docs, fp,
+            ensure_ascii=False,
+            sort_keys=True,
+            indent=4,
+            separators=(',', ': '),
+        )
+

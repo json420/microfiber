@@ -308,7 +308,7 @@ the :class:`Database` class provides these convenience methods:
 
 
 .. class:: Database(name, env='http://localhost:5984/')
-    
+
     Makes requests relative to a CouchDB database URL.
     
     Create a :class:`Database` like this:
@@ -424,6 +424,34 @@ the :class:`Database` class provides these convenience methods:
         *Note:* for subtle reasons that take a while to explain, you probably
         don't want to use this method.  Instead use
         :meth:`Database.save_many()`.
+        
+    .. method:: dump(filename)
+
+        Dump this database to regular JSON file *filename*.
+
+        For example:
+
+        >>> db = Database('foo')  #doctest: +SKIP
+        >>> db.dump('foo.json')  #doctest: +SKIP
+
+        Or if *filename* ends with ``'.json.gz'``, the file will be
+        gzip-compressed as it is written:
+
+        >>> db.dump('foo.json.gz')  #doctest: +SKIP
+
+        CouchDB is a bit awkward in that its API doesn't offer a nice way to
+        make a request whose response is suitable for writing directly to a
+        file, without decoding/encoding.  It would be nice if that dump could
+        be loaded directly from the file as well.  One of the biggest issues is
+        that a dump really needs to have doc['_rev'] removed.
+
+        This method is a compromise on many fronts, but it was made with these
+        priorities:
+
+            1. Readability of the dumped JSON file
+
+            2. High performance and low memory usage, despite the fact that
+               we must encode and decode each doc
 
 
 
