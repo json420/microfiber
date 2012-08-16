@@ -447,10 +447,10 @@ class FakeList(list):
     """
     Trick ``json.dump()`` into doing memory-efficient incremental encoding.
 
-    This is a hack to allow `Database.dump()` to dump a large database while
-    keeping the memory usage constant.
+    This class is a hack to allow `Database.dump()` to dump a large database
+    while keeping the memory usage constant.
 
-    This also provides to hacks to improve the performance of `Database.dump()`:
+    It also provides two hacks to improve the performance of `Database.dump()`:
 
         1. Documents are retrieved 50 at a time using `Database.get_many()`
 
