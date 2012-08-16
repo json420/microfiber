@@ -1035,6 +1035,52 @@ class LiveTestCase(TestCase):
         self.env = None
 
 
+class TestFakeList(LiveTestCase):
+    def test_init(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertTrue(db.ensure())
+
+        # Test when DB is empty
+        rows = []
+        fake = microfiber.FakeList(rows, db)
+        self.assertIsInstance(fake, list)
+        self.assertIs(fake._rows, rows)
+        self.assertIs(fake._db, db)
+        self.assertEqual(len(fake), 0)
+        self.assertEqual(list(fake), [])
+
+        # Test when there are some docs
+        ids = sorted(test_id() for i in range(201))
+        orig = [
+            {'_id': _id, 'hello': 'мир', 'welcome': 'все'}
+            for _id in ids
+        ]
+        docs = deepcopy(orig)
+        db.save_many(docs)
+        rows = db.get('_all_docs')['rows']
+        fake = microfiber.FakeList(rows, db)
+        self.assertIsInstance(fake, list)
+        self.assertIs(fake._rows, rows)
+        self.assertIs(fake._db, db)
+        self.assertEqual(len(fake), 201)
+        self.assertEqual(list(fake), orig)
+
+        # Verify that _attachments get deleted
+        for doc in docs:
+            db.put_att('application/octet-stream', b'foobar', doc['_id'], 'baz',
+                rev=doc['_rev']
+            )
+        for _id in ids:
+            self.assertIn('_attachments', db.get(_id))
+        rows = db.get('_all_docs')['rows']
+        fake = microfiber.FakeList(rows, db)
+        self.assertIsInstance(fake, list)
+        self.assertIs(fake._rows, rows)
+        self.assertIs(fake._db, db)
+        self.assertEqual(len(fake), 201)
+        self.assertEqual(list(fake), orig)
+
+
 class TestCouchBaseLive(LiveTestCase):
     klass = microfiber.CouchBase
 
