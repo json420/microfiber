@@ -1,1 +1,2 @@
 debian/microfiber-crashdb.conf etc/apport/crashdb.conf.d/
+debian/source_microfiber.py usr/share/apport/package-hooks/
