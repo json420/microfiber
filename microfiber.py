@@ -286,7 +286,7 @@ def push_replication(local_db, remote_db, remote_env, **kw):
 
 def pull_replication(local_db, remote_db, remote_env, **kw):
     """
-    Build the object to POST for push replication.
+    Build the object to POST for pull replication.
 
     For details on what keyword arguments you might want to use, see:
 
@@ -295,7 +295,6 @@ def pull_replication(local_db, remote_db, remote_env, **kw):
     source = replication_peer(remote_db, remote_env)
     target = local_db
     return replication_body(source, target, **kw)
-
 
 
 def id_slice_iter(rows, size=25):
