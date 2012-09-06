@@ -775,7 +775,8 @@ class Server(CouchBase):
         return self.post(obj, '_replicate')
 
     def pull(self, local_db, remote_db, remote_env, **kw):
-        pass
+        obj = pull_replication(local_db, remote_db, remote_env, **kw)
+        return self.post(obj, '_replicate')
 
 
 class Database(CouchBase):
