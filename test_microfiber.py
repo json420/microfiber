@@ -442,47 +442,53 @@ class TestFunctions(TestCase):
         )
 
     def test_push_replication(self):
-        self.skipTest('FIXME')
-        url = 'http://' + random_id().lower() + ':5984/'
-        name = 'db-' + random_id().lower()
+        local_db = random_dbname()
+        remote_db = random_dbname()
+        remote_url = 'http://' + random_id().lower() + ':5984/'
 
         # Test with no auth
-        env = {'url': url}
+        remote_env = {'url': remote_url}
         self.assertEqual(
-            microfiber.push_replication(name, env),
+            microfiber.push_replication(local_db, remote_db, remote_env),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                 },
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                 },
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                 },
                 'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True, cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                 },
                 'continuous': True,
                 'cancel': True,
@@ -491,45 +497,51 @@ class TestFunctions(TestCase):
 
         # Test with OAuth
         tokens = random_oauth()
-        env = {'url': url, 'oauth': deepcopy(tokens)}
+        remote_env = {'url': remote_url, 'oauth': deepcopy(tokens)}
         self.assertEqual(
-            microfiber.push_replication(name, env),
+            microfiber.push_replication(local_db, remote_db, remote_env),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
                 'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True, cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
                 'continuous': True,
@@ -540,45 +552,51 @@ class TestFunctions(TestCase):
         # Test with basic HTTP auth
         basic = random_basic()
         headers = microfiber._basic_auth_header(basic)
-        env = {'url': url, 'basic': basic}
+        remote_env = {'url': remote_url, 'basic': basic}
         self.assertEqual(
-            microfiber.push_replication(name, env),
+            microfiber.push_replication(local_db, remote_db, remote_env),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'headers': headers,
                 },
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'headers': headers,
                 },
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'headers': headers,
                 },
                 'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True, cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'headers': headers,
                 },
                 'continuous': True,
@@ -587,45 +605,51 @@ class TestFunctions(TestCase):
         )
 
         # Test that OAuth takes precedence over basic auth
-        env['oauth'] = deepcopy(tokens)
+        remote_env['oauth'] = deepcopy(tokens)
         self.assertEqual(
-            microfiber.push_replication(name, env),
+            microfiber.push_replication(local_db, remote_db, remote_env),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
                 'cancel': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
                 'continuous': True,
             }
         )
         self.assertEqual(
-            microfiber.push_replication(name, env, continuous=True, cancel=True),
+            microfiber.push_replication(local_db, remote_db, remote_env,
+                    continuous=True, cancel=True
+            ),
             {
-                'source': name,
+                'source': local_db,
                 'target': {
-                    'url': url + name,
+                    'url': remote_url + remote_db,
                     'auth': {'oauth': tokens},
                 },
                 'continuous': True,
