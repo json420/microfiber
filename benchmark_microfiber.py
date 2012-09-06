@@ -1,4 +1,29 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
+# -*- coding: utf-8; tab-width: 4; mode: python -*-
+# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: t -*-
+# vi: set ft=python sts=4 ts=4 sw=4 noet 
+#
+# microfiber: fabric for a lightweight Couch
+# Copyright (C) 2011-2012 Novacut Inc
+#
+# This file is part of `microfiber`.
+#
+# `microfiber` is free software: you can redistribute it and/or modify it under
+# the terms of the GNU Lesser General Public License as published by the Free
+# Software Foundation, either version 3 of the License, or (at your option) any
+# later version.
+#
+# `microfiber` is distributed in the hope that it will be useful, but WITHOUT
+# ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+# FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+# details.
+#
+# You should have received a copy of the GNU Lesser General Public License along
+# with `microfiber`.  If not, see <http://www.gnu.org/licenses/>.
+#
+# Authors:
+#   Jason Gerard DeRose <jderose@novacut.com>
+#
 
 import time
 import platform
