@@ -283,6 +283,20 @@ def push_replication(name, env, **kw):
     return replication_body(name, peer, **kw)
 
 
+def pull_replication(local_db, remote_db, remote_env, **kw):
+    """
+    Build the object to POST for push replication.
+
+    For details on what keyword arguments you might want to use, see:
+
+        http://wiki.apache.org/couchdb/Replication
+    """
+    source = replication_peer(remote_db, remote_env)
+    target = local_db
+    return replication_body(source, target, **kw)
+
+
+
 def id_slice_iter(rows, size=25):
     for i in range(math.ceil(len(rows) / size)):
         yield [row['id'] for row in rows[i*size : (i+1)*size]]
@@ -759,6 +773,9 @@ class Server(CouchBase):
     def push(self, name, env, **kw):
         obj = push_replication(name, env, **kw)
         return self.post(obj, '_replicate')
+
+    def pull(self, local_db, remote_db, remote_env, **kw):
+        pass
 
 
 class Database(CouchBase):
