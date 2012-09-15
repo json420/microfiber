@@ -99,6 +99,12 @@ HTTP_IPv4_URL = 'http://127.0.0.1:5984/'
 HTTPS_IPv4_URL = 'https://127.0.0.1:6984/'
 HTTP_IPv6_URL = 'http://[::1]:5984/'
 HTTPS_IPv6_URL = 'https://[::1]:6984/'
+DEFAULT_URLS = (
+    HTTP_IPv4_URL,
+    HTTPS_IPv4_URL,
+    HTTP_IPv6_URL,
+    HTTPS_IPv6_URL,
+)
 
 
 def random_id(numbytes=RANDOM_BYTES):
