@@ -834,7 +834,7 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, env=SERVER):
+    def __init__(self, env=None):
         super().__init__(env)
 
     def __repr__(self):

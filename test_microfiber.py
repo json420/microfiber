@@ -1508,7 +1508,7 @@ class TestServer(TestCase):
 
     def test_init(self):
         inst = self.klass()
-        self.assertEqual(inst.url, 'http://localhost:5984/')
+        self.assertEqual(inst.url, 'http://127.0.0.1:5984/')
         self.assertEqual(inst.basepath, '/')
         self.assertIsInstance(inst.conn, HTTPConnection)
         self.assertIs(inst.Conn, HTTPConnection)
