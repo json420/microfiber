@@ -99,13 +99,13 @@ HTTP_IPv4_URL = 'http://127.0.0.1:5984/'
 HTTPS_IPv4_URL = 'https://127.0.0.1:6984/'
 HTTP_IPv6_URL = 'http://[::1]:5984/'
 HTTPS_IPv6_URL = 'https://[::1]:6984/'
-DEFAULT_URL = HTTP_IPv4_URL
-DEFAULT_URLS = (
+URL_CONSTANTS = (
     HTTP_IPv4_URL,
     HTTPS_IPv4_URL,
     HTTP_IPv6_URL,
     HTTPS_IPv6_URL,
 )
+DEFAULT_URL = HTTP_IPv4_URL
 
 
 def random_id(numbytes=RANDOM_BYTES):
@@ -616,7 +616,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, env=SERVER, ctx=None):
+    def __init__(self, env=None, ctx=None):
         self.ctx = (Context(env) if ctx is None else ctx)
         self.env = self.ctx.env
         self.scheme = self.ctx.t.scheme
