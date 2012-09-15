@@ -42,13 +42,10 @@ import shutil
 from hashlib import md5
 from urllib.parse import urlparse, urlencode
 from http.client import HTTPConnection, HTTPSConnection
+import ssl
 import threading
 from random import SystemRandom
 
-try:
-    import ssl
-except ImportError:
-    ssl = None
 try:
     import usercouch.misc
 except ImportError:
@@ -370,10 +367,10 @@ class TestFunctions(TestCase):
         )
 
     def test_build_ssl_context(self):
-        if ssl is None:
-            self.skipTest('Python not compiled with ssl support')
         ctx = microfiber.build_ssl_context({})
         self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED) 
 
     def test_replication_body(self):
         src = test_id()
