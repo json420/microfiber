@@ -251,7 +251,7 @@ def _basic_auth_header(basic):
 
 
 def build_ssl_context(ssl_env):
-	ctx = ssl.SSLContext(ssl.PROTOCOL_SSLv3)
+	ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
 	ctx.verify_mode = ssl.CERT_REQUIRED
 
 	# Configure certificate authorities used to verify server certs
