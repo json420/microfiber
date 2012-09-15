@@ -1264,21 +1264,21 @@ class TestContext(TestCase):
         )
 
     def test_get_connection(self):
-        ctx = microfiber.Context(microfiber.HTTP_IPV4_URL)
+        ctx = microfiber.Context(microfiber.HTTP_IPv4_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, HTTPConnection)
         self.assertNotIsInstance(conn, HTTPSConnection)
         self.assertEqual(conn.host, '127.0.0.1')
         self.assertEqual(conn.port, 5984)
 
-        ctx = microfiber.Context(microfiber.HTTP_IPV6_URL)
+        ctx = microfiber.Context(microfiber.HTTP_IPv6_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, HTTPConnection)
         self.assertNotIsInstance(conn, HTTPSConnection)
         self.assertEqual(conn.host, '::1')
         self.assertEqual(conn.port, 5984)
 
-        ctx = microfiber.Context(microfiber.HTTPS_IPV4_URL)
+        ctx = microfiber.Context(microfiber.HTTPS_IPv4_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, HTTPConnection)
         self.assertIsInstance(conn, HTTPSConnection)
@@ -1287,7 +1287,7 @@ class TestContext(TestCase):
         self.assertIs(conn._context, ctx.ssl_ctx)
         self.assertIs(conn._check_hostname, True)
 
-        ctx = microfiber.Context(microfiber.HTTPS_IPV6_URL)
+        ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, HTTPConnection)
         self.assertIsInstance(conn, HTTPSConnection)
@@ -1297,7 +1297,7 @@ class TestContext(TestCase):
         self.assertIs(conn._check_hostname, True)
 
         env = {
-            'url': microfiber.HTTPS_IPV4_URL,
+            'url': microfiber.HTTPS_IPv4_URL,
             'ssl': {'check_hostname': False},
         }
         ctx = microfiber.Context(env)
@@ -1310,7 +1310,7 @@ class TestContext(TestCase):
         self.assertIs(conn._check_hostname, False)
 
         env = {
-            'url': microfiber.HTTPS_IPV6_URL,
+            'url': microfiber.HTTPS_IPv6_URL,
             'ssl': {'check_hostname': False},
         }
         ctx = microfiber.Context(env)
@@ -1369,7 +1369,7 @@ class TestContext(TestCase):
         self.assertEqual(ctx._calls, 1)
 
         # Sanity check with the original class:
-        ctx = microfiber.Context(microfiber.HTTPS_IPV6_URL)
+        ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
         conn = ctx.get_threadlocal_connection()
         self.assertIs(conn, ctx.threadlocal.connection)
         self.assertIsInstance(conn, HTTPConnection)
