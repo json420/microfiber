@@ -976,6 +976,108 @@ class TestBulkConflict(TestCase):
         self.assertIs(inst.rows, rows)
 
 
+class TestContext(TestCase):
+    def test_init(self):
+        # Test with bad env type:
+        bad = [microfiber.SERVER]
+        with self.assertRaises(TypeError) as cm:
+            microfiber.Context(bad)
+        self.assertEqual(
+            str(cm.exception),
+            'env must be a `dict` or `str`; got {!r}'.format(bad)
+        )
+
+        # Test with bad URL scheme:
+        bad = 'sftp://localhost:5984/'
+        with self.assertRaises(ValueError) as cm:
+            microfiber.Context(bad)
+        self.assertEqual(
+            str(cm.exception),
+            'url scheme must be http or https; got {!r}'.format(bad)
+        )
+
+        bad = 'http:localhost:5984/foo/bar'
+        with self.assertRaises(ValueError) as cm:
+            microfiber.Context(bad)
+        self.assertEqual(
+            str(cm.exception),
+            'bad url: {!r}'.format(bad)
+        )
+
+        # Test with HTTP URL:
+        url = 'http://localhost:5984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://localhost:5984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+
+        # Test with HTTPS URL:
+        url = 'https://localhost:6984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://localhost:6984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+
+    def test_full_url(self):
+        ctx = microfiber.Context('https://localhost:5003/')
+        self.assertEqual(
+            ctx.full_url('/'),
+            'https://localhost:5003/'
+        )
+        self.assertEqual(
+            ctx.full_url('/db/doc/att?bar=null&foo=true'),
+            'https://localhost:5003/db/doc/att?bar=null&foo=true'
+        )
+
+        ctx = microfiber.Context('https://localhost:5003/mydb/')
+        self.assertEqual(
+            ctx.full_url('/'),
+            'https://localhost:5003/'
+        )
+        self.assertEqual(
+            ctx.full_url('/db/doc/att?bar=null&foo=true'),
+            'https://localhost:5003/db/doc/att?bar=null&foo=true'
+        )
+
+
 class TestCouchBase(TestCase):
     klass = microfiber.CouchBase
 

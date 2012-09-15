@@ -537,7 +537,7 @@ class Context:
                 'env must be a `dict` or `str`; got {!r}'.format(env)
             )
         self.env = ({'url': env} if isinstance(env, str) else env)
-        url = env['url']
+        url = self.env['url']
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
