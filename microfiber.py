@@ -619,8 +619,6 @@ class CouchBase(object):
     def __init__(self, env=None, ctx=None):
         self.ctx = (Context(env) if ctx is None else ctx)
         self.env = self.ctx.env
-        self.scheme = self.ctx.t.scheme
-        self.netloc = self.ctx.t.netloc
         self.basepath = self.ctx.basepath
         self.url = self.ctx.url
         self._oauth = self.env.get('oauth')
