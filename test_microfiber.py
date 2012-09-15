@@ -1462,40 +1462,75 @@ class TestCouchBase(TestCase):
 
 
 class TestServer(TestCase):
-    klass = microfiber.Server
-
     def test_init(self):
-        inst = self.klass()
-        self.assertEqual(inst.url, 'http://127.0.0.1:5984/')
+        # Supply neither *env* nor *ctx*:
+        inst = microfiber.Server()
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTP_IPv4_URL})
+        self.assertIs(inst.env, inst.ctx.env)
         self.assertEqual(inst.basepath, '/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTP_IPv4_URL)
+        self.assertIs(inst.url, inst.ctx.url)
 
-        inst = self.klass('https://localhost:6000')
-        self.assertEqual(inst.url, 'https://localhost:6000/')
+        # Supply *env*:
+        env = {'url': microfiber.HTTPS_IPv6_URL}
+        inst = microfiber.Server(env=env)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTPS_IPv6_URL})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertIs(inst.env, env)
         self.assertEqual(inst.basepath, '/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTPS_IPv6_URL)
+        self.assertIs(inst.url, inst.ctx.url)
 
-        inst = self.klass('http://example.com/foo')
-        self.assertEqual(inst.url, 'http://example.com/foo/')
+        # Supply *ctx*:
+        url = 'http://example.com/foo/'
+        ctx = microfiber.Context(url)
+        inst = microfiber.Server(ctx=ctx)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertIs(inst.ctx, ctx)
+        self.assertEqual(inst.env, {'url': url})
+        self.assertIs(inst.env, inst.ctx.env)
         self.assertEqual(inst.basepath, '/foo/')
-
-        inst = self.klass('https://example.com/bar')
-        self.assertEqual(inst.url, 'https://example.com/bar/')
-        self.assertEqual(inst.basepath, '/bar/')
-
-        inst = self.klass({'oauth': 'bar'})
-        self.assertEqual(inst._oauth, 'bar')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, url)
+        self.assertIs(inst.url, inst.ctx.url)
 
     def test_repr(self):
-        inst = self.klass('http://localhost:5001/')
-        self.assertEqual(repr(inst), "Server('http://localhost:5001/')")
+        # Use a subclass to make sure only Server.url factors into __repr__():
+        class ServerSubclass(microfiber.Server):
+            def __init__(self):
+                pass
 
-        inst = self.klass('http://localhost:5002')
-        self.assertEqual(repr(inst), "Server('http://localhost:5002/')")
+        inst = ServerSubclass()
+        inst.url = microfiber.HTTP_IPv4_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('http://127.0.0.1:5984/')"
+        )
+        inst.url = microfiber.HTTPS_IPv4_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('https://127.0.0.1:6984/')"
+        )
+        inst.url = microfiber.HTTP_IPv6_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('http://[::1]:5984/')"
+        )
+        inst.url = microfiber.HTTPS_IPv6_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('https://[::1]:6984/')"
+        )
 
-        inst = self.klass('https://localhost:5003/')
-        self.assertEqual(repr(inst), "Server('https://localhost:5003/')")
-
-        inst = self.klass('https://localhost:5004')
-        self.assertEqual(repr(inst), "Server('https://localhost:5004/')")
+        # Sanity check with original class
+        inst = microfiber.Server()
+        self.assertEqual(repr(inst),
+            "Server('http://127.0.0.1:5984/')"
+        )
+        inst = microfiber.Server(microfiber.HTTPS_IPv6_URL)
+        self.assertEqual(repr(inst),
+            "Server('https://[::1]:6984/')"
+        )
 
     def test_database(self):
         server = microfiber.Server()
