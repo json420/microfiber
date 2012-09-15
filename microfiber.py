@@ -530,6 +530,48 @@ class FakeList(list):
         thread.join()  # Make sure reader() terminates
 
 
+class Context:
+    def __init__(self, env=SERVER):
+        if not isinstance(env, (dict, str)):
+            raise TypeError(
+                'env must be a `dict` or `str`; got {!r}'.format(env)
+            )
+        self.env = ({'url': env} if isinstance(env, str) else env)
+        url = env['url']
+        t = urlparse(url)
+        if t.scheme not in ('http', 'https'):
+            raise ValueError(
+                'url scheme must be http or https; got {!r}'.format(url)
+            )
+        if not t.netloc:
+            raise ValueError('bad url: {!r}'.format(url))
+        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
+        self.t = t
+        self.url = self.full_url(self.basepath)
+        self.threadlocal = threading.local()
+        if t.scheme == 'https':
+            ssl_env = self.env.get('ssl', {})
+            self.ssl_ctx = build_ssl_context(ssl_env)
+            self.check_hostname = ssl_env.get('check_hostname')
+
+    def full_url(self, path):
+        return ''.join([self.t.scheme, '://', self.t.netloc, path])
+
+    def get_connection(self):
+        if self.t.scheme == 'http':
+            return HTTPConnection(self.t.netloc)
+        else:
+            return HTTPSConnection(self.t.netloc,
+                context=self.ssl_ctx,
+                check_hostname=self.check_hostname
+            )
+
+    def get_threadlocol_connection(self):
+        if not hasattr(self.threadlocal, 'connection'):
+            self.threadlocal.connection = self.get_connection()
+        return self.threadlocal.connection
+
+
 class CouchBase(object):
     """
     Base class for `Server` and `Database`.
