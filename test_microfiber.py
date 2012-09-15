@@ -1425,7 +1425,6 @@ class TestCouchBase(TestCase):
         inst = self.klass('https://localhost:5984/couch?foo=bar/')
         self.assertEqual(inst.url, 'https://localhost:5984/couch/')
         self.assertEqual(inst.basepath, '/couch/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
         self.assertIs(inst.Conn, HTTPSConnection)
         self.assertIsNone(inst._oauth)
         self.assertIsNone(inst._basic)
@@ -1433,35 +1432,30 @@ class TestCouchBase(TestCase):
         inst = self.klass('http://localhost:5984?/')
         self.assertEqual(inst.url, 'http://localhost:5984/')
         self.assertEqual(inst.basepath, '/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
         self.assertIs(inst.Conn, HTTPConnection)
         self.assertIsNone(inst._oauth)
         self.assertIsNone(inst._basic)
 
         inst = self.klass('http://localhost:5001/')
         self.assertEqual(inst.url, 'http://localhost:5001/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
         self.assertIs(inst.Conn, HTTPConnection)
         self.assertIsNone(inst._oauth)
         self.assertIsNone(inst._basic)
 
         inst = self.klass('http://localhost:5002')
         self.assertEqual(inst.url, 'http://localhost:5002/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
         self.assertIs(inst.Conn, HTTPConnection)
         self.assertIsNone(inst._oauth)
         self.assertIsNone(inst._basic)
 
         inst = self.klass('https://localhost:5003/')
         self.assertEqual(inst.url, 'https://localhost:5003/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
         self.assertIs(inst.Conn, HTTPSConnection)
         self.assertIsNone(inst._oauth)
         self.assertIsNone(inst._basic)
 
         inst = self.klass('https://localhost:5004')
         self.assertEqual(inst.url, 'https://localhost:5004/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
         self.assertIs(inst.Conn, HTTPSConnection)
         self.assertIsNone(inst._oauth)
         self.assertIsNone(inst._basic)
@@ -1471,15 +1465,6 @@ class TestCouchBase(TestCase):
 
         inst = self.klass({'basic': 'bar'})
         self.assertEqual(inst._basic, 'bar')
-
-    def test_conn(self):
-        inst = microfiber.CouchBase()
-        self.assertIsInstance(inst._threadlocal, threading.local)
-        value = random_id()
-        inst._threadlocal.conn = value
-        self.assertEqual(inst.conn, value)
-        delattr(inst._threadlocal, 'conn')
-        self.assertIsInstance(inst.conn, HTTPConnection)
 
     def test_full_url(self):
         inst = self.klass('https://localhost:5003/')
@@ -1510,27 +1495,21 @@ class TestServer(TestCase):
         inst = self.klass()
         self.assertEqual(inst.url, 'http://127.0.0.1:5984/')
         self.assertEqual(inst.basepath, '/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
         self.assertIs(inst.Conn, HTTPConnection)
-        self.assertNotIsInstance(inst.conn, HTTPSConnection)
 
         inst = self.klass('https://localhost:6000')
         self.assertEqual(inst.url, 'https://localhost:6000/')
         self.assertEqual(inst.basepath, '/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
         self.assertIs(inst.Conn, HTTPSConnection)
 
         inst = self.klass('http://example.com/foo')
         self.assertEqual(inst.url, 'http://example.com/foo/')
         self.assertEqual(inst.basepath, '/foo/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
         self.assertIs(inst.Conn, HTTPConnection)
-        self.assertNotIsInstance(inst.conn, HTTPSConnection)
 
         inst = self.klass('https://example.com/bar')
         self.assertEqual(inst.url, 'https://example.com/bar/')
         self.assertEqual(inst.basepath, '/bar/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
         self.assertIs(inst.Conn, HTTPSConnection)
 
         inst = self.klass({'oauth': 'bar'})

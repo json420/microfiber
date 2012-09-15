@@ -628,12 +628,6 @@ class CouchBase(object):
         self.Conn = (HTTPConnection if self.ctx.t.scheme == 'http' else HTTPSConnection)
         self._threadlocal = threading.local()
 
-    @property
-    def conn(self):
-        if not hasattr(self._threadlocal, 'conn'):
-            self._threadlocal.conn = self.Conn(self.netloc)
-        return self._threadlocal.conn
-
     def _full_url(self, path):
         return ''.join([self.scheme, '://', self.netloc, path])
 
