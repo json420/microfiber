@@ -629,7 +629,7 @@ class CouchBase(object):
         self._threadlocal = threading.local()
 
     def _full_url(self, path):
-        return ''.join([self.scheme, '://', self.netloc, path])
+        return self.ctx.full_url(path)
 
     def _request(self, method, parts, options, body=None, headers=None):
         h = {
