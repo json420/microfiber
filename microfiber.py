@@ -893,9 +893,9 @@ class Database(CouchBase):
 
     def server(self):
         """
-        Return a `Server` instance pointing at the same URL as this database.
+        Return a `Server` instance using the same `Context` as this `Database`.
         """
-        return Server(self.env)
+        return Server(ctx=self.ctx)
 
     def ensure(self):
         """
