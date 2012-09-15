@@ -607,7 +607,7 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, env=SERVER):
+    def __init__(self, env=SERVER, ctx=None):
         self.env = ({'url': env} if isinstance(env, str) else env)
         assert isinstance(self.env, dict)
         url = self.env.get('url', SERVER)

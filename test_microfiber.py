@@ -996,6 +996,7 @@ class TestContext(TestCase):
             'url scheme must be http or https; got {!r}'.format(bad)
         )
 
+        # Test with bad URL:
         bad = 'http:localhost:5984/foo/bar'
         with self.assertRaises(ValueError) as cm:
             microfiber.Context(bad)
@@ -1004,7 +1005,7 @@ class TestContext(TestCase):
             'bad url: {!r}'.format(bad)
         )
 
-        # Test with HTTP URL:
+        # Test with HTTP URLs:
         url = 'http://localhost:5984/'
         for env in (url, {'url': url}):
             ctx = microfiber.Context(env)
@@ -1029,8 +1030,32 @@ class TestContext(TestCase):
             self.assertIsInstance(ctx.threadlocal, threading.local)
             self.assertFalse(hasattr(ctx, 'ssl_ctx'))
             self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://localhost:5984/foo/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984/foo/'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '/foo/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://localhost:5984/foo'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984/foo'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '/foo', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
 
-        # Test with HTTPS URL:
+        # Test with HTTPS URLs:
         url = 'https://localhost:6984/'
         for env in (url, {'url': url}):
             ctx = microfiber.Context(env)
@@ -1052,6 +1077,30 @@ class TestContext(TestCase):
                 ('https', 'localhost:6984', '', '', '', '')
             )
             self.assertEqual(ctx.url, 'https://localhost:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://localhost:6984/bar/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984/bar/'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '/bar/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://localhost:6984/bar'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984/bar'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '/bar', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/bar/')
             self.assertIsInstance(ctx.threadlocal, threading.local)
             self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
             self.assertIsNone(ctx.check_hostname)
