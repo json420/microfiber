@@ -1550,19 +1550,20 @@ class TestServer(TestCase):
         self.assertEqual(repr(inst), "Server('https://localhost:5004/')")
 
     def test_database(self):
-        s = microfiber.Server()
-        db = s.database('mydb')
+        server = microfiber.Server()
+        db = server.database('mydb')
         self.assertIsInstance(db, microfiber.Database)
-        self.assertIsNone(db._basic)
-        self.assertIsNone(db._oauth)
-        
-        s = microfiber.Server({'basic': 'foo', 'oauth': 'bar'})
-        self.assertEqual(s._basic, 'foo')
-        self.assertEqual(s._oauth, 'bar')
-        db = s.database('mydb')
+        self.assertIs(db.ctx, server.ctx)
+        self.assertEqual(db.name, 'mydb')
+        self.assertEqual(db.basepath, '/mydb/')
+
+        server = microfiber.Server('http://example.com/foo/')
+        db = server.database('mydb')
         self.assertIsInstance(db, microfiber.Database)
-        self.assertEqual(s._basic, 'foo')
-        self.assertEqual(s._oauth, 'bar')
+        self.assertIs(db.ctx, server.ctx)
+        self.assertEqual(db.name, 'mydb')
+        self.assertEqual(db.basepath, '/foo/mydb/')
+        self.assertEqual(db.url, 'http://example.com/foo/')
 
 
 class TestDatabase(TestCase):

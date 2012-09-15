@@ -839,9 +839,9 @@ class Server(CouchBase):
 
     def database(self, name, ensure=False):
         """
-        Return a new `Database` instance for the database *name*.
+        Create a `Database` with the same `Context` as this `Server`.
         """
-        db = Database(name, self.env)
+        db = Database(name, ctx=self.ctx)
         if ensure:
             db.ensure()
         return db
@@ -893,7 +893,7 @@ class Database(CouchBase):
 
     def server(self):
         """
-        Return a `Server` instance using the same `Context` as this `Database`.
+        Create a `Server` with the same `Context` as this `Database`.
         """
         return Server(ctx=self.ctx)
 
