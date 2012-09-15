@@ -1002,7 +1002,7 @@ class TestContext(TestCase):
             'bad url: {!r}'.format(bad)
         )
 
-        # Test with HTTP URLs:
+        # Test with HTTP IPv4 URLs:
         url = 'http://localhost:5984/'
         for env in (url, {'url': url}):
             ctx = microfiber.Context(env)
@@ -1052,7 +1052,57 @@ class TestContext(TestCase):
             self.assertFalse(hasattr(ctx, 'ssl_ctx'))
             self.assertFalse(hasattr(ctx, 'check_hostname'))
 
-        # Test with HTTPS URLs:
+        # Test with HTTP IPv6 URLs:
+        url = 'http://[::1]:5984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://[::1]:5984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://[::1]:5984/foo/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984/foo/'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '/foo/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://[::1]:5984/foo'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984/foo'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '/foo', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+
+        # Test with HTTPS IPv4 URLs:
         url = 'https://localhost:6984/'
         for env in (url, {'url': url}):
             ctx = microfiber.Context(env)
@@ -1101,6 +1151,96 @@ class TestContext(TestCase):
             self.assertIsInstance(ctx.threadlocal, threading.local)
             self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
             self.assertIsNone(ctx.check_hostname)
+
+        # Test with HTTPS IPv6 URLs:
+        url = 'https://[::1]:6984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://[::1]:6984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://[::1]:6984/bar/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984/bar/'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '/bar/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://[::1]:6984/bar'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984/bar'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '/bar', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+
+        # Test with check_hostname=False
+        env = {
+            'url': 'https://127.0.0.1:6984/',
+            'ssl': {'check_hostname': False},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.env,
+            {
+                'url': 'https://127.0.0.1:6984/',
+                'ssl': {'check_hostname': False},
+            }
+        )
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t,
+            ('https', '127.0.0.1:6984', '/', '', '', '')
+        )
+        self.assertEqual(ctx.url, 'https://127.0.0.1:6984/')
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+        self.assertIs(ctx.check_hostname, False)
+        env = {
+            'url': 'https://[::1]:6984/',
+            'ssl': {'check_hostname': False},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.env,
+            {
+                'url': 'https://[::1]:6984/',
+                'ssl': {'check_hostname': False},
+            }
+        )
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t,
+            ('https', '[::1]:6984', '/', '', '', '')
+        )
+        self.assertEqual(ctx.url, 'https://[::1]:6984/')
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+        self.assertIs(ctx.check_hostname, False)
 
     def test_full_url(self):
         ctx = microfiber.Context('https://localhost:5003/')
@@ -1227,6 +1367,19 @@ class TestContext(TestCase):
         self.assertEqual(ctx.get_threadlocal_connection(), id1)
         self.assertEqual(ctx.threadlocal.connection, id1)
         self.assertEqual(ctx._calls, 1)
+
+        # Sanity check with the original class:
+        ctx = microfiber.Context(microfiber.HTTPS_IPV6_URL)
+        conn = ctx.get_threadlocal_connection()
+        self.assertIs(conn, ctx.threadlocal.connection)
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '::1')
+        self.assertEqual(conn.port, 6984)
+        self.assertIs(conn._context, ctx.ssl_ctx)
+        self.assertIs(conn._check_hostname, True)
+        self.assertIs(ctx.get_threadlocal_connection(), conn)
+        self.assertIs(conn, ctx.threadlocal.connection)
 
 
 class TestCouchBase(TestCase):
