@@ -834,9 +834,6 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, env=None):
-        super().__init__(env)
-
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
 
@@ -884,8 +881,8 @@ class Database(CouchBase):
         * `Database.get_many(doc_ids)` - retrieve many docs at once
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, env=None):
-        super().__init__(env)
+    def __init__(self, name, env=None, ctx=None):
+        super().__init__(env, ctx)
         self.name = name
         self.basepath += (name + '/')
 
