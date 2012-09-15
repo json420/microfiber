@@ -1185,6 +1185,52 @@ class TestContext(TestCase):
         self.assertIs(conn._context, ctx.ssl_ctx)
         self.assertIs(conn._check_hostname, False)
 
+    def test_get_threadlocal_connection(self):
+        id1 = test_id()
+        id2 = test_id()
+
+        class ContextSubclass(microfiber.Context):
+            def __init__(self):
+                self.threadlocal = threading.local()
+                self._calls = 0
+
+            def get_connection(self):
+                self._calls += 1
+                return id1
+
+        # Test when connection does *not* exist in current thread
+        ctx = ContextSubclass()
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+        del ctx.threadlocal.connection
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 2)
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 2)
+
+        # Test when connection does exist in current thread
+        ctx = ContextSubclass()
+        ctx.threadlocal.connection = id2
+        self.assertEqual(ctx.get_threadlocal_connection(), id2)
+        self.assertEqual(ctx.threadlocal.connection, id2)
+        self.assertEqual(ctx._calls, 0)
+        self.assertEqual(ctx.get_threadlocal_connection(), id2)
+        self.assertEqual(ctx.threadlocal.connection, id2)
+        self.assertEqual(ctx._calls, 0)
+        del ctx.threadlocal.connection
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+
 
 class TestCouchBase(TestCase):
     klass = microfiber.CouchBase

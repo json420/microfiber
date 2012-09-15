@@ -571,7 +571,7 @@ class Context:
                 check_hostname=self.check_hostname
             )
 
-    def get_threadlocol_connection(self):
+    def get_threadlocal_connection(self):
         if not hasattr(self.threadlocal, 'connection'):
             self.threadlocal.connection = self.get_connection()
         return self.threadlocal.connection
