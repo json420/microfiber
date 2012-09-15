@@ -1403,65 +1403,44 @@ class TestContext(TestCase):
 
 
 class TestCouchBase(TestCase):
-    klass = microfiber.CouchBase
-
     def test_init(self):
-        bad = 'sftp://localhost:5984/'
-        with self.assertRaises(ValueError) as cm:
-            inst = self.klass(bad)
-        self.assertEqual(
-            str(cm.exception),
-            'url scheme must be http or https; got {!r}'.format(bad)
-        )
-
-        bad = 'http:localhost:5984/foo/bar'
-        with self.assertRaises(ValueError) as cm:
-            inst = self.klass(bad)
-        self.assertEqual(
-            str(cm.exception),
-            'bad url: {!r}'.format(bad)
-        )
-
-        inst = self.klass('https://localhost:5984/couch?foo=bar/')
-        self.assertEqual(inst.url, 'https://localhost:5984/couch/')
-        self.assertEqual(inst.basepath, '/couch/')
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
-
-        inst = self.klass('http://localhost:5984?/')
-        self.assertEqual(inst.url, 'http://localhost:5984/')
+        # Supply neither *env* nor *ctx*:
+        inst = microfiber.CouchBase()
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTP_IPv4_URL})
+        self.assertIs(inst.env, inst.ctx.env)
         self.assertEqual(inst.basepath, '/')
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTP_IPv4_URL)
+        self.assertIs(inst.url, inst.ctx.url)
 
-        inst = self.klass('http://localhost:5001/')
-        self.assertEqual(inst.url, 'http://localhost:5001/')
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Supply *env*:
+        env = {'url': microfiber.HTTPS_IPv6_URL}
+        inst = microfiber.CouchBase(env=env)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTPS_IPv6_URL})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertIs(inst.env, env)
+        self.assertEqual(inst.basepath, '/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTPS_IPv6_URL)
+        self.assertIs(inst.url, inst.ctx.url)
 
-        inst = self.klass('http://localhost:5002')
-        self.assertEqual(inst.url, 'http://localhost:5002/')
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
-
-        inst = self.klass('https://localhost:5003/')
-        self.assertEqual(inst.url, 'https://localhost:5003/')
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
-
-        inst = self.klass('https://localhost:5004')
-        self.assertEqual(inst.url, 'https://localhost:5004/')
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
-
-        inst = self.klass({'oauth': 'foo'})
-        self.assertEqual(inst._oauth, 'foo')
-
-        inst = self.klass({'basic': 'bar'})
-        self.assertEqual(inst._basic, 'bar')
+        # Supply *ctx*:
+        url = 'http://example.com/foo/'
+        ctx = microfiber.Context(url)
+        inst = microfiber.CouchBase(ctx=ctx)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertIs(inst.ctx, ctx)
+        self.assertEqual(inst.env, {'url': url})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertEqual(inst.basepath, '/foo/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, url)
+        self.assertIs(inst.url, inst.ctx.url)
 
     def test_full_url(self):
-        inst = self.klass('https://localhost:5003/')
+        inst = microfiber.CouchBase('https://localhost:5003/')
         self.assertEqual(
             inst._full_url('/'),
             'https://localhost:5003/'
@@ -1471,7 +1450,7 @@ class TestCouchBase(TestCase):
             'https://localhost:5003/db/doc/att?bar=null&foo=true'
         )
 
-        inst = self.klass('http://localhost:5003/mydb/')
+        inst = microfiber.CouchBase('http://localhost:5003/mydb/')
         self.assertEqual(
             inst._full_url('/'),
             'http://localhost:5003/'
