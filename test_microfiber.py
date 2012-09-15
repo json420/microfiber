@@ -46,6 +46,10 @@ import threading
 from random import SystemRandom
 
 try:
+    import ssl
+except ImportError:
+    ssl = None
+try:
     import usercouch.misc
 except ImportError:
     usercouch = None
@@ -170,7 +174,6 @@ class TestFunctions(TestCase):
             microfiber.dumps(doc, pretty=True),
             '{\n    "hello": "мир",\n    "welcome": "все"\n}'
         )
-        
 
     def test_json_body(self):
         doc = {
@@ -365,6 +368,12 @@ class TestFunctions(TestCase):
             f(basic),
             {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
         )
+
+    def test_build_ssl_context(self):
+        if ssl is None:
+            self.skipTest('Python not compiled with ssl support')
+        ctx = microfiber.build_ssl_context({})
+        self.assertIsInstance(ctx, ssl.SSLContext)
 
     def test_replication_body(self):
         src = test_id()

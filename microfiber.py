@@ -58,9 +58,9 @@ from queue import Queue
 import math
 
 try:
-	import ssl
+    import ssl
 except ImportError:
-	ssl = None
+    ssl = None
 
 
 __all__ = (
@@ -251,25 +251,25 @@ def _basic_auth_header(basic):
 
 
 def build_ssl_context(ssl_env):
-	ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-	ctx.verify_mode = ssl.CERT_REQUIRED
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    ctx.verify_mode = ssl.CERT_REQUIRED
 
-	# Configure certificate authorities used to verify server certs
-	if 'ca_file' in ssl_env or 'ca_path' in ssl_env:
-		ctx.load_verify_locations(
-			cafile=ssl_env.get('ca_file'),
-			capath=ssl_env.get('ca_path'),
-		)
-	else:
-		ctx.set_default_verify_paths()
+    # Configure certificate authorities used to verify server certs
+    if 'ca_file' in ssl_env or 'ca_path' in ssl_env:
+        ctx.load_verify_locations(
+            cafile=ssl_env.get('ca_file'),
+            capath=ssl_env.get('ca_path'),
+        )
+    else:
+        ctx.set_default_verify_paths()
 
-	# Configure client certificate, if provided
-	if 'cert_file' in ssl_env:
-		ctx.load_cert_chain(ssl_env['cert_file'],
-			keyfile=ssl_env.get('key_file')
-		)
+    # Configure client certificate, if provided
+    if 'cert_file' in ssl_env:
+        ctx.load_cert_chain(ssl_env['cert_file'],
+            keyfile=ssl_env.get('key_file')
+        )
 
-	return ctx
+    return ctx
 
 
 REPLICATION_KW = frozenset([
