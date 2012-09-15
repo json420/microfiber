@@ -99,6 +99,7 @@ HTTP_IPv4_URL = 'http://127.0.0.1:5984/'
 HTTPS_IPv4_URL = 'https://127.0.0.1:6984/'
 HTTP_IPv6_URL = 'http://[::1]:5984/'
 HTTPS_IPv6_URL = 'https://[::1]:6984/'
+DEFAULT_URL = HTTP_IPv4_URL
 DEFAULT_URLS = (
     HTTP_IPv4_URL,
     HTTPS_IPv4_URL,
@@ -548,7 +549,7 @@ class Context:
                 'env must be a `dict` or `str`; got {!r}'.format(env)
             )
         self.env = ({'url': env} if isinstance(env, str) else env)
-        url = self.env['url']
+        url = self.env.get('url', DEFAULT_URL)
         t = urlparse(url)
         if t.scheme not in ('http', 'https'):
             raise ValueError(
@@ -614,23 +615,15 @@ class CouchBase(object):
     """
 
     def __init__(self, env=SERVER, ctx=None):
-        self.env = ({'url': env} if isinstance(env, str) else env)
-        assert isinstance(self.env, dict)
-        url = self.env.get('url', SERVER)
-        t = urlparse(url)
-        if t.scheme not in ('http', 'https'):
-            raise ValueError(
-                'url scheme must be http or https: {!r}'.format(url)
-            )
-        if not t.netloc:
-            raise ValueError('bad url: {!r}'.format(url))
-        self.scheme = t.scheme
-        self.netloc = t.netloc
-        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
-        self.url = self._full_url(self.basepath)
+        self.ctx = (Context(env) if ctx is None else ctx)
+        self.env = self.ctx.env
+        self.scheme = self.ctx.t.scheme
+        self.netloc = self.ctx.t.netloc
+        self.basepath = self.ctx.basepath
+        self.url = self.ctx.url
         self._oauth = self.env.get('oauth')
         self._basic = self.env.get('basic')
-        self.Conn = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
+        self.Conn = (HTTPConnection if self.ctx.t.scheme == 'http' else HTTPSConnection)
         self._threadlocal = threading.local()
 
     @property

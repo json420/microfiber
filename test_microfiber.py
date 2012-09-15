@@ -1391,7 +1391,7 @@ class TestCouchBase(TestCase):
             inst = self.klass(bad)
         self.assertEqual(
             str(cm.exception),
-            'url scheme must be http or https: {!r}'.format(bad)
+            'url scheme must be http or https; got {!r}'.format(bad)
         )
 
         bad = 'http:localhost:5984/foo/bar'
