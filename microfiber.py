@@ -625,8 +625,6 @@ class CouchBase(object):
         self.url = self.ctx.url
         self._oauth = self.env.get('oauth')
         self._basic = self.env.get('basic')
-        self.Conn = (HTTPConnection if self.ctx.t.scheme == 'http' else HTTPSConnection)
-        self._threadlocal = threading.local()
 
     def _full_url(self, path):
         return self.ctx.full_url(path)
