@@ -1571,7 +1571,7 @@ class TestDatabase(TestCase):
     def test_init(self):
         inst = self.klass('foo')
         self.assertEqual(inst.name, 'foo')
-        self.assertEqual(inst.url, 'http://localhost:5984/')
+        self.assertEqual(inst.url, 'http://127.0.0.1:5984/')
         self.assertEqual(inst.basepath, '/foo/')
 
         inst = self.klass('baz', 'https://example.com/bar')
@@ -1583,7 +1583,7 @@ class TestDatabase(TestCase):
         inst = self.klass('dmedia')
         self.assertEqual(
             repr(inst),
-            "Database('dmedia', 'http://localhost:5984/')"
+            "Database('dmedia', 'http://127.0.0.1:5984/')"
         )
 
         inst = self.klass('novacut', 'https://localhost:5004/')
@@ -1598,7 +1598,7 @@ class TestDatabase(TestCase):
         self.assertIsNone(db._oauth)
         s = db.server()
         self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'http://localhost:5984/')
+        self.assertEqual(s.url, 'http://127.0.0.1:5984/')
         self.assertEqual(s.basepath, '/')
         self.assertIsNone(s._basic)
         self.assertIsNone(s._oauth)

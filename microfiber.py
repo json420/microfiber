@@ -884,7 +884,7 @@ class Database(CouchBase):
         * `Database.get_many(doc_ids)` - retrieve many docs at once
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, env=SERVER):
+    def __init__(self, name, env=None):
         super().__init__(env)
         self.name = name
         self.basepath += (name + '/')
