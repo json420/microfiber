@@ -95,6 +95,11 @@ RANDOM_BITS = 120
 RANDOM_BYTES = RANDOM_BITS // 8
 RANDOM_B32LEN = RANDOM_BITS // 5
 
+HTTP_IPV4_URL = 'http://127.0.0.1:5984/'
+HTTPS_IPV4_URL = 'https://127.0.0.1:6984/'
+HTTP_IPV6_URL = 'http://[::1]:5984/'
+HTTPS_IPV6_URL = 'https://[::1]:6984/'
+
 
 def random_id(numbytes=RANDOM_BYTES):
     """
