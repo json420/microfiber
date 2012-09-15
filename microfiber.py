@@ -655,18 +655,19 @@ class CouchBase(object):
             h.update(_basic_auth_header(self._basic))
         if query:
             path = '?'.join([path, urlencode(query)])
+        conn = self.ctx.get_threadlocal_connection()
         for retry in range(2):
             try:
-                self.conn.request(method, path, body, h)
-                response = self.conn.getresponse()
+                conn.request(method, path, body, h)
+                response = conn.getresponse()
                 data = response.read()
                 break
             except BadStatusLine as e:
-                self.conn.close()
+                conn.close()
                 if retry == 1:
                     raise e
             except Exception as e:
-                self.conn.close()
+                conn.close()
                 raise e
         if response.status >= 500:
             raise ServerError(response, data, method, path)
