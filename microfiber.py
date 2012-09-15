@@ -543,7 +543,9 @@ class FakeList(list):
 
 
 class Context:
-    def __init__(self, env=SERVER):
+    def __init__(self, env=None):
+        if env is None:
+            env = DEFAULT_URL
         if not isinstance(env, (dict, str)):
             raise TypeError(
                 'env must be a `dict` or `str`; got {!r}'.format(env)

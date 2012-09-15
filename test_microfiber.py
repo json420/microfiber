@@ -1002,6 +1002,26 @@ class TestContext(TestCase):
             'bad url: {!r}'.format(bad)
         )
 
+        # Test with default env:
+        ctx = microfiber.Context()
+        self.assertEqual(ctx.env, {'url': microfiber.DEFAULT_URL})
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t, urlparse(microfiber.DEFAULT_URL))
+        self.assertEqual(ctx.url, microfiber.DEFAULT_URL)
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+        self.assertFalse(hasattr(ctx, 'check_hostname'))
+
+        # Test with an empty env dict:
+        ctx = microfiber.Context({})
+        self.assertEqual(ctx.env, {})
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t, urlparse(microfiber.DEFAULT_URL))
+        self.assertEqual(ctx.url, microfiber.DEFAULT_URL)
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+        self.assertFalse(hasattr(ctx, 'check_hostname'))
+
         # Test with HTTP IPv4 URLs:
         url = 'http://localhost:5984/'
         for env in (url, {'url': url}):
