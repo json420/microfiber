@@ -45,11 +45,7 @@ from http.client import HTTPConnection, HTTPSConnection
 import ssl
 import threading
 from random import SystemRandom
-
-try:
-    import usercouch.misc
-except ImportError:
-    usercouch = None
+from usercouch.misc import TempCouch
 
 import microfiber
 from microfiber import random_id
@@ -57,11 +53,10 @@ from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
 random = SystemRandom()
+B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
 # OAuth test string from http://oauth.net/core/1.0a/#anchor46
 BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
-
-B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
 
 # A sample view from Dmedia:
@@ -84,12 +79,23 @@ doc_design = {
 }
 
 
+def test_id():
+    """
+    So we can tell our random test IDs from the ones microfiber.random_id()
+    makes, we use 160-bit IDs instead of 120-bit.
+    """
+    return b32encode(os.urandom(20)).decode('ascii')
+
+
 def is_microfiber_id(_id):
     assert isinstance(_id, str)
     return (
         len(_id) == microfiber.RANDOM_B32LEN
         and set(_id).issubset(B32ALPHABET)
     )
+
+assert is_microfiber_id(microfiber.random_id())
+assert not is_microfiber_id(test_id())
 
 
 def random_dbname():
@@ -108,18 +114,6 @@ def random_basic():
         (k, random_id())
         for k in ('username', 'password')
     )
-
-
-def test_id():
-    """
-    So we can tell our random test IDs from the ones microfiber.random_id()
-    makes, we use 160-bit IDs instead of 120-bit.
-    """
-    return b32encode(os.urandom(20)).decode('ascii')
-
-
-assert is_microfiber_id(microfiber.random_id())
-assert not is_microfiber_id(test_id())
 
 
 class FakeResponse(object):
@@ -1627,15 +1621,45 @@ class TestDatabase(TestCase):
         self.assertEqual(db._options, {'reduce': True, 'include_docs': True})
 
 
-class ReplicationTestCase(TestCase):
+class LiveTestCase(TestCase):
+    """
+    Base class for tests that can be skipped via the --no-live option.
+
+    When working on code whose tests don't need a live CouchDB instance, its
+    annoying to wait for the slow live tests to run.  You can skip the live
+    tests like this::
+
+        ./setup.py test --no-live
+
+    Sub-classes should call ``super().setUp()`` first thing in their
+    ``setUp()`` methods.
+    """
+
     def setUp(self):
         if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
-            self.skipTest('called with --no-live')
-        if usercouch is None:
-            self.skipTest('`usercouch` not installed')
-        self.tmp1 = usercouch.misc.TempCouch()
+            self.skipTest('run with --no-live')
+
+
+class CouchTestCase(LiveTestCase):
+    db = 'test_microfiber'
+
+    def setUp(self):
+        super().setUp()
+        self.auth = os.environ.get('MICROFIBER_TEST_AUTH', 'basic')
+        self.tmpcouch = TempCouch()
+        self.env = self.tmpcouch.bootstrap(self.auth)
+
+    def tearDown(self):
+        self.tmpcouch = None
+        self.env = None
+
+
+class ReplicationTestCase(LiveTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tmp1 = TempCouch()
         self.env1 = self.tmp1.bootstrap()
-        self.tmp2 = usercouch.misc.TempCouch()
+        self.tmp2 = TempCouch()
         self.env2 = self.tmp2.bootstrap()
 
     def tearDown(self):
@@ -1717,23 +1741,6 @@ class TestServerReplication(ReplicationTestCase):
         time.sleep(1)
         for doc in docs2:
             self.assertEqual(s2.get(name2, doc['_id']), doc)
-
-
-class CouchTestCase(TestCase):
-    db = 'test_microfiber'
-
-    def setUp(self):
-        if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
-            self.skipTest('called with --no-live')
-        if usercouch is None:
-            self.skipTest('`usercouch` not installed')
-        self.auth = os.environ.get('MICROFIBER_TEST_AUTH', 'basic')
-        self.tmpcouch = usercouch.misc.TempCouch()
-        self.env = self.tmpcouch.bootstrap(self.auth)
-
-    def tearDown(self):
-        self.tmpcouch = None
-        self.env = None
 
 
 class TestFakeList(CouchTestCase):
