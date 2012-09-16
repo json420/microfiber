@@ -1719,7 +1719,7 @@ class TestServerReplication(ReplicationTestCase):
             self.assertEqual(s2.get(name2, doc['_id']), doc)
 
 
-class LiveTestCase(TestCase):
+class CouchTestCase(TestCase):
     db = 'test_microfiber'
 
     def setUp(self):
@@ -1736,7 +1736,7 @@ class LiveTestCase(TestCase):
         self.env = None
 
 
-class TestFakeList(LiveTestCase):
+class TestFakeList(CouchTestCase):
     def test_init(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
@@ -1782,7 +1782,7 @@ class TestFakeList(LiveTestCase):
         self.assertEqual(list(fake), orig)
 
 
-class TestCouchBaseLive(LiveTestCase):
+class TestCouchBaseLive(CouchTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
@@ -2023,7 +2023,7 @@ class TestCouchBaseLive(LiveTestCase):
         self.assertRaises(NotFound, inst.get, self.db)
 
 
-class TestDatabaseLive(LiveTestCase):
+class TestDatabaseLive(CouchTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
