@@ -2461,7 +2461,7 @@ class TestDatabaseLive(LiveTestCase):
         db.save_many(docs)
 
         # Test with .json
-        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json')
+        dst = path.join(self.tmpcouch.paths.dump, 'foo.json')
         db.dump(dst)
         self.assertEqual(open(dst, 'r').read(), docs_s)
         self.assertEqual(
@@ -2470,7 +2470,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
         # Test with .json.gz
-        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json.gz')
+        dst = path.join(self.tmpcouch.paths.dump, 'foo.json.gz')
         db.dump(dst)
         gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
         self.assertEqual(
@@ -2487,7 +2487,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
         # Test that filename doesn't change gz_checksum
-        dst = path.join(self.tmpcouch.paths.bzr, 'bar.json.gz')
+        dst = path.join(self.tmpcouch.paths.dump, 'bar.json.gz')
         db.dump(dst)
         self.assertEqual(
             md5(open(dst, 'rb').read()).hexdigest(),
@@ -2495,7 +2495,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
         # Make sure .JSON.GZ also works, that case is ignored
-        dst = path.join(self.tmpcouch.paths.bzr, 'FOO.JSON.GZ')
+        dst = path.join(self.tmpcouch.paths.dump, 'FOO.JSON.GZ')
         db.dump(dst)
         self.assertEqual(
             md5(open(dst, 'rb').read()).hexdigest(),
