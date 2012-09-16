@@ -262,23 +262,23 @@ def _basic_auth_header(basic):
     return {'Authorization': 'Basic ' + b64}
 
 
-def build_ssl_context(ssl_env):
+def build_ssl_context(config):
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     ctx.verify_mode = ssl.CERT_REQUIRED
 
     # Configure certificate authorities used to verify server certs
-    if 'ca_file' in ssl_env or 'ca_path' in ssl_env:
+    if 'ca_file' in config or 'ca_path' in config:
         ctx.load_verify_locations(
-            cafile=ssl_env.get('ca_file'),
-            capath=ssl_env.get('ca_path'),
+            cafile=config.get('ca_file'),
+            capath=config.get('ca_path'),
         )
     else:
         ctx.set_default_verify_paths()
 
     # Configure client certificate, if provided
-    if 'cert_file' in ssl_env:
-        ctx.load_cert_chain(ssl_env['cert_file'],
-            keyfile=ssl_env.get('key_file')
+    if 'cert_file' in config:
+        ctx.load_cert_chain(config['cert_file'],
+            keyfile=config.get('key_file')
         )
 
     return ctx
@@ -564,9 +564,9 @@ class Context:
         self.url = self.full_url(self.basepath)
         self.threadlocal = threading.local()
         if t.scheme == 'https':
-            ssl_env = self.env.get('ssl', {})
-            self.ssl_ctx = build_ssl_context(ssl_env)
-            self.check_hostname = ssl_env.get('check_hostname')
+            ssl_config = self.env.get('ssl', {})
+            self.ssl_ctx = build_ssl_context(ssl_config)
+            self.check_hostname = ssl_config.get('check_hostname')
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
