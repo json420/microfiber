@@ -551,16 +551,17 @@ class Context:
 
     Individual `Server` and `Database` instances automatically do this
     internally: each thread gets its own thread-local connection that will be
-    reused as long as the TCP keep-alive interval isn't reached.
+    reused as long as the TCP keep-alive interval isn't reached (after which a
+    new connection will transparently be created when the next request is made).
 
     But often you'll have multiple `Server` and `Database` instances all using
     the same *env*, and if you were making requests from one to another (say
     copying docs, or saving the same doc to multiple databases), you don't
     automatically get connection reuse.
-    
+
     To reuse connections among multiple `CouchBase` instances you need to create
     them with the same `Context` instance, like this:
-    
+
     >>> from usercouch.misc import TempCouch
     >>> from microfiber import Context, Database
     >>> tmpcouch = TempCouch()
@@ -570,6 +571,13 @@ class Context:
     >>> bar = Database('bar', ctx=ctx)
     >>> foo.ctx is bar.ctx
     True
+
+    However, this database doesn't use the same `Context`, despite having an
+    identical *env*:
+
+    >>> baz = Database('baz', env)
+    >>> baz.ctx is foo.ctx
+    False
 
     When connecting to CouchDB via SSL, its highly recommended to use the same
     `Context` because that will allow all your SSL connections to reuse the same
