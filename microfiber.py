@@ -262,28 +262,6 @@ def _basic_auth_header(basic):
     return {'Authorization': 'Basic ' + b64}
 
 
-def build_ssl_context(config):
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-    ctx.verify_mode = ssl.CERT_REQUIRED
-
-    # Configure certificate authorities used to verify server certs
-    if 'ca_file' in config or 'ca_path' in config:
-        ctx.load_verify_locations(
-            cafile=config.get('ca_file'),
-            capath=config.get('ca_path'),
-        )
-    else:
-        ctx.set_default_verify_paths()
-
-    # Configure client certificate, if provided
-    if 'cert_file' in config:
-        ctx.load_cert_chain(config['cert_file'],
-            keyfile=config.get('key_file')
-        )
-
-    return ctx
-
-
 REPLICATION_KW = frozenset([
     'cancel', 
     'continuous',
@@ -542,7 +520,61 @@ class FakeList(list):
         thread.join()  # Make sure reader() terminates
 
 
+def build_ssl_context(config):
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    ctx.verify_mode = ssl.CERT_REQUIRED
+
+    # Configure certificate authorities used to verify server certs
+    if 'ca_file' in config or 'ca_path' in config:
+        ctx.load_verify_locations(
+            cafile=config.get('ca_file'),
+            capath=config.get('ca_path'),
+        )
+    else:
+        ctx.set_default_verify_paths()
+
+    # Configure client certificate, if provided
+    if 'cert_file' in config:
+        ctx.load_cert_chain(config['cert_file'],
+            keyfile=config.get('key_file')
+        )
+
+    return ctx
+
+
 class Context:
+    """
+    Reuse TCP connections between multiple `CouchBase` instances.
+
+    When making serial requests one after another, you get considerably better
+    performance when you reuse your ``HTTPConnection`` (or ``HTTPSConnection``).
+
+    Individual `Server` and `Database` instances automatically do this
+    internally: each thread gets its own thread-local connection that will be
+    reused as long as the TCP keep-alive interval isn't reached.
+
+    But often you'll have multiple `Server` and `Database` instances all using
+    the same *env*, and if you were making requests from one to another (say
+    copying docs, or saving the same doc to multiple databases), you don't
+    automatically get connection reuse.
+    
+    To reuse connections among multiple `CouchBase` instances you need to create
+    them with the same `Context` instance, like this:
+    
+    >>> from usercouch.misc import TempCouch
+    >>> from microfiber import Context, Database
+    >>> tmpcouch = TempCouch()
+    >>> env = tmpcouch.bootstrap()
+    >>> ctx = Context(env)
+    >>> foo = Database('foo', ctx=ctx)
+    >>> bar = Database('bar', ctx=ctx)
+    >>> foo.ctx is bar.ctx
+    True
+
+    When connecting to CouchDB via SSL, its highly recommended to use the same
+    `Context` because that will allow all your SSL connections to reuse the same
+    ``ssl.SSLContext``.
+    """
     def __init__(self, env=None):
         if env is None:
             env = DEFAULT_URL
