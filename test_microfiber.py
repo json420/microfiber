@@ -1577,16 +1577,12 @@ class TestDatabase(TestCase):
         self.assertIs(server.ctx, db.ctx)
         self.assertEqual(server.basepath, '/')
 
-        db = microfiber.Database('mydb',
-            {'url': 'https://example.com/stuff', 'basic': 'foo', 'oauth': 'bar'}
-        )
+        db = microfiber.Database('mydb', {'url': 'https://example.com/stuff'})
         server = db.server()
         self.assertIsInstance(server, microfiber.Server)
         self.assertIs(server.ctx, db.ctx)
         self.assertEqual(server.url, 'https://example.com/stuff/')
         self.assertEqual(server.basepath, '/stuff/')
-        self.assertEqual(server._basic, 'foo')
-        self.assertEqual(server._oauth, 'bar')
 
     def test_view(self):
         class Mock(microfiber.Database):

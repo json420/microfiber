@@ -671,8 +671,6 @@ class CouchBase(object):
         self.env = self.ctx.env
         self.basepath = self.ctx.basepath
         self.url = self.ctx.url
-        self._oauth = self.env.get('oauth')
-        self._basic = self.env.get('basic')
 
     def _full_url(self, path):
         return self.ctx.full_url(path)
