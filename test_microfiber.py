@@ -45,7 +45,7 @@ from http.client import HTTPConnection, HTTPSConnection
 import ssl
 import threading
 from random import SystemRandom
-from usercouch.misc import TempCouch, TempCerts
+from usercouch.misc import TempCouch, TempPKI
 
 import microfiber
 from microfiber import random_id
@@ -358,7 +358,7 @@ class TestFunctions(TestCase):
         )
 
     def test_build_ssl_context(self):
-        certs = TempCerts()
+        pki = TempPKI(client_pki=True)
 
         # FIXME: We need to add tests for config['ca_path'], but
         # `usercouch.sslhelpers` doesn't have the needed helpers yet.
@@ -371,7 +371,7 @@ class TestFunctions(TestCase):
 
         # Provide ca_file
         config = {
-            'ca_file': certs.user.ca_file,
+            'ca_file': pki.server_ca.ca_file,
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
@@ -380,8 +380,8 @@ class TestFunctions(TestCase):
 
         # Provide cert_file and key_file (uses openssl default ca_path)
         config = {
-            'cert_file': certs.machine.cert_file,
-            'key_file': certs.machine.key_file,
+            'cert_file': pki.client.cert_file,
+            'key_file': pki.client.key_file,
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
@@ -390,9 +390,9 @@ class TestFunctions(TestCase):
 
         # Provide all three
         config = {
-            'ca_file': certs.user.ca_file,
-            'cert_file': certs.machine.cert_file,
-            'key_file': certs.machine.key_file,
+            'ca_file': pki.server_ca.ca_file,
+            'cert_file': pki.client.cert_file,
+            'key_file': pki.client.key_file,
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
@@ -401,14 +401,14 @@ class TestFunctions(TestCase):
 
         # Provide junk ca_file, make sure ca_file is actually being used
         config = {
-            'ca_file': certs.machine.key_file,
+            'ca_file': pki.server_ca.key_file,
         }
         with self.assertRaises(ssl.SSLError) as cm:
             microfiber.build_ssl_context(config)
 
         # Leave out key_file, make sure cert_file is actually being used
         config = {
-            'cert_file': certs.machine.cert_file,
+            'cert_file': pki.client.cert_file,
         }
         with self.assertRaises(ssl.SSLError) as cm:
             microfiber.build_ssl_context(config)
@@ -2167,40 +2167,32 @@ class TestPermutations(LiveTestCase):
                 self.check_with_bad_auth(env, auth)
 
     def test_https(self):
-        certs = TempCerts()
+        pki = TempPKI()
         for bind_address in self.bind_addresses:
             for auth in self.auths:
                 if auth == 'oauth' and bind_address == '::1':
                     continue
                 config = {
                     'bind_address': bind_address,
-                    'ssl': {
-                        'cert_file': certs.machine.cert_file,
-                        'key_file': certs.machine.key_file,
-                        'ca_file': certs.user.ca_file,
-                    }
+                    'ssl': pki.get_server_config()
                 }
                 tmpcouch = TempCouch()
-                env = tmpcouch.bootstrap(auth, config)
-                env2 = env['env2']
-                env2['ssl'] = {
-                    'ca_file': certs.user.ca_file,
-                    'check_hostname': False,
-                }
-                uc = microfiber.CouchBase(env2)
+                env = tmpcouch.bootstrap(auth, config)['x_env_ssl']
+                env['ssl'] = pki.get_client_config()
+                uc = microfiber.CouchBase(env)
                 self.assertEqual(uc.get()['couchdb'], 'Welcome')
                 self.check_with_bad_auth(env, auth)
 
                 # Make sure things fail without ca_file
-                bad = deepcopy(env2)
-                bad['ssl'] = {'check_hostname': False}
+                bad = deepcopy(env)
+                del bad['ssl']['ca_file']
                 uc = microfiber.CouchBase(bad)
                 with self.assertRaises(ssl.SSLError) as cm:
                     uc.get()
 
                 # Make sure things fail without {'check_hostname': False}
-                bad = deepcopy(env2)
-                bad['ssl'] = {'ca_file': certs.user.ca_file}
+                bad = deepcopy(env)
+                del bad['ssl']['check_hostname']
                 uc = microfiber.CouchBase(bad)
                 with self.assertRaises(ssl.CertificateError) as cm:
                     uc.get()
