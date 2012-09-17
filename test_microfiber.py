@@ -56,7 +56,7 @@ random = SystemRandom()
 B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
 
-# OAuth 1.0A test vector from http://oauth.net/core/1.0a/#anchor46
+# OAuth 1.0a test vector from http://oauth.net/core/1.0a/#anchor46
 
 SAMPLE_OAUTH_TOKENS = (
     ('consumer_secret', 'kd94hf93k423kf44'),
@@ -2138,6 +2138,23 @@ class TestPermutations(LiveTestCase):
     bind_addresses = ('127.0.0.1', '::1')
     auths = ('open', 'basic', 'oauth')
 
+    def check_with_bad_auth(self, env, auth):
+        """
+        Sanity check to make sure UserCouch configured CouchDB as expected.
+        """
+        if auth == 'basic':
+            bad = deepcopy(env)
+            bad['basic']['password'] = random_id()
+            uc = microfiber.CouchBase(bad)
+            with self.assertRaises(microfiber.Unauthorized):
+                uc.get()
+        elif auth == 'oauth':
+            bad = deepcopy(env)
+            bad['oauth']['token_secret'] = random_id()
+            uc = microfiber.CouchBase(bad)
+            with self.assertRaises(microfiber.Unauthorized):
+                uc.get()
+
     def test_http(self):
         for bind_address in self.bind_addresses:
             for auth in self.auths:
@@ -2147,6 +2164,7 @@ class TestPermutations(LiveTestCase):
                 env = tmpcouch.bootstrap(auth, {'bind_address': bind_address})
                 uc = microfiber.CouchBase(env)
                 self.assertEqual(uc.get()['couchdb'], 'Welcome')
+                self.check_with_bad_auth(env, auth)
 
     def test_https(self):
         certs = TempCerts()
@@ -2171,6 +2189,7 @@ class TestPermutations(LiveTestCase):
                 }
                 uc = microfiber.CouchBase(env2)
                 self.assertEqual(uc.get()['couchdb'], 'Welcome')
+                self.check_with_bad_auth(env, auth)
 
                 # Make sure things fail without ca_file
                 bad = deepcopy(env2)
