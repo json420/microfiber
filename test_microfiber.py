@@ -1392,6 +1392,56 @@ class TestContext(TestCase):
         self.assertIs(ctx.get_threadlocal_connection(), conn)
         self.assertIs(conn, ctx.threadlocal.connection)
 
+    def test_get_auth_headers(self):
+        method = 'GET'
+        path = '/photos'
+        query = (('file', 'vacation.jpg'), ('size', 'original'))
+        testing = ('1191242096', 'kllo9940pd9333jh')
+
+        # Test with no-auth (open):
+        env = {
+            'url': 'http://photos.example.net/',
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {}
+        )
+
+        # Test with basic auth:
+        env = {
+            'url': 'http://photos.example.net/',
+            'basic': {'username': 'Aladdin', 'password': 'open sesame'},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+        )
+
+        # Test with oauth:
+        env = {
+            'url': 'http://photos.example.net/',
+            'oauth': dict(SAMPLE_OAUTH_TOKENS),
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+        )
+
+        # Make sure oauth overrides basic
+        env = {
+            'url': 'http://photos.example.net/',
+            'oauth': dict(SAMPLE_OAUTH_TOKENS),
+            'basic': {'username': 'Aladdin', 'password': 'open sesame'},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+        )
+
 
 class TestCouchBase(TestCase):
     def test_init(self):
