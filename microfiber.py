@@ -53,14 +53,10 @@ from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
+import ssl
 import threading
 from queue import Queue
 import math
-
-try:
-    import ssl
-except ImportError:
-    ssl = None
 
 
 __all__ = (
