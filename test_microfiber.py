@@ -1017,7 +1017,7 @@ class TestBulkConflict(TestCase):
 class TestContext(TestCase):
     def test_init(self):
         # Test with bad env type:
-        bad = [microfiber.SERVER]
+        bad = [microfiber.DEFAULT_URL]
         with self.assertRaises(TypeError) as cm:
             microfiber.Context(bad)
         self.assertEqual(
