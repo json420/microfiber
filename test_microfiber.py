@@ -2124,8 +2124,7 @@ class TestCouchBaseLive(CouchTestCase):
         # Delete the database
         self.assertEqual(inst.delete(self.db), {'ok': True})
         self.assertRaises(NotFound, inst.delete, self.db)
-        self.assertRaises(NotFound, inst.get, self.db)
-        
+        self.assertRaises(NotFound, inst.get, self.db)    
 
 
 class TestPermutations(LiveTestCase):
@@ -2133,15 +2132,17 @@ class TestPermutations(LiveTestCase):
     Test `CouchBase._request()` over all key *env* permutations.
     """
 
-    bind_addresses = ('127.0.0.1', '::1')
-
     # FIXME: For some reason OAuth isn't working with IPv6, perhap
     # server and client aren't using same canonical URL when signing?
-    auths = ('open', 'basic')
+
+    bind_addresses = ('127.0.0.1', '::1')
+    auths = ('open', 'basic', 'oauth')
 
     def test_http(self):
         for bind_address in self.bind_addresses:
             for auth in self.auths:
+                if auth == 'oauth' and bind_address == '::1':
+                    continue
                 tmpcouch = TempCouch()
                 env = tmpcouch.bootstrap(auth, {'bind_address': bind_address})
                 uc = microfiber.CouchBase(env)
@@ -2151,6 +2152,8 @@ class TestPermutations(LiveTestCase):
         certs = TempCerts()
         for bind_address in self.bind_addresses:
             for auth in self.auths:
+                if auth == 'oauth' and bind_address == '::1':
+                    continue
                 config = {
                     'bind_address': bind_address,
                     'ssl': {
