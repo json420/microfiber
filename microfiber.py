@@ -53,6 +53,7 @@ from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
+import ssl
 import threading
 from queue import Queue
 import math
@@ -82,13 +83,24 @@ __all__ = (
 
 __version__ = '12.09.0'
 USER_AGENT = 'microfiber ' + __version__
-SERVER = 'http://localhost:5984/'
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
 DMEDIA_CMD = ('/usr/bin/dmedia-cli', 'GetEnv')
 
 RANDOM_BITS = 120
 RANDOM_BYTES = RANDOM_BITS // 8
 RANDOM_B32LEN = RANDOM_BITS // 5
+
+HTTP_IPv4_URL = 'http://127.0.0.1:5984/'
+HTTPS_IPv4_URL = 'https://127.0.0.1:6984/'
+HTTP_IPv6_URL = 'http://[::1]:5984/'
+HTTPS_IPv6_URL = 'https://[::1]:6984/'
+URL_CONSTANTS = (
+    HTTP_IPv4_URL,
+    HTTPS_IPv4_URL,
+    HTTP_IPv6_URL,
+    HTTPS_IPv6_URL,
+)
+DEFAULT_URL = HTTP_IPv4_URL
 
 
 def random_id(numbytes=RANDOM_BYTES):
@@ -503,6 +515,121 @@ class FakeList(list):
         thread.join()  # Make sure reader() terminates
 
 
+def build_ssl_context(config):
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
+    ctx.verify_mode = ssl.CERT_REQUIRED
+
+    # Configure certificate authorities used to verify server certs
+    if 'ca_file' in config or 'ca_path' in config:
+        ctx.load_verify_locations(
+            cafile=config.get('ca_file'),
+            capath=config.get('ca_path'),
+        )
+    else:
+        ctx.set_default_verify_paths()
+
+    # Configure client certificate, if provided
+    if 'cert_file' in config:
+        ctx.load_cert_chain(config['cert_file'],
+            keyfile=config.get('key_file')
+        )
+
+    return ctx
+
+
+class Context:
+    """
+    Reuse TCP connections between multiple `CouchBase` instances.
+
+    When making serial requests one after another, you get considerably better
+    performance when you reuse your ``HTTPConnection`` (or ``HTTPSConnection``).
+
+    Individual `Server` and `Database` instances automatically do this: each
+    thread gets its own thread-local connection that will transparently be
+    reused.
+
+    But often you'll have multiple `Server` and `Database` instances all using
+    the same *env*, and if you were making requests from one to another (say
+    copying docs, or saving the same doc to multiple databases), you don't
+    automatically get connection reuse.
+
+    To reuse connections among multiple `CouchBase` instances you need to create
+    them with the same `Context` instance, like this:
+
+    >>> from usercouch.misc import TempCouch
+    >>> from microfiber import Context, Database
+    >>> tmpcouch = TempCouch()
+    >>> env = tmpcouch.bootstrap()
+    >>> ctx = Context(env)
+    >>> foo = Database('foo', ctx=ctx)
+    >>> bar = Database('bar', ctx=ctx)
+    >>> foo.ctx is bar.ctx
+    True
+
+    However, this database doesn't use the same `Context`, despite having an
+    identical *env*:
+
+    >>> baz = Database('baz', env)
+    >>> baz.ctx is foo.ctx
+    False
+
+    When connecting to CouchDB via SSL, its highly recommended to use the same
+    `Context` because that will allow all your SSL connections to reuse the
+    same ``ssl.SSLContext``.
+    """
+    def __init__(self, env=None):
+        if env is None:
+            env = DEFAULT_URL
+        if not isinstance(env, (dict, str)):
+            raise TypeError(
+                'env must be a `dict` or `str`; got {!r}'.format(env)
+            )
+        self.env = ({'url': env} if isinstance(env, str) else env)
+        url = self.env.get('url', DEFAULT_URL)
+        t = urlparse(url)
+        if t.scheme not in ('http', 'https'):
+            raise ValueError(
+                'url scheme must be http or https; got {!r}'.format(url)
+            )
+        if not t.netloc:
+            raise ValueError('bad url: {!r}'.format(url))
+        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
+        self.t = t
+        self.url = self.full_url(self.basepath)
+        self.threadlocal = threading.local()
+        if t.scheme == 'https':
+            ssl_config = self.env.get('ssl', {})
+            self.ssl_ctx = build_ssl_context(ssl_config)
+            self.check_hostname = ssl_config.get('check_hostname')
+
+    def full_url(self, path):
+        return ''.join([self.t.scheme, '://', self.t.netloc, path])
+
+    def get_connection(self):
+        if self.t.scheme == 'http':
+            return HTTPConnection(self.t.netloc)
+        else:
+            return HTTPSConnection(self.t.netloc,
+                context=self.ssl_ctx,
+                check_hostname=self.check_hostname
+            )
+
+    def get_threadlocal_connection(self):
+        if not hasattr(self.threadlocal, 'connection'):
+            self.threadlocal.connection = self.get_connection()
+        return self.threadlocal.connection
+
+    def get_auth_headers(self, method, path, query, testing=None):
+        if 'oauth' in self.env:
+            baseurl = self.full_url(path)
+            return _oauth_header(
+                self.env['oauth'], method, baseurl, dict(query), testing
+            )
+        if 'basic' in self.env:
+            return _basic_auth_header(self.env['basic'])
+        return {}
+
+
 class CouchBase(object):
     """
     Base class for `Server` and `Database`.
@@ -533,34 +660,14 @@ class CouchBase(object):
     "CouchBase".
     """
 
-    def __init__(self, env=SERVER):
-        self.env = ({'url': env} if isinstance(env, str) else env)
-        assert isinstance(self.env, dict)
-        url = self.env.get('url', SERVER)
-        t = urlparse(url)
-        if t.scheme not in ('http', 'https'):
-            raise ValueError(
-                'url scheme must be http or https: {!r}'.format(url)
-            )
-        if not t.netloc:
-            raise ValueError('bad url: {!r}'.format(url))
-        self.scheme = t.scheme
-        self.netloc = t.netloc
-        self.basepath = (t.path if t.path.endswith('/') else t.path + '/')
-        self.url = self._full_url(self.basepath)
-        self._oauth = self.env.get('oauth')
-        self._basic = self.env.get('basic')
-        self.Conn = (HTTPConnection if t.scheme == 'http' else HTTPSConnection)
-        self._threadlocal = threading.local()
-
-    @property
-    def conn(self):
-        if not hasattr(self._threadlocal, 'conn'):
-            self._threadlocal.conn = self.Conn(self.netloc)
-        return self._threadlocal.conn
+    def __init__(self, env=None, ctx=None):
+        self.ctx = (Context(env) if ctx is None else ctx)
+        self.env = self.ctx.env
+        self.basepath = self.ctx.basepath
+        self.url = self.ctx.url
 
     def _full_url(self, path):
-        return ''.join([self.scheme, '://', self.netloc, path])
+        return self.ctx.full_url(path)
 
     def _request(self, method, parts, options, body=None, headers=None):
         h = {
@@ -571,27 +678,22 @@ class CouchBase(object):
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        if self._oauth:
-            baseurl = self._full_url(path)
-            h.update(
-                _oauth_header(self._oauth, method, baseurl, dict(query))
-            )
-        elif self._basic:
-            h.update(_basic_auth_header(self._basic))
+        h.update(self.ctx.get_auth_headers(method, path, query))
         if query:
             path = '?'.join([path, urlencode(query)])
+        conn = self.ctx.get_threadlocal_connection()
         for retry in range(2):
             try:
-                self.conn.request(method, path, body, h)
-                response = self.conn.getresponse()
+                conn.request(method, path, body, h)
+                response = conn.getresponse()
                 data = response.read()
                 break
             except BadStatusLine as e:
-                self.conn.close()
+                conn.close()
                 if retry == 1:
                     raise e
             except Exception as e:
-                self.conn.close()
+                conn.close()
                 raise e
         if response.status >= 500:
             raise ServerError(response, data, method, path)
@@ -759,17 +861,14 @@ class Server(CouchBase):
         * Server.database(name) - return a Database instance with server URL
     """
 
-    def __init__(self, env=SERVER):
-        super().__init__(env)
-
     def __repr__(self):
         return '{}({!r})'.format(self.__class__.__name__, self.url)
 
     def database(self, name, ensure=False):
         """
-        Return a new `Database` instance for the database *name*.
+        Create a `Database` with the same `Context` as this `Server`.
         """
-        db = Database(name, self.env)
+        db = Database(name, ctx=self.ctx)
         if ensure:
             db.ensure()
         return db
@@ -809,8 +908,8 @@ class Database(CouchBase):
         * `Database.get_many(doc_ids)` - retrieve many docs at once
         * `Datebase.view(design, view, **options)` - shortcut method, that's all
     """
-    def __init__(self, name, env=SERVER):
-        super().__init__(env)
+    def __init__(self, name, env=None, ctx=None):
+        super().__init__(env, ctx)
         self.name = name
         self.basepath += (name + '/')
 
@@ -821,9 +920,9 @@ class Database(CouchBase):
 
     def server(self):
         """
-        Return a `Server` instance pointing at the same URL as this database.
+        Create a `Server` with the same `Context` as this `Database`.
         """
-        return Server(self.env)
+        return Server(ctx=self.ctx)
 
     def ensure(self):
         """

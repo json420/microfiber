@@ -42,13 +42,10 @@ import shutil
 from hashlib import md5
 from urllib.parse import urlparse, urlencode
 from http.client import HTTPConnection, HTTPSConnection
+import ssl
 import threading
 from random import SystemRandom
-
-try:
-    import usercouch.misc
-except ImportError:
-    usercouch = None
+from usercouch.misc import TempCouch, TempPKI
 
 import microfiber
 from microfiber import random_id
@@ -56,11 +53,30 @@ from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
 random = SystemRandom()
-
-# OAuth test string from http://oauth.net/core/1.0a/#anchor46
-BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
-
 B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
+
+
+# OAuth 1.0a test vector from http://oauth.net/core/1.0a/#anchor46
+
+SAMPLE_OAUTH_TOKENS = (
+    ('consumer_secret', 'kd94hf93k423kf44'),
+    ('token_secret', 'pfkkdhi9sl3r4s00'),
+    ('consumer_key', 'dpf43f3p2l4k3l03'),
+    ('token', 'nnch734d00sl2jdk'),
+)
+
+SAMPLE_OAUTH_BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
+
+SAMPLE_OAUTH_AUTHORIZATION = ', '.join([
+    'OAuth realm=""',
+    'oauth_consumer_key="dpf43f3p2l4k3l03"',
+    'oauth_nonce="kllo9940pd9333jh"',
+    'oauth_signature="tR3%2BTy81lMeYAr%2FFid0kMTYa%2FWM%3D"',
+    'oauth_signature_method="HMAC-SHA1"',
+    'oauth_timestamp="1191242096"',
+    'oauth_token="nnch734d00sl2jdk"',
+    'oauth_version="1.0"',
+])
 
 
 # A sample view from Dmedia:
@@ -83,12 +99,23 @@ doc_design = {
 }
 
 
+def test_id():
+    """
+    So we can tell our random test IDs from the ones microfiber.random_id()
+    makes, we use 160-bit IDs instead of 120-bit.
+    """
+    return b32encode(os.urandom(20)).decode('ascii')
+
+
 def is_microfiber_id(_id):
     assert isinstance(_id, str)
     return (
         len(_id) == microfiber.RANDOM_B32LEN
         and set(_id).issubset(B32ALPHABET)
     )
+
+assert is_microfiber_id(microfiber.random_id())
+assert not is_microfiber_id(test_id())
 
 
 def random_dbname():
@@ -107,18 +134,6 @@ def random_basic():
         (k, random_id())
         for k in ('username', 'password')
     )
-
-
-def test_id():
-    """
-    So we can tell our random test IDs from the ones microfiber.random_id()
-    makes, we use 160-bit IDs instead of 120-bit.
-    """
-    return b32encode(os.urandom(20)).decode('ascii')
-
-
-assert is_microfiber_id(microfiber.random_id())
-assert not is_microfiber_id(test_id())
 
 
 class FakeResponse(object):
@@ -170,7 +185,6 @@ class TestFunctions(TestCase):
             microfiber.dumps(doc, pretty=True),
             '{\n    "hello": "мир",\n    "welcome": "все"\n}'
         )
-        
 
     def test_json_body(self):
         doc = {
@@ -300,8 +314,6 @@ class TestFunctions(TestCase):
         )
 
     def test_oauth_base_string(self):
-        f = microfiber._oauth_base_string
-
         method = 'GET'
         url = 'http://photos.example.net/photos'
         params = {
@@ -314,48 +326,27 @@ class TestFunctions(TestCase):
             'file': 'vacation.jpg',
             'size': 'original',
         }
-        self.assertEqual(f(method, url, params), BASE_STRING)
+        self.assertEqual(
+            microfiber._oauth_base_string(method, url, params),
+            SAMPLE_OAUTH_BASE_STRING
+        )
 
     def test_oauth_sign(self):
-        f = microfiber._oauth_sign
-
-        oauth = {
-            'consumer_secret': 'kd94hf93k423kf44',
-            'token_secret': 'pfkkdhi9sl3r4s00',
-        }
+        tokens = dict(SAMPLE_OAUTH_TOKENS)
         self.assertEqual(
-            f(oauth, BASE_STRING),
+            microfiber._oauth_sign(tokens, SAMPLE_OAUTH_BASE_STRING),
             'tR3+Ty81lMeYAr/Fid0kMTYa/WM='
         )
 
     def test_oauth_header(self):
-        self.maxDiff = None
-        f = microfiber._oauth_header
-
-        oauth = {
-            'consumer_secret': 'kd94hf93k423kf44',
-            'token_secret': 'pfkkdhi9sl3r4s00',
-            'consumer_key': 'dpf43f3p2l4k3l03',
-            'token': 'nnch734d00sl2jdk',
-        }
+        tokens = dict(SAMPLE_OAUTH_TOKENS)
         method = 'GET'
         baseurl = 'http://photos.example.net/photos'
         query = {'file': 'vacation.jpg', 'size': 'original'}
         testing = ('1191242096', 'kllo9940pd9333jh')
-
-        expected = ', '.join([
-            'OAuth realm=""',
-            'oauth_consumer_key="dpf43f3p2l4k3l03"',
-            'oauth_nonce="kllo9940pd9333jh"',
-            'oauth_signature="tR3%2BTy81lMeYAr%2FFid0kMTYa%2FWM%3D"',
-            'oauth_signature_method="HMAC-SHA1"',
-            'oauth_timestamp="1191242096"',
-            'oauth_token="nnch734d00sl2jdk"',
-            'oauth_version="1.0"',
-        ])
         self.assertEqual(
-            f(oauth, method, baseurl, query, testing),
-            {'Authorization': expected},
+            microfiber._oauth_header(tokens, method, baseurl, query, testing),
+            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
         )
 
     def test_basic_auth_header(self):
@@ -365,6 +356,62 @@ class TestFunctions(TestCase):
             f(basic),
             {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
         )
+
+    def test_build_ssl_context(self):
+        pki = TempPKI(client_pki=True)
+
+        # FIXME: We need to add tests for config['ca_path'], but
+        # `usercouch.sslhelpers` doesn't have the needed helpers yet.
+
+        # Empty config, uses openssl default ca_path
+        ctx = microfiber.build_ssl_context({})
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide ca_file
+        config = {
+            'ca_file': pki.server_ca.ca_file,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide cert_file and key_file (uses openssl default ca_path)
+        config = {
+            'cert_file': pki.client.cert_file,
+            'key_file': pki.client.key_file,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide all three
+        config = {
+            'ca_file': pki.server_ca.ca_file,
+            'cert_file': pki.client.cert_file,
+            'key_file': pki.client.key_file,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide junk ca_file, make sure ca_file is actually being used
+        config = {
+            'ca_file': pki.server_ca.key_file,
+        }
+        with self.assertRaises(ssl.SSLError) as cm:
+            microfiber.build_ssl_context(config)
+
+        # Leave out key_file, make sure cert_file is actually being used
+        config = {
+            'cert_file': pki.client.cert_file,
+        }
+        with self.assertRaises(ssl.SSLError) as cm:
+            microfiber.build_ssl_context(config)
 
     def test_replication_body(self):
         src = test_id()
@@ -967,87 +1014,528 @@ class TestBulkConflict(TestCase):
         self.assertIs(inst.rows, rows)
 
 
-class TestCouchBase(TestCase):
-    klass = microfiber.CouchBase
-
+class TestContext(TestCase):
     def test_init(self):
-        bad = 'sftp://localhost:5984/'
-        with self.assertRaises(ValueError) as cm:
-            inst = self.klass(bad)
+        # Test with bad env type:
+        bad = [microfiber.DEFAULT_URL]
+        with self.assertRaises(TypeError) as cm:
+            microfiber.Context(bad)
         self.assertEqual(
             str(cm.exception),
-            'url scheme must be http or https: {!r}'.format(bad)
+            'env must be a `dict` or `str`; got {!r}'.format(bad)
         )
 
+        # Test with bad URL scheme:
+        bad = 'sftp://localhost:5984/'
+        with self.assertRaises(ValueError) as cm:
+            microfiber.Context(bad)
+        self.assertEqual(
+            str(cm.exception),
+            'url scheme must be http or https; got {!r}'.format(bad)
+        )
+
+        # Test with bad URL:
         bad = 'http:localhost:5984/foo/bar'
         with self.assertRaises(ValueError) as cm:
-            inst = self.klass(bad)
+            microfiber.Context(bad)
         self.assertEqual(
             str(cm.exception),
             'bad url: {!r}'.format(bad)
         )
 
-        inst = self.klass('https://localhost:5984/couch?foo=bar/')
-        self.assertEqual(inst.url, 'https://localhost:5984/couch/')
-        self.assertEqual(inst.basepath, '/couch/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIs(inst.Conn, HTTPSConnection)
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Test with default env:
+        ctx = microfiber.Context()
+        self.assertEqual(ctx.env, {'url': microfiber.DEFAULT_URL})
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t, urlparse(microfiber.DEFAULT_URL))
+        self.assertEqual(ctx.url, microfiber.DEFAULT_URL)
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+        self.assertFalse(hasattr(ctx, 'check_hostname'))
 
-        inst = self.klass('http://localhost:5984?/')
-        self.assertEqual(inst.url, 'http://localhost:5984/')
-        self.assertEqual(inst.basepath, '/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIs(inst.Conn, HTTPConnection)
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Test with an empty env dict:
+        ctx = microfiber.Context({})
+        self.assertEqual(ctx.env, {})
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t, urlparse(microfiber.DEFAULT_URL))
+        self.assertEqual(ctx.url, microfiber.DEFAULT_URL)
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+        self.assertFalse(hasattr(ctx, 'check_hostname'))
 
-        inst = self.klass('http://localhost:5001/')
-        self.assertEqual(inst.url, 'http://localhost:5001/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIs(inst.Conn, HTTPConnection)
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Test with HTTP IPv4 URLs:
+        url = 'http://localhost:5984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://localhost:5984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://localhost:5984/foo/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984/foo/'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '/foo/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://localhost:5984/foo'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://localhost:5984/foo'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', 'localhost:5984', '/foo', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://localhost:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
 
-        inst = self.klass('http://localhost:5002')
-        self.assertEqual(inst.url, 'http://localhost:5002/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIs(inst.Conn, HTTPConnection)
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Test with HTTP IPv6 URLs:
+        url = 'http://[::1]:5984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://[::1]:5984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://[::1]:5984/foo/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984/foo/'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '/foo/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
+        url = 'http://[::1]:5984/foo'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'http://[::1]:5984/foo'})
+            self.assertEqual(ctx.basepath, '/foo/')
+            self.assertEqual(ctx.t,
+                ('http', '[::1]:5984', '/foo', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'http://[::1]:5984/foo/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertFalse(hasattr(ctx, 'ssl_ctx'))
+            self.assertFalse(hasattr(ctx, 'check_hostname'))
 
-        inst = self.klass('https://localhost:5003/')
-        self.assertEqual(inst.url, 'https://localhost:5003/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIs(inst.Conn, HTTPSConnection)
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Test with HTTPS IPv4 URLs:
+        url = 'https://localhost:6984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://localhost:6984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://localhost:6984/bar/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984/bar/'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '/bar/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://localhost:6984/bar'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://localhost:6984/bar'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', 'localhost:6984', '/bar', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://localhost:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
 
-        inst = self.klass('https://localhost:5004')
-        self.assertEqual(inst.url, 'https://localhost:5004/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIs(inst.Conn, HTTPSConnection)
-        self.assertIsNone(inst._oauth)
-        self.assertIsNone(inst._basic)
+        # Test with HTTPS IPv6 URLs:
+        url = 'https://[::1]:6984/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984/'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://[::1]:6984'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984'})
+            self.assertEqual(ctx.basepath, '/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://[::1]:6984/bar/'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984/bar/'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '/bar/', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
+        url = 'https://[::1]:6984/bar'
+        for env in (url, {'url': url}):
+            ctx = microfiber.Context(env)
+            self.assertEqual(ctx.env, {'url': 'https://[::1]:6984/bar'})
+            self.assertEqual(ctx.basepath, '/bar/')
+            self.assertEqual(ctx.t,
+                ('https', '[::1]:6984', '/bar', '', '', '')
+            )
+            self.assertEqual(ctx.url, 'https://[::1]:6984/bar/')
+            self.assertIsInstance(ctx.threadlocal, threading.local)
+            self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+            self.assertIsNone(ctx.check_hostname)
 
-        inst = self.klass({'oauth': 'foo'})
-        self.assertEqual(inst._oauth, 'foo')
-
-        inst = self.klass({'basic': 'bar'})
-        self.assertEqual(inst._basic, 'bar')
-
-    def test_conn(self):
-        inst = microfiber.CouchBase()
-        self.assertIsInstance(inst._threadlocal, threading.local)
-        value = random_id()
-        inst._threadlocal.conn = value
-        self.assertEqual(inst.conn, value)
-        delattr(inst._threadlocal, 'conn')
-        self.assertIsInstance(inst.conn, HTTPConnection)
+        # Test with check_hostname=False
+        env = {
+            'url': 'https://127.0.0.1:6984/',
+            'ssl': {'check_hostname': False},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.env,
+            {
+                'url': 'https://127.0.0.1:6984/',
+                'ssl': {'check_hostname': False},
+            }
+        )
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t,
+            ('https', '127.0.0.1:6984', '/', '', '', '')
+        )
+        self.assertEqual(ctx.url, 'https://127.0.0.1:6984/')
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+        self.assertIs(ctx.check_hostname, False)
+        env = {
+            'url': 'https://[::1]:6984/',
+            'ssl': {'check_hostname': False},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.env,
+            {
+                'url': 'https://[::1]:6984/',
+                'ssl': {'check_hostname': False},
+            }
+        )
+        self.assertEqual(ctx.basepath, '/')
+        self.assertEqual(ctx.t,
+            ('https', '[::1]:6984', '/', '', '', '')
+        )
+        self.assertEqual(ctx.url, 'https://[::1]:6984/')
+        self.assertIsInstance(ctx.threadlocal, threading.local)
+        self.assertIsInstance(ctx.ssl_ctx, ssl.SSLContext)
+        self.assertIs(ctx.check_hostname, False)
 
     def test_full_url(self):
-        inst = self.klass('https://localhost:5003/')
+        ctx = microfiber.Context('https://localhost:5003/')
+        self.assertEqual(
+            ctx.full_url('/'),
+            'https://localhost:5003/'
+        )
+        self.assertEqual(
+            ctx.full_url('/db/doc/att?bar=null&foo=true'),
+            'https://localhost:5003/db/doc/att?bar=null&foo=true'
+        )
+
+        ctx = microfiber.Context('https://localhost:5003/mydb/')
+        self.assertEqual(
+            ctx.full_url('/'),
+            'https://localhost:5003/'
+        )
+        self.assertEqual(
+            ctx.full_url('/db/doc/att?bar=null&foo=true'),
+            'https://localhost:5003/db/doc/att?bar=null&foo=true'
+        )
+
+        for url in microfiber.URL_CONSTANTS:
+            ctx = microfiber.Context(url)
+            self.assertEqual(ctx.full_url('/'), url)
+
+    def test_get_connection(self):
+        ctx = microfiber.Context(microfiber.HTTP_IPv4_URL)
+        conn = ctx.get_connection()
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertNotIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '127.0.0.1')
+        self.assertEqual(conn.port, 5984)
+
+        ctx = microfiber.Context(microfiber.HTTP_IPv6_URL)
+        conn = ctx.get_connection()
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertNotIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '::1')
+        self.assertEqual(conn.port, 5984)
+
+        ctx = microfiber.Context(microfiber.HTTPS_IPv4_URL)
+        conn = ctx.get_connection()
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '127.0.0.1')
+        self.assertEqual(conn.port, 6984)
+        self.assertIs(conn._context, ctx.ssl_ctx)
+        self.assertIs(conn._check_hostname, True)
+
+        ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
+        conn = ctx.get_connection()
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '::1')
+        self.assertEqual(conn.port, 6984)
+        self.assertIs(conn._context, ctx.ssl_ctx)
+        self.assertIs(conn._check_hostname, True)
+
+        env = {
+            'url': microfiber.HTTPS_IPv4_URL,
+            'ssl': {'check_hostname': False},
+        }
+        ctx = microfiber.Context(env)
+        conn = ctx.get_connection()
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '127.0.0.1')
+        self.assertEqual(conn.port, 6984)
+        self.assertIs(conn._context, ctx.ssl_ctx)
+        self.assertIs(conn._check_hostname, False)
+
+        env = {
+            'url': microfiber.HTTPS_IPv6_URL,
+            'ssl': {'check_hostname': False},
+        }
+        ctx = microfiber.Context(env)
+        conn = ctx.get_connection()
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '::1')
+        self.assertEqual(conn.port, 6984)
+        self.assertIs(conn._context, ctx.ssl_ctx)
+        self.assertIs(conn._check_hostname, False)
+
+    def test_get_threadlocal_connection(self):
+        id1 = test_id()
+        id2 = test_id()
+
+        class ContextSubclass(microfiber.Context):
+            def __init__(self):
+                self.threadlocal = threading.local()
+                self._calls = 0
+
+            def get_connection(self):
+                self._calls += 1
+                return id1
+
+        # Test when connection does *not* exist in current thread
+        ctx = ContextSubclass()
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+        del ctx.threadlocal.connection
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 2)
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 2)
+
+        # Test when connection does exist in current thread
+        ctx = ContextSubclass()
+        ctx.threadlocal.connection = id2
+        self.assertEqual(ctx.get_threadlocal_connection(), id2)
+        self.assertEqual(ctx.threadlocal.connection, id2)
+        self.assertEqual(ctx._calls, 0)
+        self.assertEqual(ctx.get_threadlocal_connection(), id2)
+        self.assertEqual(ctx.threadlocal.connection, id2)
+        self.assertEqual(ctx._calls, 0)
+        del ctx.threadlocal.connection
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+        self.assertEqual(ctx.get_threadlocal_connection(), id1)
+        self.assertEqual(ctx.threadlocal.connection, id1)
+        self.assertEqual(ctx._calls, 1)
+
+        # Sanity check with the original class:
+        ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
+        conn = ctx.get_threadlocal_connection()
+        self.assertIs(conn, ctx.threadlocal.connection)
+        self.assertIsInstance(conn, HTTPConnection)
+        self.assertIsInstance(conn, HTTPSConnection)
+        self.assertEqual(conn.host, '::1')
+        self.assertEqual(conn.port, 6984)
+        self.assertIs(conn._context, ctx.ssl_ctx)
+        self.assertIs(conn._check_hostname, True)
+        self.assertIs(ctx.get_threadlocal_connection(), conn)
+        self.assertIs(conn, ctx.threadlocal.connection)
+
+    def test_get_auth_headers(self):
+        method = 'GET'
+        path = '/photos'
+        query = (('file', 'vacation.jpg'), ('size', 'original'))
+        testing = ('1191242096', 'kllo9940pd9333jh')
+
+        # Test with no-auth (open):
+        env = {
+            'url': 'http://photos.example.net/',
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {}
+        )
+
+        # Test with basic auth:
+        env = {
+            'url': 'http://photos.example.net/',
+            'basic': {'username': 'Aladdin', 'password': 'open sesame'},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+        )
+
+        # Test with oauth:
+        env = {
+            'url': 'http://photos.example.net/',
+            'oauth': dict(SAMPLE_OAUTH_TOKENS),
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+        )
+
+        # Make sure oauth overrides basic
+        env = {
+            'url': 'http://photos.example.net/',
+            'oauth': dict(SAMPLE_OAUTH_TOKENS),
+            'basic': {'username': 'Aladdin', 'password': 'open sesame'},
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(
+            ctx.get_auth_headers(method, path, query, testing),
+            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+        )
+
+
+class TestCouchBase(TestCase):
+    def test_init(self):
+        # Supply neither *env* nor *ctx*:
+        inst = microfiber.CouchBase()
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTP_IPv4_URL})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertEqual(inst.basepath, '/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTP_IPv4_URL)
+        self.assertIs(inst.url, inst.ctx.url)
+
+        # Supply *env*:
+        env = {'url': microfiber.HTTPS_IPv6_URL}
+        inst = microfiber.CouchBase(env=env)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTPS_IPv6_URL})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertIs(inst.env, env)
+        self.assertEqual(inst.basepath, '/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTPS_IPv6_URL)
+        self.assertIs(inst.url, inst.ctx.url)
+
+        # Supply *ctx*:
+        url = 'http://example.com/foo/'
+        ctx = microfiber.Context(url)
+        inst = microfiber.CouchBase(ctx=ctx)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertIs(inst.ctx, ctx)
+        self.assertEqual(inst.env, {'url': url})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertEqual(inst.basepath, '/foo/')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, url)
+        self.assertIs(inst.url, inst.ctx.url)
+
+    def test_full_url(self):
+        inst = microfiber.CouchBase('https://localhost:5003/')
         self.assertEqual(
             inst._full_url('/'),
             'https://localhost:5003/'
@@ -1057,7 +1545,7 @@ class TestCouchBase(TestCase):
             'https://localhost:5003/db/doc/att?bar=null&foo=true'
         )
 
-        inst = self.klass('http://localhost:5003/mydb/')
+        inst = microfiber.CouchBase('http://localhost:5003/mydb/')
         self.assertEqual(
             inst._full_url('/'),
             'http://localhost:5003/'
@@ -1069,65 +1557,91 @@ class TestCouchBase(TestCase):
 
 
 class TestServer(TestCase):
-    klass = microfiber.Server
-
     def test_init(self):
-        inst = self.klass()
-        self.assertEqual(inst.url, 'http://localhost:5984/')
+        # Supply neither *env* nor *ctx*:
+        inst = microfiber.Server()
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTP_IPv4_URL})
+        self.assertIs(inst.env, inst.ctx.env)
         self.assertEqual(inst.basepath, '/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIs(inst.Conn, HTTPConnection)
-        self.assertNotIsInstance(inst.conn, HTTPSConnection)
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTP_IPv4_URL)
+        self.assertIs(inst.url, inst.ctx.url)
 
-        inst = self.klass('https://localhost:6000')
-        self.assertEqual(inst.url, 'https://localhost:6000/')
+        # Supply *env*:
+        env = {'url': microfiber.HTTPS_IPv6_URL}
+        inst = microfiber.Server(env=env)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertEqual(inst.env, {'url': microfiber.HTTPS_IPv6_URL})
+        self.assertIs(inst.env, inst.ctx.env)
+        self.assertIs(inst.env, env)
         self.assertEqual(inst.basepath, '/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIs(inst.Conn, HTTPSConnection)
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, microfiber.HTTPS_IPv6_URL)
+        self.assertIs(inst.url, inst.ctx.url)
 
-        inst = self.klass('http://example.com/foo')
-        self.assertEqual(inst.url, 'http://example.com/foo/')
+        # Supply *ctx*:
+        url = 'http://example.com/foo/'
+        ctx = microfiber.Context(url)
+        inst = microfiber.Server(ctx=ctx)
+        self.assertIsInstance(inst.ctx, microfiber.Context)
+        self.assertIs(inst.ctx, ctx)
+        self.assertEqual(inst.env, {'url': url})
+        self.assertIs(inst.env, inst.ctx.env)
         self.assertEqual(inst.basepath, '/foo/')
-        self.assertIsInstance(inst.conn, HTTPConnection)
-        self.assertIs(inst.Conn, HTTPConnection)
-        self.assertNotIsInstance(inst.conn, HTTPSConnection)
-
-        inst = self.klass('https://example.com/bar')
-        self.assertEqual(inst.url, 'https://example.com/bar/')
-        self.assertEqual(inst.basepath, '/bar/')
-        self.assertIsInstance(inst.conn, HTTPSConnection)
-        self.assertIs(inst.Conn, HTTPSConnection)
-
-        inst = self.klass({'oauth': 'bar'})
-        self.assertEqual(inst._oauth, 'bar')
+        self.assertIs(inst.basepath, inst.ctx.basepath)
+        self.assertEqual(inst.url, url)
+        self.assertIs(inst.url, inst.ctx.url)
 
     def test_repr(self):
-        inst = self.klass('http://localhost:5001/')
-        self.assertEqual(repr(inst), "Server('http://localhost:5001/')")
+        # Use a subclass to make sure only Server.url factors into __repr__():
+        class ServerSubclass(microfiber.Server):
+            def __init__(self):
+                pass
 
-        inst = self.klass('http://localhost:5002')
-        self.assertEqual(repr(inst), "Server('http://localhost:5002/')")
+        inst = ServerSubclass()
+        inst.url = microfiber.HTTP_IPv4_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('http://127.0.0.1:5984/')"
+        )
+        inst.url = microfiber.HTTPS_IPv4_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('https://127.0.0.1:6984/')"
+        )
+        inst.url = microfiber.HTTP_IPv6_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('http://[::1]:5984/')"
+        )
+        inst.url = microfiber.HTTPS_IPv6_URL
+        self.assertEqual(repr(inst),
+            "ServerSubclass('https://[::1]:6984/')"
+        )
 
-        inst = self.klass('https://localhost:5003/')
-        self.assertEqual(repr(inst), "Server('https://localhost:5003/')")
-
-        inst = self.klass('https://localhost:5004')
-        self.assertEqual(repr(inst), "Server('https://localhost:5004/')")
+        # Sanity check with original class
+        inst = microfiber.Server()
+        self.assertEqual(repr(inst),
+            "Server('http://127.0.0.1:5984/')"
+        )
+        inst = microfiber.Server(microfiber.HTTPS_IPv6_URL)
+        self.assertEqual(repr(inst),
+            "Server('https://[::1]:6984/')"
+        )
 
     def test_database(self):
-        s = microfiber.Server()
-        db = s.database('mydb')
+        server = microfiber.Server()
+        db = server.database('mydb')
         self.assertIsInstance(db, microfiber.Database)
-        self.assertIsNone(db._basic)
-        self.assertIsNone(db._oauth)
-        
-        s = microfiber.Server({'basic': 'foo', 'oauth': 'bar'})
-        self.assertEqual(s._basic, 'foo')
-        self.assertEqual(s._oauth, 'bar')
-        db = s.database('mydb')
+        self.assertIs(db.ctx, server.ctx)
+        self.assertEqual(db.name, 'mydb')
+        self.assertEqual(db.basepath, '/mydb/')
+
+        server = microfiber.Server('http://example.com/foo/')
+        db = server.database('mydb')
         self.assertIsInstance(db, microfiber.Database)
-        self.assertEqual(s._basic, 'foo')
-        self.assertEqual(s._oauth, 'bar')
+        self.assertIs(db.ctx, server.ctx)
+        self.assertEqual(db.name, 'mydb')
+        self.assertEqual(db.basepath, '/foo/mydb/')
+        self.assertEqual(db.url, 'http://example.com/foo/')
 
 
 class TestDatabase(TestCase):
@@ -1136,7 +1650,7 @@ class TestDatabase(TestCase):
     def test_init(self):
         inst = self.klass('foo')
         self.assertEqual(inst.name, 'foo')
-        self.assertEqual(inst.url, 'http://localhost:5984/')
+        self.assertEqual(inst.url, 'http://127.0.0.1:5984/')
         self.assertEqual(inst.basepath, '/foo/')
 
         inst = self.klass('baz', 'https://example.com/bar')
@@ -1148,7 +1662,7 @@ class TestDatabase(TestCase):
         inst = self.klass('dmedia')
         self.assertEqual(
             repr(inst),
-            "Database('dmedia', 'http://localhost:5984/')"
+            "Database('dmedia', 'http://127.0.0.1:5984/')"
         )
 
         inst = self.klass('novacut', 'https://localhost:5004/')
@@ -1159,26 +1673,17 @@ class TestDatabase(TestCase):
 
     def test_server(self):
         db = microfiber.Database('mydb')
-        self.assertIsNone(db._basic)
-        self.assertIsNone(db._oauth)
-        s = db.server()
-        self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'http://localhost:5984/')
-        self.assertEqual(s.basepath, '/')
-        self.assertIsNone(s._basic)
-        self.assertIsNone(s._oauth)
+        server = db.server()
+        self.assertIsInstance(server, microfiber.Server)
+        self.assertIs(server.ctx, db.ctx)
+        self.assertEqual(server.basepath, '/')
 
-        db = microfiber.Database('mydb',
-            {'url': 'https://example.com/stuff', 'basic': 'foo', 'oauth': 'bar'}
-        )
-        self.assertEqual(db._basic, 'foo')
-        self.assertEqual(db._oauth, 'bar')
-        s = db.server()
-        self.assertIsInstance(s, microfiber.Server)
-        self.assertEqual(s.url, 'https://example.com/stuff/')
-        self.assertEqual(s.basepath, '/stuff/')
-        self.assertEqual(s._basic, 'foo')
-        self.assertEqual(s._oauth, 'bar')
+        db = microfiber.Database('mydb', {'url': 'https://example.com/stuff'})
+        server = db.server()
+        self.assertIsInstance(server, microfiber.Server)
+        self.assertIs(server.ctx, db.ctx)
+        self.assertEqual(server.url, 'https://example.com/stuff/')
+        self.assertEqual(server.basepath, '/stuff/')
 
     def test_view(self):
         class Mock(microfiber.Database):
@@ -1213,15 +1718,45 @@ class TestDatabase(TestCase):
         self.assertEqual(db._options, {'reduce': True, 'include_docs': True})
 
 
-class ReplicationTestCase(TestCase):
+class LiveTestCase(TestCase):
+    """
+    Base class for tests that can be skipped via the --no-live option.
+
+    When working on code whose tests don't need a live CouchDB instance, its
+    annoying to wait for the slow live tests to run.  You can skip the live
+    tests like this::
+
+        ./setup.py test --no-live
+
+    Sub-classes should call ``super().setUp()`` first thing in their
+    ``setUp()`` methods.
+    """
+
     def setUp(self):
         if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
-            self.skipTest('called with --no-live')
-        if usercouch is None:
-            self.skipTest('`usercouch` not installed')
-        self.tmp1 = usercouch.misc.TempCouch()
+            self.skipTest('run with --no-live')
+
+
+class CouchTestCase(LiveTestCase):
+    db = 'test_microfiber'
+
+    def setUp(self):
+        super().setUp()
+        self.auth = os.environ.get('MICROFIBER_TEST_AUTH', 'basic')
+        self.tmpcouch = TempCouch()
+        self.env = self.tmpcouch.bootstrap(self.auth)
+
+    def tearDown(self):
+        self.tmpcouch = None
+        self.env = None
+
+
+class ReplicationTestCase(LiveTestCase):
+    def setUp(self):
+        super().setUp()
+        self.tmp1 = TempCouch()
         self.env1 = self.tmp1.bootstrap()
-        self.tmp2 = usercouch.misc.TempCouch()
+        self.tmp2 = TempCouch()
         self.env2 = self.tmp2.bootstrap()
 
     def tearDown(self):
@@ -1305,24 +1840,7 @@ class TestServerReplication(ReplicationTestCase):
             self.assertEqual(s2.get(name2, doc['_id']), doc)
 
 
-class LiveTestCase(TestCase):
-    db = 'test_microfiber'
-
-    def setUp(self):
-        if os.environ.get('MICROFIBER_TEST_NO_LIVE') == 'true':
-            self.skipTest('called with --no-live')
-        if usercouch is None:
-            self.skipTest('`usercouch` not installed')
-        self.auth = os.environ.get('MICROFIBER_TEST_AUTH', 'basic')
-        self.tmpcouch = usercouch.misc.TempCouch()
-        self.env = self.tmpcouch.bootstrap(self.auth)
-
-    def tearDown(self):
-        self.tmpcouch = None
-        self.env = None
-
-
-class TestFakeList(LiveTestCase):
+class TestFakeList(CouchTestCase):
     def test_init(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
@@ -1368,7 +1886,7 @@ class TestFakeList(LiveTestCase):
         self.assertEqual(list(fake), orig)
 
 
-class TestCouchBaseLive(LiveTestCase):
+class TestCouchBaseLive(CouchTestCase):
     klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
@@ -1606,10 +2124,81 @@ class TestCouchBaseLive(LiveTestCase):
         # Delete the database
         self.assertEqual(inst.delete(self.db), {'ok': True})
         self.assertRaises(NotFound, inst.delete, self.db)
-        self.assertRaises(NotFound, inst.get, self.db)
+        self.assertRaises(NotFound, inst.get, self.db)    
 
 
-class TestDatabaseLive(LiveTestCase):
+class TestPermutations(LiveTestCase):
+    """
+    Test `CouchBase._request()` over all key *env* permutations.
+    """
+
+    # FIXME: For some reason OAuth isn't working with IPv6, perhap
+    # server and client aren't using same canonical URL when signing?
+
+    bind_addresses = ('127.0.0.1', '::1')
+    auths = ('open', 'basic', 'oauth')
+
+    def check_with_bad_auth(self, env, auth):
+        """
+        Sanity check to make sure UserCouch configured CouchDB as expected.
+        """
+        if auth == 'basic':
+            bad = deepcopy(env)
+            bad['basic']['password'] = random_id()
+            uc = microfiber.CouchBase(bad)
+            with self.assertRaises(microfiber.Unauthorized):
+                uc.get()
+        elif auth == 'oauth':
+            bad = deepcopy(env)
+            bad['oauth']['token_secret'] = random_id()
+            uc = microfiber.CouchBase(bad)
+            with self.assertRaises(microfiber.Unauthorized):
+                uc.get()
+
+    def test_http(self):
+        for bind_address in self.bind_addresses:
+            for auth in self.auths:
+                if auth == 'oauth' and bind_address == '::1':
+                    continue
+                tmpcouch = TempCouch()
+                env = tmpcouch.bootstrap(auth, {'bind_address': bind_address})
+                uc = microfiber.CouchBase(env)
+                self.assertEqual(uc.get()['couchdb'], 'Welcome')
+                self.check_with_bad_auth(env, auth)
+
+    def test_https(self):
+        pki = TempPKI()
+        for bind_address in self.bind_addresses:
+            for auth in self.auths:
+                if auth == 'oauth' and bind_address == '::1':
+                    continue
+                config = {
+                    'bind_address': bind_address,
+                    'ssl': pki.get_server_config()
+                }
+                tmpcouch = TempCouch()
+                env = tmpcouch.bootstrap(auth, config)['x_env_ssl']
+                env['ssl'] = pki.get_client_config()
+                uc = microfiber.CouchBase(env)
+                self.assertEqual(uc.get()['couchdb'], 'Welcome')
+                self.check_with_bad_auth(env, auth)
+
+                # Make sure things fail without ca_file
+                bad = deepcopy(env)
+                del bad['ssl']['ca_file']
+                uc = microfiber.CouchBase(bad)
+                with self.assertRaises(ssl.SSLError) as cm:
+                    uc.get()
+
+                # Make sure things fail without {'check_hostname': False}
+                bad = deepcopy(env)
+                del bad['ssl']['check_hostname']
+                uc = microfiber.CouchBase(bad)
+                with self.assertRaises(ssl.CertificateError) as cm:
+                    uc.get()
+
+
+class TestDatabaseLive(CouchTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
@@ -2047,7 +2636,7 @@ class TestDatabaseLive(LiveTestCase):
         db.save_many(docs)
 
         # Test with .json
-        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json')
+        dst = path.join(self.tmpcouch.paths.dump, 'foo.json')
         db.dump(dst)
         self.assertEqual(open(dst, 'r').read(), docs_s)
         self.assertEqual(
@@ -2056,7 +2645,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
         # Test with .json.gz
-        dst = path.join(self.tmpcouch.paths.bzr, 'foo.json.gz')
+        dst = path.join(self.tmpcouch.paths.dump, 'foo.json.gz')
         db.dump(dst)
         gz_checksum = md5(open(dst, 'rb').read()).hexdigest()
         self.assertEqual(
@@ -2073,7 +2662,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
         # Test that filename doesn't change gz_checksum
-        dst = path.join(self.tmpcouch.paths.bzr, 'bar.json.gz')
+        dst = path.join(self.tmpcouch.paths.dump, 'bar.json.gz')
         db.dump(dst)
         self.assertEqual(
             md5(open(dst, 'rb').read()).hexdigest(),
@@ -2081,7 +2670,7 @@ class TestDatabaseLive(LiveTestCase):
         )
 
         # Make sure .JSON.GZ also works, that case is ignored
-        dst = path.join(self.tmpcouch.paths.bzr, 'FOO.JSON.GZ')
+        dst = path.join(self.tmpcouch.paths.dump, 'FOO.JSON.GZ')
         db.dump(dst)
         self.assertEqual(
             md5(open(dst, 'rb').read()).hexdigest(),
