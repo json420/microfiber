@@ -45,7 +45,7 @@ from http.client import HTTPConnection, HTTPSConnection
 import ssl
 import threading
 from random import SystemRandom
-from usercouch.misc import TempCouch
+from usercouch.misc import TempCouch, TempCerts
 
 import microfiber
 from microfiber import random_id
@@ -358,10 +358,60 @@ class TestFunctions(TestCase):
         )
 
     def test_build_ssl_context(self):
+        certs = TempCerts()
+
+        # FIXME: We need to add tests for config['ca_path'], but
+        # `usercouch.sslhelpers` doesn't have the needed helpers yet.
+
+        # Empty config, uses openssl default ca_path
         ctx = microfiber.build_ssl_context({})
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
-        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED) 
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide ca_file
+        config = {
+            'ca_file': certs.user.ca_file,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide cert_file and key_file (uses openssl default ca_path)
+        config = {
+            'cert_file': certs.machine.cert_file,
+            'key_file': certs.machine.key_file,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide all three
+        config = {
+            'ca_file': certs.user.ca_file,
+            'cert_file': certs.machine.cert_file,
+            'key_file': certs.machine.key_file,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        self.assertIsInstance(ctx, ssl.SSLContext)
+        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+
+        # Provide junk ca_file, make sure ca_file is actually being used
+        config = {
+            'ca_file': certs.machine.key_file,
+        }
+        with self.assertRaises(ssl.SSLError) as cm:
+            microfiber.build_ssl_context(config)
+
+        # Leave out key_file, make sure cert_file is actually being used
+        config = {
+            'cert_file': certs.machine.cert_file,
+        }
+        with self.assertRaises(ssl.SSLError) as cm:
+            microfiber.build_ssl_context(config)
 
     def test_replication_body(self):
         src = test_id()
