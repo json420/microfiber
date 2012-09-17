@@ -625,6 +625,16 @@ class Context:
             self.threadlocal.connection = self.get_connection()
         return self.threadlocal.connection
 
+    def get_auth_headers(self, method, path, query, testing=None):
+        if 'oauth' in self.env:
+            baseurl = self.full_url(path)
+            return _oauth_header(
+                self.env['oauth'], method, baseurl, dict(query), testing
+            )
+        if 'basic' in self.env:
+            return _basic_auth_header(self.env['basic'])
+        return {}
+
 
 class CouchBase(object):
     """
@@ -676,13 +686,7 @@ class CouchBase(object):
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        if self._oauth:
-            baseurl = self._full_url(path)
-            h.update(
-                _oauth_header(self._oauth, method, baseurl, dict(query))
-            )
-        elif self._basic:
-            h.update(_basic_auth_header(self._basic))
+        h.update(self.ctx.get_auth_headers(method, path, query))
         if query:
             path = '?'.join([path, urlencode(query)])
         conn = self.ctx.get_threadlocal_connection()
