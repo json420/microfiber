@@ -549,10 +549,9 @@ class Context:
     When making serial requests one after another, you get considerably better
     performance when you reuse your ``HTTPConnection`` (or ``HTTPSConnection``).
 
-    Individual `Server` and `Database` instances automatically do this
-    internally: each thread gets its own thread-local connection that will be
-    reused as long as the TCP keep-alive interval isn't reached (after which a
-    new connection will transparently be created when the next request is made).
+    Individual `Server` and `Database` instances automatically do this: each
+    thread gets its own thread-local connection that will transparently be
+    reused.
 
     But often you'll have multiple `Server` and `Database` instances all using
     the same *env*, and if you were making requests from one to another (say
