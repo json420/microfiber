@@ -55,8 +55,28 @@ from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 random = SystemRandom()
 B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
 
-# OAuth test string from http://oauth.net/core/1.0a/#anchor46
-BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
+
+# OAuth 1.0A test vector from http://oauth.net/core/1.0a/#anchor46
+
+SAMPLE_OAUTH_TOKENS = (
+    ('consumer_secret', 'kd94hf93k423kf44'),
+    ('token_secret', 'pfkkdhi9sl3r4s00'),
+    ('consumer_key', 'dpf43f3p2l4k3l03'),
+    ('token', 'nnch734d00sl2jdk'),
+)
+
+SAMPLE_OAUTH_BASE_STRING = 'GET&http%3A%2F%2Fphotos.example.net%2Fphotos&file%3Dvacation.jpg%26oauth_consumer_key%3Ddpf43f3p2l4k3l03%26oauth_nonce%3Dkllo9940pd9333jh%26oauth_signature_method%3DHMAC-SHA1%26oauth_timestamp%3D1191242096%26oauth_token%3Dnnch734d00sl2jdk%26oauth_version%3D1.0%26size%3Doriginal'
+
+SAMPLE_OAUTH_AUTHORIZATION = ', '.join([
+    'OAuth realm=""',
+    'oauth_consumer_key="dpf43f3p2l4k3l03"',
+    'oauth_nonce="kllo9940pd9333jh"',
+    'oauth_signature="tR3%2BTy81lMeYAr%2FFid0kMTYa%2FWM%3D"',
+    'oauth_signature_method="HMAC-SHA1"',
+    'oauth_timestamp="1191242096"',
+    'oauth_token="nnch734d00sl2jdk"',
+    'oauth_version="1.0"',
+])
 
 
 # A sample view from Dmedia:
@@ -294,8 +314,6 @@ class TestFunctions(TestCase):
         )
 
     def test_oauth_base_string(self):
-        f = microfiber._oauth_base_string
-
         method = 'GET'
         url = 'http://photos.example.net/photos'
         params = {
@@ -308,48 +326,27 @@ class TestFunctions(TestCase):
             'file': 'vacation.jpg',
             'size': 'original',
         }
-        self.assertEqual(f(method, url, params), BASE_STRING)
+        self.assertEqual(
+            microfiber._oauth_base_string(method, url, params),
+            SAMPLE_OAUTH_BASE_STRING
+        )
 
     def test_oauth_sign(self):
-        f = microfiber._oauth_sign
-
-        oauth = {
-            'consumer_secret': 'kd94hf93k423kf44',
-            'token_secret': 'pfkkdhi9sl3r4s00',
-        }
+        tokens = dict(SAMPLE_OAUTH_TOKENS)
         self.assertEqual(
-            f(oauth, BASE_STRING),
+            microfiber._oauth_sign(tokens, SAMPLE_OAUTH_BASE_STRING),
             'tR3+Ty81lMeYAr/Fid0kMTYa/WM='
         )
 
     def test_oauth_header(self):
-        self.maxDiff = None
-        f = microfiber._oauth_header
-
-        oauth = {
-            'consumer_secret': 'kd94hf93k423kf44',
-            'token_secret': 'pfkkdhi9sl3r4s00',
-            'consumer_key': 'dpf43f3p2l4k3l03',
-            'token': 'nnch734d00sl2jdk',
-        }
+        tokens = dict(SAMPLE_OAUTH_TOKENS)
         method = 'GET'
         baseurl = 'http://photos.example.net/photos'
         query = {'file': 'vacation.jpg', 'size': 'original'}
         testing = ('1191242096', 'kllo9940pd9333jh')
-
-        expected = ', '.join([
-            'OAuth realm=""',
-            'oauth_consumer_key="dpf43f3p2l4k3l03"',
-            'oauth_nonce="kllo9940pd9333jh"',
-            'oauth_signature="tR3%2BTy81lMeYAr%2FFid0kMTYa%2FWM%3D"',
-            'oauth_signature_method="HMAC-SHA1"',
-            'oauth_timestamp="1191242096"',
-            'oauth_token="nnch734d00sl2jdk"',
-            'oauth_version="1.0"',
-        ])
         self.assertEqual(
-            f(oauth, method, baseurl, query, testing),
-            {'Authorization': expected},
+            microfiber._oauth_header(tokens, method, baseurl, query, testing),
+            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
         )
 
     def test_basic_auth_header(self):
