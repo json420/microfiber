@@ -2169,6 +2169,20 @@ class TestPermutations(LiveTestCase):
                 uc = microfiber.CouchBase(env2)
                 self.assertEqual(uc.get()['couchdb'], 'Welcome')
 
+                # Make sure things fail without ca_file
+                bad = deepcopy(env2)
+                bad['ssl'] = {'check_hostname': False}
+                uc = microfiber.CouchBase(bad)
+                with self.assertRaises(ssl.SSLError) as cm:
+                    uc.get()
+
+                # Make sure things fail without {'check_hostname': False}
+                bad = deepcopy(env2)
+                bad['ssl'] = {'ca_file': certs.user.ca_file}
+                uc = microfiber.CouchBase(bad)
+                with self.assertRaises(ssl.CertificateError) as cm:
+                    uc.get()
+
 
 class TestDatabaseLive(CouchTestCase):
     klass = microfiber.Database
