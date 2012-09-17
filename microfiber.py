@@ -579,8 +579,8 @@ class Context:
     False
 
     When connecting to CouchDB via SSL, its highly recommended to use the same
-    `Context` because that will allow all your SSL connections to reuse the same
-    ``ssl.SSLContext``.
+    `Context` because that will allow all your SSL connections to reuse the
+    same ``ssl.SSLContext``.
     """
     def __init__(self, env=None):
         if env is None:
