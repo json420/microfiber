@@ -380,8 +380,8 @@ class TestFunctions(TestCase):
 
         # Provide cert_file and key_file (uses openssl default ca_path)
         config = {
-            'cert_file': pki.client.cert_file,
-            'key_file': pki.client.key_file,
+            'cert_file': pki.client_cert.cert_file,
+            'key_file': pki.client_cert.key_file,
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
@@ -391,8 +391,8 @@ class TestFunctions(TestCase):
         # Provide all three
         config = {
             'ca_file': pki.server_ca.ca_file,
-            'cert_file': pki.client.cert_file,
-            'key_file': pki.client.key_file,
+            'cert_file': pki.client_cert.cert_file,
+            'key_file': pki.client_cert.key_file,
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
@@ -408,7 +408,7 @@ class TestFunctions(TestCase):
 
         # Leave out key_file, make sure cert_file is actually being used
         config = {
-            'cert_file': pki.client.cert_file,
+            'cert_file': pki.client_cert.cert_file,
         }
         with self.assertRaises(ssl.SSLError) as cm:
             microfiber.build_ssl_context(config)
