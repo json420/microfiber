@@ -8,7 +8,7 @@ This is a quick tour of the CouchDB REST API, as you would use it from
 Microfiber.  This is indented as a quick reference, and as such not all the API
 is documented here.  For more details, see the full `CouchDB REST API`_.
 
-.. _`CouchDB REST API`: http://wiki.apache.org/couchdb/Reference
+.. _`CouchDB REST API`: http://couchdb.readthedocs.org/en/latest/index.html
 
 
 Databases

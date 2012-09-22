@@ -111,6 +111,52 @@ CouchDB.  Likewise, the code in the middle wont need changes should new types of
 authentication be added.
 
 
+SSL and HTTPS
+=============
+
+Microfiber has comprehensive SSL support, including support for client
+certificates.
+
+Whenever your *env* has a URL that starts with ``'https://'``, Microfiber will
+configure an ``ssl.SSLContext`` instance for you.  The server certificates are
+always verified (the *verify_mode* is set to ``CERT_REQUIRED``).
+
+By default, the standard openssl *ca_path* will be used, and hostname
+verification will be done.
+
+Additional SSL configuration can be supplied via ``env['ssl']``.  For example,
+an SSL *env* looks like this:
+
+>>> env = {
+...     'url': 'https://example.com/',
+...     'ssl': {
+...         'ca_file': '/trusted/server.ca',
+...         'ca_path': 'trusted/ca.directory/',
+...         'check_hostname': False,
+...         'cert_file': '/my/client.cert',
+...         'key_file': '/my/client.key',
+...     }
+... }
+
+If you provide ``'ca_file'`` and/or ``'ca_path'``, only those certificates will
+be trusted for verifying the server.
+
+If you provide neither, then Microfiber will call
+``SSLContext.set_default_verify_paths()`` in order to use the standard openssl
+*ca_path*.  This is configured by the openssl packagers and should work across
+distributions, regardless where the distribution keeps their system-wide 
+certificates.
+
+If you provide ``{'check_hostname': False}``, hostname verification will not
+be done.  When you're only trusting a private CA provided via ``'ca_file'``,
+it's perfectly secure to turn off hostname checking.  This allows you to use
+SSL in, for example, P2P environments where the hostnames are meaningless and
+change frequently.
+
+Lastly, provide ``'cert_file'`` to specify a client certificate that Microfiber
+should use to identify itself to the server.  Assuming the private key isn't in
+the *cert_file*, you must also provide ``'key_file'``.
+
 
 CouchBase class
 ===============

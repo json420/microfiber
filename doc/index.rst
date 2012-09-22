@@ -30,7 +30,7 @@ Contents:
 
 .. _`Microfiber`: https://launchpad.net/microfiber
 .. _`CouchDB`: http://couchdb.apache.org/
-.. _`CouchDB REST API`: http://www.couchbase.org/sites/default/files/uploads/all/documentation/couchbase-api.html
+.. _`CouchDB REST API`: http://couchdb.readthedocs.org/en/latest/index.html
 .. _`LGPLv3+`: http://www.gnu.org/licenses/lgpl-3.0.html
 
 .. _`Novacut`: https://wiki.ubuntu.com/Novacut
