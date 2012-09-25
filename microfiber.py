@@ -667,18 +667,18 @@ class CouchBase(object):
         return self.ctx.full_url(path)
 
     def request(self, method, parts, options, body=None, headers=None):
-        if headers is None:
-            headers = {}
-        headers['User-Agent'] = USER_AGENT
+        h = {'User-Agent': USER_AGENT}
+        if headers:
+            h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        headers.update(self.ctx.get_auth_headers(method, path, query))
+        h.update(self.ctx.get_auth_headers(method, path, query))
         if query:
             path = '?'.join([path, urlencode(query)])
         conn = self.ctx.get_threadlocal_connection()
         for retry in range(2):
             try:
-                conn.request(method, path, body, headers)
+                conn.request(method, path, body, h)
                 response = conn.getresponse()
                 break
             except BadStatusLine as e:
