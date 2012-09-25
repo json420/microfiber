@@ -335,9 +335,6 @@ class HTTPError(Exception):
             self.response.status, self.response.reason, self.method, self.url
         )
 
-    def loads(self):
-        return json.loads(self.data.decode('utf-8'))
-
 
 class ClientError(HTTPError):
     """
