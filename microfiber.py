@@ -666,27 +666,6 @@ class CouchBase(object):
     def _full_url(self, path):
         return self.ctx.full_url(path)
 
-    def raw_request(self, method, path, body, headers):    
-        conn = self.ctx.get_threadlocal_connection()
-        for retry in range(2):
-            try:
-                conn.request(method, path, body, headers)
-                response = conn.getresponse()
-                break
-            except BadStatusLine as e:
-                conn.close()
-                if retry == 1:
-                    raise e
-            except Exception as e:
-                conn.close()
-                raise e
-        if response.status >= 500:
-            raise ServerError(response, method, path)
-        if response.status >= 400:
-            E = errors.get(response.status, ClientError)
-            raise E(response, method, path)
-        return response
-
     def _request(self, method, parts, options, body=None, headers=None):
         h = {
             'User-Agent': USER_AGENT,
