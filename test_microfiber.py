@@ -136,10 +136,14 @@ def random_basic():
     )
 
 
-class FakeResponse(object):
-    def __init__(self, status, reason):
+class FakeResponse:
+    def __init__(self, status, reason, data):
         self.status = status
         self.reason = reason
+        self.__data = data
+
+    def read(self):
+        return self.__data
 
 
 class TestFunctions(TestCase):
@@ -986,8 +990,8 @@ class TestErrors(TestCase):
         for (status, klass) in microfiber.errors.items():
             reason = b32encode(os.urandom(10))
             data = os.urandom(20)
-            r = FakeResponse(status, reason)
-            inst = klass(r, data, method, url)
+            r = FakeResponse(status, reason, data)
+            inst = klass(r, method, url)
             self.assertIs(inst.response, r)
             self.assertEqual(inst.method, method)
             self.assertEqual(inst.url, url)
