@@ -323,9 +323,9 @@ class HTTPError(Exception):
     Base class for custom `microfiber` exceptions.
     """
 
-    def __init__(self, response, data, method, url):
+    def __init__(self, response, method, url):
         self.response = response
-        self.data = data
+        self.data = response.read()
         self.method = method
         self.url = url
         super().__init__()
@@ -716,12 +716,10 @@ class CouchBase(object):
                 conn.close()
                 raise e
         if response.status >= 500:
-            data = response.read()
-            raise ServerError(response, data, method, path)
+            raise ServerError(response, method, path)
         if response.status >= 400:
-            data = response.read()
             E = errors.get(response.status, ClientError)
-            raise E(response, data, method, path)
+            raise E(response, method, path)
         return response
 
     def post(self, obj, *parts, **options):
