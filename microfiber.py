@@ -81,7 +81,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '12.09.0'
+__version__ = '12.10.0'
 USER_AGENT = 'microfiber ' + __version__
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
 DMEDIA_CMD = ('/usr/bin/dmedia-cli', 'GetEnv')
