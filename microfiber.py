@@ -707,7 +707,6 @@ class CouchBase(object):
             try:
                 conn.request(method, path, body, h)
                 response = conn.getresponse()
-                data = response.read()
                 break
             except BadStatusLine as e:
                 conn.close()
@@ -717,11 +716,13 @@ class CouchBase(object):
                 conn.close()
                 raise e
         if response.status >= 500:
+            data = response.read()
             raise ServerError(response, data, method, path)
         if response.status >= 400:
+            data = response.read()
             E = errors.get(response.status, ClientError)
             raise E(response, data, method, path)
-        return (response, data)
+        return response
 
     def post(self, obj, *parts, **options):
         """
@@ -739,10 +740,11 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        (response, data) = self._request('POST', parts, options,
+        response = self._request('POST', parts, options,
             body=_json_body(obj),
             headers={'Content-Type': 'application/json'},
         )
+        data = response.read()
         return json.loads(data.decode('utf-8'))
 
     def put(self, obj, *parts, **options):
@@ -761,10 +763,11 @@ class CouchBase(object):
         {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
 
         """
-        (response, data) = self._request('PUT', parts, options,
+        response = self._request('PUT', parts, options,
             body=_json_body(obj),
             headers={'Content-Type': 'application/json'},
         )
+        data = response.read()
         return json.loads(data.decode('utf-8'))
 
     def get(self, *parts, **options):
@@ -783,7 +786,8 @@ class CouchBase(object):
         >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
-        (response, data) = self._request('GET', parts, options)
+        response = self._request('GET', parts, options)
+        data = response.read()
         return json.loads(data.decode('utf-8'))
 
     def delete(self, *parts, **options):
@@ -802,7 +806,8 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        (response, data) = self._request('DELETE', parts, options)
+        response = self._request('DELETE', parts, options)
+        data = response.read()
         return json.loads(data.decode('utf-8'))
 
     def head(self, *parts, **options):
@@ -812,7 +817,8 @@ class CouchBase(object):
         Returns a ``dict`` containing the response headers from the HEAD
         request.
         """
-        (response, data) = self._request('HEAD', parts, options)
+        response = self._request('HEAD', parts, options)
+        data = response.read()
         return dict(response.getheaders())
 
     def put_att(self, mime, data, *parts, **options):
@@ -835,10 +841,11 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        (response, data) = self._request('PUT', parts, options,
+        response = self._request('PUT', parts, options,
             body=data,
             headers={'Content-Type': mime},
         )
+        data = response.read()
         return json.loads(data.decode('utf-8'))
 
     def get_att(self, *parts, **options):
@@ -859,7 +866,8 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        (response, data) = self._request('GET', parts, options)
+        response = self._request('GET', parts, options)
+        data = response.read()
         return (response.getheader('Content-Type'), data)
 
 
