@@ -666,22 +666,19 @@ class CouchBase(object):
     def _full_url(self, path):
         return self.ctx.full_url(path)
 
-    def _request(self, method, parts, options, body=None, headers=None):
-        h = {
-            'User-Agent': USER_AGENT,
-            'Accept': 'application/json',
-        }
-        if headers:
-            h.update(headers)
+    def request(self, method, parts, options, body=None, headers=None):
+        if headers is None:
+            headers = {}
+        headers['User-Agent'] = USER_AGENT
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        h.update(self.ctx.get_auth_headers(method, path, query))
+        headers.update(self.ctx.get_auth_headers(method, path, query))
         if query:
             path = '?'.join([path, urlencode(query)])
         conn = self.ctx.get_threadlocal_connection()
         for retry in range(2):
             try:
-                conn.request(method, path, body, h)
+                conn.request(method, path, body, headers)
                 response = conn.getresponse()
                 break
             except BadStatusLine as e:
@@ -697,6 +694,14 @@ class CouchBase(object):
             E = errors.get(response.status, ClientError)
             raise E(response, method, path)
         return response
+
+    def recv_json(self, method, parts, options, body=None, headers=None):
+        if headers is None:
+            headers = {}
+        headers['Accept'] = 'application/json'
+        response = self.request(method, parts, options, body, headers)
+        data = response.read()
+        return json.loads(data.decode('utf-8'))
 
     def post(self, obj, *parts, **options):
         """
@@ -714,12 +719,9 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        response = self._request('POST', parts, options,
-            body=_json_body(obj),
-            headers={'Content-Type': 'application/json'},
+        return self.recv_json('POST', parts, options, _json_body(obj),
+            {'Content-Type': 'application/json'}
         )
-        data = response.read()
-        return json.loads(data.decode('utf-8'))
 
     def put(self, obj, *parts, **options):
         """
@@ -737,12 +739,9 @@ class CouchBase(object):
         {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
 
         """
-        response = self._request('PUT', parts, options,
-            body=_json_body(obj),
-            headers={'Content-Type': 'application/json'},
+        return self.recv_json('PUT', parts, options, _json_body(obj),
+            {'Content-Type': 'application/json'}
         )
-        data = response.read()
-        return json.loads(data.decode('utf-8'))
 
     def get(self, *parts, **options):
         """
@@ -760,9 +759,7 @@ class CouchBase(object):
         >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
         {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
         """
-        response = self._request('GET', parts, options)
-        data = response.read()
-        return json.loads(data.decode('utf-8'))
+        return self.recv_json('GET', parts, options)
 
     def delete(self, *parts, **options):
         """
@@ -780,9 +777,7 @@ class CouchBase(object):
         {'ok': True}
 
         """
-        response = self._request('DELETE', parts, options)
-        data = response.read()
-        return json.loads(data.decode('utf-8'))
+        return self.recv_json('DELETE', parts, options)
 
     def head(self, *parts, **options):
         """
@@ -791,8 +786,7 @@ class CouchBase(object):
         Returns a ``dict`` containing the response headers from the HEAD
         request.
         """
-        response = self._request('HEAD', parts, options)
-        data = response.read()
+        response = self.request('HEAD', parts, options)
         return dict(response.getheaders())
 
     def put_att(self, mime, data, *parts, **options):
@@ -815,12 +809,9 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        response = self._request('PUT', parts, options,
-            body=data,
-            headers={'Content-Type': mime},
+        return self.recv_json('PUT', parts, options, data,
+            {'Content-Type': mime}
         )
-        data = response.read()
-        return json.loads(data.decode('utf-8'))
 
     def get_att(self, *parts, **options):
         """
@@ -840,7 +831,7 @@ class CouchBase(object):
         :param parts: path components to construct URL relative to base path
         :param options: optional keyword arguments to include in query
         """
-        response = self._request('GET', parts, options)
+        response = self.request('GET', parts, options)
         data = response.read()
         return (response.getheader('Content-Type'), data)
 
