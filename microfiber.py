@@ -57,6 +57,7 @@ import ssl
 import threading
 from queue import Queue
 import math
+import platform
 
 
 __all__ = (
@@ -82,7 +83,10 @@ __all__ = (
 )
 
 __version__ = '12.10.0'
-USER_AGENT = 'microfiber ' + __version__
+USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__, 
+    platform.dist()[0], platform.dist()[1], platform.machine()
+)
+
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
 DMEDIA_CMD = ('/usr/bin/dmedia-cli', 'GetEnv')
 
