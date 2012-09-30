@@ -59,6 +59,10 @@ from queue import Queue
 import math
 import platform
 
+# Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
+if not hasattr(ssl, 'OP_NO_COMPRESSION'):
+    ssl.OP_NO_COMPRESSION = 131072  
+
 
 __all__ = (
     'random_id',
@@ -519,6 +523,7 @@ class FakeList(list):
 def build_ssl_context(config):
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     ctx.verify_mode = ssl.CERT_REQUIRED
+    ctx.options |= ssl.OP_NO_COMPRESSION
 
     # Configure certificate authorities used to verify server certs
     if 'ca_file' in config or 'ca_path' in config:
