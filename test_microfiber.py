@@ -372,6 +372,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
 
         # Provide ca_file
         config = {
@@ -381,6 +382,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
 
         # Provide cert_file and key_file (uses openssl default ca_path)
         config = {
@@ -391,6 +393,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
 
         # Provide all three
         config = {
@@ -402,6 +405,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
+        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
 
         # Provide junk ca_file, make sure ca_file is actually being used
         config = {
