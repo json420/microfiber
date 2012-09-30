@@ -523,7 +523,7 @@ class FakeList(list):
 def build_ssl_context(config):
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.options |= ssl.OP_NO_COMPRESSION
+    ctx.options |= ssl.OP_NO_COMPRESSION  # Protect against CRIME-like attacks
 
     # Configure certificate authorities used to verify server certs
     if 'ca_file' in config or 'ca_path' in config:
