@@ -259,10 +259,13 @@ def _oauth_header(oauth, method, baseurl, query, testing=None):
     return {'Authorization': value}
 
 
-def _basic_auth_header(basic):
+def basic_auth_header(basic):
     b = '{username}:{password}'.format(**basic).encode('utf-8')
-    b64 = b64encode(b).decode('utf-8')
-    return {'Authorization': 'Basic ' + b64}
+    return 'Basic ' + b64encode(b).decode('utf-8')
+
+
+def _basic_auth_header(basic):
+    return {'Authorization': basic_auth_header(basic)}
 
 
 REPLICATION_KW = frozenset([
