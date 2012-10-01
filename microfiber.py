@@ -675,19 +675,11 @@ class CouchBase(object):
     def _full_url(self, path):
         return self.ctx.full_url(path)
 
-    def request(self, method, parts, options, body=None, headers=None):
-        h = {'User-Agent': USER_AGENT}
-        if headers:
-            h.update(headers)
-        path = (self.basepath + '/'.join(parts) if parts else self.basepath)
-        query = (tuple(_queryiter(options)) if options else tuple())
-        h.update(self.ctx.get_auth_headers(method, path, query))
-        if query:
-            path = '?'.join([path, urlencode(query)])
+    def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
         for retry in range(2):
             try:
-                conn.request(method, path, body, h)
+                conn.request(method, path, body, headers)
                 response = conn.getresponse()
                 break
             except BadStatusLine as e:
@@ -697,6 +689,18 @@ class CouchBase(object):
             except Exception as e:
                 conn.close()
                 raise e
+        return response
+
+    def request(self, method, parts, options, body=None, headers=None):
+        h = {'User-Agent': USER_AGENT}
+        if headers:
+            h.update(headers)
+        path = (self.basepath + '/'.join(parts) if parts else self.basepath)
+        query = (tuple(_queryiter(options)) if options else tuple())
+        h.update(self.ctx.get_auth_headers(method, path, query))
+        if query:
+            path = '?'.join([path, urlencode(query)])
+        response = self.raw_request(method, path, body, h)
         if response.status >= 500:
             raise ServerError(response, method, path)
         if response.status >= 400:
