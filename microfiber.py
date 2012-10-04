@@ -111,6 +111,105 @@ URL_CONSTANTS = (
 DEFAULT_URL = HTTP_IPv4_URL
 
 
+class BulkConflict(Exception):
+    """
+    Raised by `Database.save_many()` when one or more conflicts occur.
+    """
+    def __init__(self, conflicts, rows):
+        self.conflicts = conflicts
+        self.rows = rows
+        count = len(conflicts)
+        msg = ('conflict on {} doc' if count == 1 else 'conflict on {} docs')
+        super().__init__(msg.format(count))
+
+
+class HTTPError(Exception):
+    """
+    Base class for exceptions raised based on HTTP response status.
+    """
+
+    def __init__(self, response, method, url):
+        self.response = response
+        self.data = response.read()
+        self.method = method
+        self.url = url
+        super().__init__()
+
+    def __str__(self):
+        return '{} {}: {} {}'.format(
+            self.response.status, self.response.reason, self.method, self.url
+        )
+
+
+class ClientError(HTTPError):
+    """
+    Base class for all 4xx Client Error exceptions.
+    """
+
+
+class BadRequest(ClientError):
+    '400 Bad Request'
+
+class Unauthorized(ClientError):
+    '401 Unauthorized'
+
+class Forbidden(ClientError):
+    '403 Forbidden'
+
+class NotFound(ClientError):
+    '404 Not Found'
+
+class MethodNotAllowed(ClientError):
+    '405 Method Not Allowed'
+
+class NotAcceptable(ClientError):
+    '406 Not Acceptable'
+
+class Conflict(ClientError):
+    '409 Conflict'
+
+class Gone(ClientError):
+    '410 Gone'
+
+class LengthRequired(ClientError):
+    '411 Length Required'
+
+class PreconditionFailed(ClientError):
+    '412 Precondition Failed'
+
+class BadContentType(ClientError):
+    '415 Unsupported Media Type'
+
+class BadRangeRequest(ClientError):
+    '416 Requested Range Not Satisfiable'
+
+class ExpectationFailed(ClientError):
+    '417 Expectation Failed'
+
+
+class ServerError(HTTPError):
+    """
+    Used to raise exceptions for any 5xx Server Errors.
+    """
+
+
+errors = {
+    400: BadRequest,
+    401: Unauthorized,
+    403: Forbidden,
+    404: NotFound,
+    405: MethodNotAllowed,
+    406: NotAcceptable,
+    409: Conflict,
+    410: Gone,
+    411: LengthRequired,
+    412: PreconditionFailed,
+    415: BadContentType,
+    416: BadRangeRequest,
+    417: ExpectationFailed,
+}
+
+
 def random_id(numbytes=RANDOM_BYTES):
     """
     Returns a 120-bit base32-encoded random ID.
@@ -327,130 +426,6 @@ def pull_replication(local_db, remote_db, remote_env, **kw):
 def id_slice_iter(rows, size=25):
     for i in range(math.ceil(len(rows) / size)):
         yield [row['id'] for row in rows[i*size : (i+1)*size]]
-
-
-class HTTPError(Exception):
-    """
-    Base class for custom `microfiber` exceptions.
-    """
-
-    def __init__(self, response, method, url):
-        self.response = response
-        self.data = response.read()
-        self.method = method
-        self.url = url
-        super().__init__()
-
-    def __str__(self):
-        return '{} {}: {} {}'.format(
-            self.response.status, self.response.reason, self.method, self.url
-        )
-
-
-class ClientError(HTTPError):
-    """
-    Base class for all 4xx Client Error exceptions.
-    """
-
-
-class BadRequest(ClientError):
-    """
-    400 Bad Request.
-    """
-
-
-class Unauthorized(ClientError):
-    """
-    401 Unauthorized.
-    """
-
-
-class Forbidden(ClientError):
-    """
-    403 Forbidden.
-    """
-
-
-class NotFound(ClientError):
-    """
-    404 Not Found.
-    """
-
-
-class MethodNotAllowed(ClientError):
-    """
-    405 Method Not Allowed.
-    """
-
-
-class NotAcceptable(ClientError):
-    """
-    406 Not Acceptable.
-    """
-
-
-class Conflict(ClientError):
-    """
-    409 Conflict.
-
-    Raised when the request resulted in an update conflict.
-    """
-
-
-class PreconditionFailed(ClientError):
-    """
-    412 Precondition Failed.
-    """
-
-
-class BadContentType(ClientError):
-    """
-    415 Unsupported Media Type.
-    """
-
-
-class BadRangeRequest(ClientError):
-    """
-    416 Requested Range Not Satisfiable.
-    """
-
-
-class ExpectationFailed(ClientError):
-    """
-    417 Expectation Failed.
-
-    Raised when a bulk operation failed.
-    """
-
-
-class ServerError(HTTPError):
-    """
-    Used to raise exceptions for any 5xx Server Errors.
-    """
-
-
-errors = {
-    400: BadRequest,
-    401: Unauthorized,
-    403: Forbidden,
-    404: NotFound,
-    405: MethodNotAllowed,
-    406: NotAcceptable,
-    409: Conflict,
-    412: PreconditionFailed,
-    415: BadContentType,
-    416: BadRangeRequest,
-    417: ExpectationFailed,
-}
-
-
-class BulkConflict(Exception):
-    def __init__(self, conflicts, rows):
-        self.conflicts = conflicts
-        self.rows = rows
-        count = len(conflicts)
-        msg = ('conflict on {} doc' if count == 1 else 'conflict on {} docs')
-        super().__init__(msg.format(count))
 
 
 def _start_thread(target, *args):

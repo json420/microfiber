@@ -983,6 +983,8 @@ class TestErrors(TestCase):
                 405: microfiber.MethodNotAllowed,
                 406: microfiber.NotAcceptable,
                 409: microfiber.Conflict,
+                410: microfiber.Gone,
+                411: microfiber.LengthRequired,
                 412: microfiber.PreconditionFailed,
                 415: microfiber.BadContentType,
                 416: microfiber.BadRangeRequest,
@@ -992,6 +994,7 @@ class TestErrors(TestCase):
         method = 'MOST'
         url = '/restful?and=awesome'
         for (status, klass) in microfiber.errors.items():
+            self.assertTrue(klass.__doc__.startswith('{} '.format(status)))
             reason = b32encode(os.urandom(10))
             data = os.urandom(20)
             r = FakeResponse(status, reason, data)
