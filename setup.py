@@ -29,6 +29,10 @@
 Install `microfiber`.
 """
 
+import sys
+if sys.version_info < (3, 2):
+    sys.exit('Microfiber requires Python 3.2 or newer')
+
 from distutils.core import setup
 from distutils.cmd import Command
 from unittest import TestLoader, TextTestRunner
