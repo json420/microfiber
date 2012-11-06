@@ -908,6 +908,12 @@ class Database(CouchBase):
         Create a `Server` with the same `Context` as this `Database`.
         """
         return Server(ctx=self.ctx)
+ 
+    def database(self, name):
+        """
+        Create a `Database` with the same `Context` as this `Database`.
+        """
+        return Database(name, ctx=self.ctx)
 
     def ensure(self):
         """

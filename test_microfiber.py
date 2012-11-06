@@ -1696,6 +1696,14 @@ class TestDatabase(TestCase):
         self.assertEqual(server.url, 'https://example.com/stuff/')
         self.assertEqual(server.basepath, '/stuff/')
 
+    def test_database(self):
+        foo = microfiber.Database('foo')
+        bar = foo.database('bar')
+        self.assertIsInstance(bar, microfiber.Database)
+        self.assertIs(bar.ctx, foo.ctx)
+        self.assertEqual(bar.name, 'bar')
+        self.assertEqual(bar.basepath, '/bar/')
+
     def test_view(self):
         class Mock(microfiber.Database):
             def get(self, *parts, **options):
