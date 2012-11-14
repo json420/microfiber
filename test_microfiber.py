@@ -250,6 +250,17 @@ class TestFunctions(TestCase):
         # Test when obj is pre-encoded bytes
         self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
 
+    def test_encode_attachment(self):
+        data = os.urandom(1776)
+        att = microfiber.Attachment('image/jpeg', data)
+        self.assertEqual(
+            microfiber.encode_attachment(att),
+            {
+                'content_type': 'image/jpeg',
+                'data': b64encode(data).decode('utf-8'),
+            }
+        )
+
     def test_queryiter(self):
         f = microfiber._queryiter
         d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')
@@ -1966,10 +1977,10 @@ class TestCouchBaseLive(CouchTestCase):
         self.assertEqual(att['data'], b64encode(data).decode('utf-8'))
 
         # GET the attachment
-        self.assertEqual(
-            inst.get_att(self.db, 'doc1', 'att'),
-            (mime, data)
-        )
+        att = inst.get_att(self.db, 'doc1', 'att')
+        self.assertIsInstance(att, microfiber.Attachment)
+        self.assertEqual(att.content_type, mime)
+        self.assertEqual(att.data, data)
 
         # Create new doc with inline attachment:
         new = {
@@ -2005,10 +2016,47 @@ class TestCouchBaseLive(CouchTestCase):
         )
 
         # GET the attachment:
+        att = inst.get_att(self.db, 'doc1', 'att')
+        self.assertIsInstance(att, microfiber.Attachment)
+        self.assertEqual(att.content_type, mime)
+        self.assertEqual(att.data, data)
+
+    def test_put_att2(self):
+        inst = microfiber.CouchBase(self.env)
+
+        # Create database
+        self.assertEqual(inst.put(None, 'foo'), {'ok': True})
+
+        data = os.urandom(1776)
+        att = microfiber.Attachment('image/png', data)
+        digest = b64encode(md5(data).digest()).decode('utf-8')
+
+        # PUT attachment
+        r = inst.put_att2(att, 'foo', 'bar', 'baz')
+        self.assertEqual(set(r), set(['id', 'rev', 'ok']))
+        self.assertEqual(r['id'], 'bar')
+        self.assertEqual(r['ok'], True)
+        self.assertTrue(r['rev'].startswith('1-'))
+
+        # GET the doc with attachments=true
+        doc = inst.get('foo', 'bar', attachments=True)
+        self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
+        self.assertEqual(doc['_id'], 'bar')
+        self.assertEqual(doc['_rev'], r['rev'])
         self.assertEqual(
-            inst.get_att(self.db, 'doc2', 'att'),
-            (mime, data)
+            doc['_attachments'],
+            {
+                'baz': {
+                    'content_type': 'image/png',
+                    'data': b64encode(data).decode('ascii'),
+                    'revpos': 1,
+                    'digest': 'md5-{}'.format(digest),
+                },
+            }
         )
+
+        # Test the round-trip
+        self.assertEqual(inst.get_att('foo', 'bar', 'baz'), att)
 
     def test_put_post(self):
         inst = self.klass(self.env)

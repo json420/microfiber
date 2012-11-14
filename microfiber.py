@@ -58,6 +58,7 @@ import threading
 from queue import Queue
 import math
 import platform
+from collections import namedtuple
 
 # Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
 if not hasattr(ssl, 'OP_NO_COMPRESSION'):
@@ -109,6 +110,8 @@ URL_CONSTANTS = (
     HTTPS_IPv6_URL,
 )
 DEFAULT_URL = HTTP_IPv4_URL
+
+Attachment = namedtuple('Attachment', 'content_type data')
 
 
 class BulkConflict(Exception):
@@ -305,6 +308,25 @@ def _json_body(obj):
     if isinstance(obj, (bytes, BufferedReader)):
         return obj
     return dumps(obj).encode('utf-8')
+
+
+def encode_attachment(attachment):
+    """
+    Encode *attachment* for use in ``doc['_attachments']``.
+
+    For example:
+
+    >>> attachment = Attachment('image/png', b'PNG data')
+    >>> dumps(encode_attachment(attachment))
+    '{"content_type":"image/png","data":"UE5HIGRhdGE="}'
+
+    :param attachment: an `Attachment` namedtuple
+    """
+    assert isinstance(attachment, Attachment)    
+    return {
+        'content_type': attachment.content_type,
+        'data': b64encode(attachment.data).decode('utf-8'),        
+    }
 
 
 def _queryiter(options):
@@ -804,6 +826,17 @@ class CouchBase(object):
             {'Content-Type': mime}
         )
 
+    def put_att2(self, attachment, *parts, **options):
+        """
+        Experiment for possible CouchBase.put_att() API change.
+
+        WARNING: regardless how the experiment turns out, this method will be
+        removed!
+        """
+        return self.recv_json('PUT', parts, options, attachment.data,
+            {'Content-Type': attachment.content_type}
+        )
+
     def get_att(self, *parts, **options):
         """
         GET an attachment.
@@ -823,8 +856,9 @@ class CouchBase(object):
         :param options: optional keyword arguments to include in query
         """
         response = self.request('GET', parts, options)
+        content_type = response.getheader('Content-Type')
         data = response.read()
-        return (response.getheader('Content-Type'), data)
+        return Attachment(content_type, data)
 
 
 class Server(CouchBase):
