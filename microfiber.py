@@ -310,6 +310,17 @@ def _json_body(obj):
     return dumps(obj).encode('utf-8')
 
 
+def encode_attachment(attachment):
+    """
+    Encode *attachment* for use is doc['_attachments'].
+    """
+    assert isinstance(attachment, Attachment)    
+    return {
+        'content_type': attachment.content_type,
+        'data': b64encode(attachment.data).decode('utf-8'),        
+    }
+
+
 def _queryiter(options):
     """
     Return appropriately encoded (key, value) pairs sorted by key.

@@ -250,6 +250,17 @@ class TestFunctions(TestCase):
         # Test when obj is pre-encoded bytes
         self.assertEqual(microfiber._json_body(json_bytes), json_bytes)
 
+    def test_encode_attachment(self):
+        data = os.urandom(1776)
+        att = microfiber.Attachment('image/jpeg', data)
+        self.assertEqual(
+            microfiber.encode_attachment(att),
+            {
+                'content_type': 'image/jpeg',
+                'data': b64encode(data).decode('utf-8'),
+            }
+        )
+
     def test_queryiter(self):
         f = microfiber._queryiter
         d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')
