@@ -312,7 +312,15 @@ def _json_body(obj):
 
 def encode_attachment(attachment):
     """
-    Encode *attachment* for use is doc['_attachments'].
+    Encode *attachment* for use in ``doc['_attachments']``.
+
+    For example:
+
+    >>> attachment = Attachment('image/png', b'PNG data')
+    >>> dumps(encode_attachment(attachment))
+    '{"content_type":"image/png","data":"UE5HIGRhdGE="}'
+
+    :param attachment: an `Attachment` namedtuple
     """
     assert isinstance(attachment, Attachment)    
     return {
