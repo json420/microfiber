@@ -1966,10 +1966,10 @@ class TestCouchBaseLive(CouchTestCase):
         self.assertEqual(att['data'], b64encode(data).decode('utf-8'))
 
         # GET the attachment
-        self.assertEqual(
-            inst.get_att(self.db, 'doc1', 'att'),
-            (mime, data)
-        )
+        att = inst.get_att(self.db, 'doc1', 'att')
+        self.assertIsInstance(att, microfiber.Attachment)
+        self.assertEqual(att.content_type, mime)
+        self.assertEqual(att.data, data)
 
         # Create new doc with inline attachment:
         new = {
@@ -2005,10 +2005,10 @@ class TestCouchBaseLive(CouchTestCase):
         )
 
         # GET the attachment:
-        self.assertEqual(
-            inst.get_att(self.db, 'doc2', 'att'),
-            (mime, data)
-        )
+        att = inst.get_att(self.db, 'doc1', 'att')
+        self.assertIsInstance(att, microfiber.Attachment)
+        self.assertEqual(att.content_type, mime)
+        self.assertEqual(att.data, data)
 
     def test_put_post(self):
         inst = self.klass(self.env)

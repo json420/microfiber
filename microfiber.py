@@ -58,6 +58,7 @@ import threading
 from queue import Queue
 import math
 import platform
+from collections import namedtuple
 
 # Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
 if not hasattr(ssl, 'OP_NO_COMPRESSION'):
@@ -109,6 +110,8 @@ URL_CONSTANTS = (
     HTTPS_IPv6_URL,
 )
 DEFAULT_URL = HTTP_IPv4_URL
+
+Attachment = namedtuple('Attachment', 'content_type data')
 
 
 class BulkConflict(Exception):
@@ -823,8 +826,9 @@ class CouchBase(object):
         :param options: optional keyword arguments to include in query
         """
         response = self.request('GET', parts, options)
+        content_type = response.getheader('Content-Type')
         data = response.read()
-        return (response.getheader('Content-Type'), data)
+        return Attachment(content_type, data)
 
 
 class Server(CouchBase):
