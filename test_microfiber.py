@@ -2021,6 +2021,43 @@ class TestCouchBaseLive(CouchTestCase):
         self.assertEqual(att.content_type, mime)
         self.assertEqual(att.data, data)
 
+    def test_put_att2(self):
+        inst = microfiber.CouchBase(self.env)
+
+        # Create database
+        self.assertEqual(inst.put(None, 'foo'), {'ok': True})
+
+        data = os.urandom(1776)
+        att = microfiber.Attachment('image/png', data)
+        digest = b64encode(md5(data).digest()).decode('utf-8')
+
+        # PUT attachment
+        r = inst.put_att2(att, 'foo', 'bar', 'baz')
+        self.assertEqual(set(r), set(['id', 'rev', 'ok']))
+        self.assertEqual(r['id'], 'bar')
+        self.assertEqual(r['ok'], True)
+        self.assertTrue(r['rev'].startswith('1-'))
+
+        # GET the doc with attachments=true
+        doc = inst.get('foo', 'bar', attachments=True)
+        self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
+        self.assertEqual(doc['_id'], 'bar')
+        self.assertEqual(doc['_rev'], r['rev'])
+        self.assertEqual(
+            doc['_attachments'],
+            {
+                'baz': {
+                    'content_type': 'image/png',
+                    'data': b64encode(data).decode('ascii'),
+                    'revpos': 1,
+                    'digest': 'md5-{}'.format(digest),
+                },
+            }
+        )
+
+        # Test the round-trip
+        self.assertEqual(inst.get_att('foo', 'bar', 'baz'), att)
+
     def test_put_post(self):
         inst = self.klass(self.env)
 

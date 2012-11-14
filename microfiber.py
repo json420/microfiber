@@ -826,6 +826,17 @@ class CouchBase(object):
             {'Content-Type': mime}
         )
 
+    def put_att2(self, attachment, *parts, **options):
+        """
+        Experiment for possible CouchBase.put_att() API change.
+
+        WARNING: regardless how the experiment turns out, this method will be
+        removed!
+        """
+        return self.recv_json('PUT', parts, options, attachment.data,
+            {'Content-Type': attachment.content_type}
+        )
+
     def get_att(self, *parts, **options):
         """
         GET an attachment.
