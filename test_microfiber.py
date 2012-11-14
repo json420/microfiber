@@ -1772,9 +1772,8 @@ class CouchTestCase(LiveTestCase):
 
     def setUp(self):
         super().setUp()
-        self.auth = os.environ.get('MICROFIBER_TEST_AUTH', 'basic')
         self.tmpcouch = TempCouch()
-        self.env = self.tmpcouch.bootstrap(self.auth)
+        self.env = self.tmpcouch.bootstrap()
 
     def tearDown(self):
         self.tmpcouch = None
