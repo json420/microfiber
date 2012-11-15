@@ -1667,27 +1667,26 @@ class TestServer(TestCase):
 
 
 class TestDatabase(TestCase):
-    klass = microfiber.Database
 
     def test_init(self):
-        inst = self.klass('foo')
+        inst = microfiber.Database('foo')
         self.assertEqual(inst.name, 'foo')
         self.assertEqual(inst.url, 'http://127.0.0.1:5984/')
         self.assertEqual(inst.basepath, '/foo/')
 
-        inst = self.klass('baz', 'https://example.com/bar')
+        inst = microfiber.Database('baz', 'https://example.com/bar')
         self.assertEqual(inst.name, 'baz')
         self.assertEqual(inst.url, 'https://example.com/bar/')
         self.assertEqual(inst.basepath, '/bar/baz/')
 
     def test_repr(self):
-        inst = self.klass('dmedia')
+        inst = microfiber.Database('dmedia')
         self.assertEqual(
             repr(inst),
             "Database('dmedia', 'http://127.0.0.1:5984/')"
         )
 
-        inst = self.klass('novacut', 'https://localhost:5004/')
+        inst = microfiber.Database('novacut', 'https://localhost:5004/')
         self.assertEqual(
             repr(inst),
             "Database('novacut', 'https://localhost:5004/')"
@@ -1915,13 +1914,12 @@ class TestFakeList(CouchTestCase):
 
 
 class TestCouchBaseLive(CouchTestCase):
-    klass = microfiber.CouchBase
 
     def test_bad_status_line(self):
         if os.environ.get('MICROFIBER_TEST_SKIP_SLOW') == 'true':
             self.skipTest('called with --skip-slow')
 
-        inst = self.klass(self.env)
+        inst = microfiber.CouchBase(self.env)
 
         # Create database
         self.assertEqual(inst.put(None, 'foo'), {'ok': True})
@@ -1935,7 +1933,7 @@ class TestCouchBaseLive(CouchTestCase):
         doc = inst.get('foo', 'bar')
 
     def test_put_att(self):
-        inst = self.klass(self.env)
+        inst = microfiber.CouchBase(self.env)
 
         # Create database
         self.assertEqual(inst.put(None, 'foo'), {'ok': True})
@@ -2057,7 +2055,7 @@ class TestCouchBaseLive(CouchTestCase):
         self.assertEqual(inst.get_att('foo', 'bar', 'baz'), att)
 
     def test_put_post(self):
-        inst = self.klass(self.env)
+        inst = microfiber.CouchBase(self.env)
 
         ####################
         # Test requests to /
@@ -2264,10 +2262,9 @@ class TestPermutations(LiveTestCase):
 
 
 class TestDatabaseLive(CouchTestCase):
-    klass = microfiber.Database
 
     def test_ensure(self):
-        inst = self.klass('foo', self.env)
+        inst = microfiber.Database('foo', self.env)
         self.assertRaises(NotFound, inst.get)
         self.assertTrue(inst.ensure())
         self.assertEqual(inst.get()['db_name'], 'foo')
@@ -2276,7 +2273,7 @@ class TestDatabaseLive(CouchTestCase):
         self.assertRaises(NotFound, inst.get)
 
     def test_non_ascii(self):
-        inst = self.klass('foo', self.env)
+        inst = microfiber.Database('foo', self.env)
         self.assertTrue(inst.ensure())
         _id = test_id()
         name = '*safe solvent™'
@@ -2285,7 +2282,7 @@ class TestDatabaseLive(CouchTestCase):
         self.assertEqual(inst.get(_id)['name'], name)
 
     def test_save(self):
-        inst = self.klass('foo', self.env)
+        inst = microfiber.Database('foo', self.env)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
