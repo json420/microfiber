@@ -1768,7 +1768,6 @@ class LiveTestCase(TestCase):
 
 
 class CouchTestCase(LiveTestCase):
-    db = 'test_microfiber'
 
     def setUp(self):
         super().setUp()
@@ -1925,37 +1924,37 @@ class TestCouchBaseLive(CouchTestCase):
         inst = self.klass(self.env)
 
         # Create database
-        self.assertEqual(inst.put(None, self.db), {'ok': True})
+        self.assertEqual(inst.put(None, 'foo'), {'ok': True})
 
         # Create a doc:
-        inst.put({'hello': 'world'}, self.db, 'bar')
+        inst.put({'hello': 'world'}, 'foo', 'bar')
 
         time.sleep(30)  # The connection should close, raising BadStatusLine
 
         # Get the doc
-        doc = inst.get(self.db, 'bar')
+        doc = inst.get('foo', 'bar')
 
     def test_put_att(self):
         inst = self.klass(self.env)
 
         # Create database
-        self.assertEqual(inst.put(None, self.db), {'ok': True})
+        self.assertEqual(inst.put(None, 'foo'), {'ok': True})
 
         mime = 'image/jpeg'
         data = os.urandom(2001)
         digest = b64encode(md5(data).digest()).decode('utf-8')
 
         # Try to GET attachment that doesn't exist:
-        self.assertRaises(NotFound, inst.get_att, self.db, 'doc1', 'att')
+        self.assertRaises(NotFound, inst.get_att, 'foo', 'doc1', 'att')
 
         # PUT an attachment
-        r = inst.put_att(mime, data, self.db, 'doc1', 'att')
+        r = inst.put_att(mime, data, 'foo', 'doc1', 'att')
         self.assertEqual(set(r), set(['id', 'rev', 'ok']))
         self.assertEqual(r['id'], 'doc1')
         self.assertEqual(r['ok'], True)
 
         # GET the doc with attachments=True
-        doc = inst.get(self.db, 'doc1', attachments=True)
+        doc = inst.get('foo', 'doc1', attachments=True)
         self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
         self.assertEqual(doc['_id'], 'doc1')
         self.assertEqual(doc['_rev'], r['rev'])
@@ -1976,7 +1975,7 @@ class TestCouchBaseLive(CouchTestCase):
         self.assertEqual(att['data'], b64encode(data).decode('utf-8'))
 
         # GET the attachment
-        att = inst.get_att(self.db, 'doc1', 'att')
+        att = inst.get_att('foo', 'doc1', 'att')
         self.assertIsInstance(att, microfiber.Attachment)
         self.assertEqual(att.content_type, mime)
         self.assertEqual(att.data, data)
@@ -1991,14 +1990,14 @@ class TestCouchBaseLive(CouchTestCase):
                 },
             },
         }
-        r = inst.post(new, self.db)
+        r = inst.post(new, 'foo')
 
         self.assertEqual(set(r), set(['id', 'rev', 'ok']))
         self.assertEqual(r['id'], 'doc2')
         self.assertEqual(r['ok'], True)
 
         # GET the doc with attachments=true
-        doc = inst.get(self.db, 'doc2', attachments=True)
+        doc = inst.get('foo', 'doc2', attachments=True)
         self.assertEqual(set(doc), set(['_id', '_rev', '_attachments']))
         self.assertEqual(doc['_id'], 'doc2')
         self.assertEqual(doc['_rev'], r['rev'])
@@ -2015,7 +2014,7 @@ class TestCouchBaseLive(CouchTestCase):
         )
 
         # GET the attachment:
-        att = inst.get_att(self.db, 'doc1', 'att')
+        att = inst.get_att('foo', 'doc1', 'att')
         self.assertIsInstance(att, microfiber.Attachment)
         self.assertEqual(att.content_type, mime)
         self.assertEqual(att.data, data)
@@ -2075,18 +2074,18 @@ class TestCouchBaseLive(CouchTestCase):
         # Create the database
 
         # Try to get DB when it doesn't exist:
-        self.assertRaises(NotFound, inst.get, self.db)
+        self.assertRaises(NotFound, inst.get, 'foo')
 
         # Create DB:
-        d = inst.put(None, self.db)
+        d = inst.put(None, 'foo')
         self.assertEqual(d, {'ok': True})
 
         # Try to create DB when it already exists:
-        self.assertRaises(PreconditionFailed, inst.put, None, self.db)
+        self.assertRaises(PreconditionFailed, inst.put, None, 'foo')
 
         # Get DB info:
-        d = inst.get(self.db)
-        self.assertEqual(d['db_name'], self.db)
+        d = inst.get('foo')
+        self.assertEqual(d['db_name'], 'foo')
         self.assertEqual(d['doc_count'], 0)
 
 
@@ -2095,11 +2094,11 @@ class TestCouchBaseLive(CouchTestCase):
         _id = random_id()
 
         # Try getting doc that doesn't exist:
-        self.assertRaises(NotFound, inst.get, self.db, _id)
+        self.assertRaises(NotFound, inst.get, 'foo', _id)
 
         # Create doc with a put:
         doc = {'foo': 'bar'}
-        d = inst.put(doc, self.db, _id)
+        d = inst.put(doc, 'foo', _id)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['ok'], True)
         self.assertEqual(d['id'], _id)
@@ -2107,31 +2106,31 @@ class TestCouchBaseLive(CouchTestCase):
         doc['_id'] = _id
 
         # get the doc:
-        self.assertEqual(inst.get(self.db, _id), doc)
+        self.assertEqual(inst.get('foo', _id), doc)
 
         # Try creating doc that already exists with put:
-        self.assertRaises(Conflict, inst.put, {'no': 'way'}, self.db, _id)
+        self.assertRaises(Conflict, inst.put, {'no': 'way'}, 'foo', _id)
 
         # Try deleting the doc with *no* revision supplied:
-        self.assertRaises(Conflict, inst.delete, self.db, _id)
+        self.assertRaises(Conflict, inst.delete, 'foo', _id)
 
         # Try deleting the doc with the wrong revision supplied:
         old = doc['_rev']
         doc['stuff'] = 'junk'
-        d = inst.put(doc, self.db, _id)
-        self.assertRaises(Conflict, inst.delete, self.db, _id, rev=old)
+        d = inst.put(doc, 'foo', _id)
+        self.assertRaises(Conflict, inst.delete, 'foo', _id, rev=old)
 
         # Delete the doc
         cur = d['rev']
-        d = inst.delete(self.db, _id, rev=cur)
+        d = inst.delete('foo', _id, rev=cur)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['id'], _id)
         self.assertIs(d['ok'], True)
         self.assertGreater(d['rev'], cur)
 
         # Try deleting doc that has already been deleted
-        self.assertRaises(NotFound, inst.delete, self.db, _id, rev=d['rev'])
-        self.assertRaises(NotFound, inst.get, self.db, _id)
+        self.assertRaises(NotFound, inst.delete, 'foo', _id, rev=d['rev'])
+        self.assertRaises(NotFound, inst.get, 'foo', _id)
 
 
         ###############################
@@ -2143,54 +2142,54 @@ class TestCouchBaseLive(CouchTestCase):
         }
 
         # Try getting doc that doesn't exist:
-        self.assertRaises(NotFound, inst.get, self.db, _id)
+        self.assertRaises(NotFound, inst.get, 'foo', _id)
 
         # Create doc with a post:
-        d = inst.post(doc, self.db)
+        d = inst.post(doc, 'foo')
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['ok'], True)
         self.assertEqual(d['id'], _id)
         doc['_rev'] = d['rev']
 
         # get the doc:
-        self.assertEqual(inst.get(self.db, _id), doc)
+        self.assertEqual(inst.get('foo', _id), doc)
 
         # Try creating doc that already exists with a post:
         nope = {'_id': _id, 'no': 'way'}
-        self.assertRaises(Conflict, inst.post, nope, self.db)
+        self.assertRaises(Conflict, inst.post, nope, 'foo')
 
         # Try deleting the doc with *no* revision supplied:
-        self.assertRaises(Conflict, inst.delete, self.db, _id)
+        self.assertRaises(Conflict, inst.delete, 'foo', _id)
 
         # Update the doc:
         old = doc['_rev']
         doc['touch'] = 'bad'
-        d = inst.post(doc, self.db)
+        d = inst.post(doc, 'foo')
 
         # Try updating with wrong revision:
-        self.assertRaises(Conflict, inst.post, doc, self.db)
+        self.assertRaises(Conflict, inst.post, doc, 'foo')
 
         # Try deleting the doc with the wrong revision supplied:
-        self.assertRaises(Conflict, inst.delete, self.db, _id, rev=old)
+        self.assertRaises(Conflict, inst.delete, 'foo', _id, rev=old)
 
         # Delete the doc
         cur = d['rev']
-        d = inst.delete(self.db, _id, rev=cur)
+        d = inst.delete('foo', _id, rev=cur)
         self.assertEqual(set(d), set(['id', 'rev', 'ok']))
         self.assertEqual(d['id'], _id)
         self.assertIs(d['ok'], True)
         self.assertGreater(d['rev'], cur)
 
         # Try deleting doc that has already been deleted
-        self.assertRaises(NotFound, inst.delete, self.db, _id, rev=cur)
-        self.assertRaises(NotFound, inst.get, self.db, _id)
+        self.assertRaises(NotFound, inst.delete, 'foo', _id, rev=cur)
+        self.assertRaises(NotFound, inst.get, 'foo', _id)
 
 
         #####################
         # Delete the database
-        self.assertEqual(inst.delete(self.db), {'ok': True})
-        self.assertRaises(NotFound, inst.delete, self.db)
-        self.assertRaises(NotFound, inst.get, self.db)    
+        self.assertEqual(inst.delete('foo'), {'ok': True})
+        self.assertRaises(NotFound, inst.delete, 'foo')
+        self.assertRaises(NotFound, inst.get, 'foo')    
 
 
 class TestPermutations(LiveTestCase):
@@ -2268,16 +2267,16 @@ class TestDatabaseLive(CouchTestCase):
     klass = microfiber.Database
 
     def test_ensure(self):
-        inst = self.klass(self.db, self.env)
+        inst = self.klass('foo', self.env)
         self.assertRaises(NotFound, inst.get)
         self.assertTrue(inst.ensure())
-        self.assertEqual(inst.get()['db_name'], self.db)
+        self.assertEqual(inst.get()['db_name'], 'foo')
         self.assertFalse(inst.ensure())
         self.assertEqual(inst.delete(), {'ok': True})
         self.assertRaises(NotFound, inst.get)
 
     def test_non_ascii(self):
-        inst = self.klass(self.db, self.env)
+        inst = self.klass('foo', self.env)
         self.assertTrue(inst.ensure())
         _id = test_id()
         name = '*safe solvent™'
@@ -2286,11 +2285,11 @@ class TestDatabaseLive(CouchTestCase):
         self.assertEqual(inst.get(_id)['name'], name)
 
     def test_save(self):
-        inst = self.klass(self.db, self.env)
+        inst = self.klass('foo', self.env)
 
         self.assertRaises(NotFound, inst.get)
         self.assertEqual(inst.put(None), {'ok': True})
-        self.assertEqual(inst.get()['db_name'], self.db)
+        self.assertEqual(inst.get()['db_name'], 'foo')
         self.assertRaises(PreconditionFailed, inst.put, None)
 
         docs = [{'_id': random_id(), 'foo': i} for i in range(100)]
@@ -2331,7 +2330,7 @@ class TestDatabaseLive(CouchTestCase):
 
         Pro tip: use this!
         """
-        db = microfiber.Database(self.db, self.env)
+        db = microfiber.Database('foo', self.env)
         db.ensure()
         db.post({'_id': 'example'})
         me = db.get('example')
@@ -2397,7 +2396,7 @@ class TestDatabaseLive(CouchTestCase):
 
         Pro tip: these are not the semantics you're looking for!
         """
-        db = microfiber.Database(self.db, self.env)
+        db = microfiber.Database('foo', self.env)
         db.ensure()
         db.post({'_id': 'example'})
         me = db.get('example')
@@ -2484,7 +2483,7 @@ class TestDatabaseLive(CouchTestCase):
         )
 
     def test_save_many(self):
-        db = microfiber.Database(self.db, self.env)
+        db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
 
         # Test that doc['_id'] gets set automatically
@@ -2560,7 +2559,7 @@ class TestDatabaseLive(CouchTestCase):
                 self.assertEqual(real, doc)
 
     def test_bulksave(self):
-        db = microfiber.Database(self.db, self.env)
+        db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
 
         # Test that doc['_id'] gets set automatically
@@ -2646,7 +2645,7 @@ class TestDatabaseLive(CouchTestCase):
                 self.assertEqual(doc, real)
 
     def test_get_many(self):
-        db = microfiber.Database(self.db, self.env)
+        db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
 
         ids = tuple(test_id() for i in range(50))
