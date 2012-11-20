@@ -329,6 +329,39 @@ def encode_attachment(attachment):
     }
 
 
+def has_attachment(doc, name):
+    """
+    Return True if *doc* has an attachment named *name*.
+
+    For example, when the attachment isn't present:
+
+    >>> has_attachment({}, 'thumbnail')
+    False
+    >>> has_attachment({'_attachments': {}}, 'thumbnail')
+    False
+
+    Or when the attachment is present:
+
+    >>> doc= {
+    ...    '_attachments': {
+    ...         'thumbnail': {
+    ...             'content_type': 'image/png',
+    ...             'data': 'UE5HIGRhdGE=',
+    ...         }
+    ...     }
+    ... }
+    ...
+    >>> has_attachment(doc, 'thumbnail')
+    True
+
+    """
+    try:
+        doc['_attachments'][name]
+        return True
+    except KeyError:
+        return False
+
+
 def _queryiter(options):
     """
     Return appropriately encoded (key, value) pairs sorted by key.

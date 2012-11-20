@@ -261,6 +261,15 @@ class TestFunctions(TestCase):
             }
         )
 
+    def test_has_attachment(self):
+        self.assertIs(microfiber.has_attachment({}, 'thumb'), False)
+        doc = {'_attachments': {}}
+        self.assertIs(microfiber.has_attachment(doc, 'thumb'), False)
+        doc = {'_attachments': {'foo': 'nope'}}
+        self.assertIs(microfiber.has_attachment(doc, 'thumb'), False)
+        doc = {'_attachments': {'thumb': 'yup'}}
+        self.assertIs(microfiber.has_attachment(doc, 'thumb'), True)
+
     def test_queryiter(self):
         f = microfiber._queryiter
         d = dict(foo=True, bar=False, baz=None, aye=10, zee=17.5, key='app')
