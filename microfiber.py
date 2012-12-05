@@ -25,6 +25,8 @@
 #
 
 """
+Hi Kevin!
+
 `microfiber` - fabric for a lightweight Couch.
 
 Microfiber is an generic adapter for making HTTP requests to an arbitrary JSON
