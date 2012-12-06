@@ -441,6 +441,20 @@ class TestFunctions(TestCase):
         with self.assertRaises(ssl.SSLError) as cm:
             microfiber.build_ssl_context(config)
 
+        # Test with config['context']
+        config = {
+            'ca_file': pki.server_ca.ca_file,
+            'cert_file': pki.client_cert.cert_file,
+            'key_file': pki.client_cert.key_file,
+            'check_hostname': False,
+        }
+        ctx = microfiber.build_ssl_context(config)
+        ctx2 = microfiber.build_ssl_context({'context': ctx})
+        self.assertIs(ctx, ctx2)
+        config['context'] = ctx
+        ctx3 = microfiber.build_ssl_context(config)
+        self.assertIs(ctx, ctx3)
+
     def test_replication_body(self):
         src = test_id()
         dst = test_id()
