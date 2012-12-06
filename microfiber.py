@@ -554,6 +554,14 @@ class FakeList(list):
 
 
 def build_ssl_context(config):
+    if 'context' in config:
+        ctx = config['context']
+        assert isinstance(ctx, ssl.SSLContext)
+        assert ctx.protocol == ssl.PROTOCOL_TLSv1
+        assert ctx.verify_mode == ssl.CERT_REQUIRED
+        assert ctx.options == (ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        return ctx
+
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
     ctx.verify_mode = ssl.CERT_REQUIRED
     ctx.options |= ssl.OP_NO_COMPRESSION  # Protect against CRIME-like attacks
