@@ -53,7 +53,6 @@ from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
-import socket
 import ssl
 import threading
 from queue import Queue
@@ -63,44 +62,7 @@ from collections import namedtuple
 
 # Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
 if not hasattr(ssl, 'OP_NO_COMPRESSION'):
-    ssl.OP_NO_COMPRESSION = 131072
-
-
-# Monkey patch socket.create_connection() to support link-local IPv6:  
-def create_connection(address,
-            timeout=socket._GLOBAL_DEFAULT_TIMEOUT,
-            source_address=None):
-    """
-    Ugly hack, but it works.
-    """
-    (host, port) = address
-    err = None
-    for res in socket.getaddrinfo(host, port, 0, socket.SOCK_STREAM):
-        (af, socktype, proto, canonname, sa) = res
-        # Here's the nasty hack:
-        if len(sa) == 4 and sa[0].startswith('fe80:'):
-            sa = (sa[0], sa[1], 0, 1)
-        sock = None
-        try:
-            sock = socket.socket(af, socktype, proto)
-            if timeout is not socket._GLOBAL_DEFAULT_TIMEOUT:
-                sock.settimeout(timeout)
-            if source_address:
-                sock.bind(source_address)
-            sock.connect(sa)
-            return sock
-
-        except socket.error as _:
-            err = _
-            if sock is not None:
-                sock.close()
-
-    if err is not None:
-        raise err
-    else:
-        raise socket.error("getaddrinfo returns an empty list")
-
-socket.create_connection = create_connection
+    ssl.OP_NO_COMPRESSION = 131072  
 
 
 __all__ = (
