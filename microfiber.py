@@ -1112,6 +1112,30 @@ class Database(CouchBase):
             options['reduce'] = False
         return self.get('_design', design, '_view', view, **options)
 
+    def tophash(self):
+        """
+        A fast way of hashing the state of the database, minus design docs.
+
+        This does no JSON decoding/encoding, instead hashes the response
+        chunk by chunk as it is read from the socket.
+
+        This returns a (sha1, Etag) tuple with the hexdigest of the sha1 hash,
+        plus the ETag from CouchDB.
+        """
+        parts = ('_all_docs',)
+        options = {'endkey': '_'}
+        headers = {'Accept': 'application/json'}
+        response = self.request('GET', parts, options, None, headers)
+        MiB = 1024 * 1024
+        h = sha1()
+        while True:
+            data = response.read(MiB)
+            if not data:
+                assert response.read() == b''
+                break
+            h.update(data)
+        return h.hexdigest()
+
     def dump(self, filename):
         """
         Dump this database to regular JSON file *filename*.

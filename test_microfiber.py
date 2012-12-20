@@ -2705,6 +2705,52 @@ class TestDatabaseLive(CouchTestCase):
             [docs[17], None, docs[18]]
         )
 
+    def test_tophash(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertTrue(db.ensure())
+
+        # When empty:
+        self.assertEqual(db.tophash(),
+            'e44d2850e2693b88bdcfa137525d2bcf779cea40'
+        )
+
+        # Save a doc:
+        doc1 = {'_id': 'BAR', 'hello': 'world'}
+        db.save(doc1)
+        self.assertEqual(db.tophash(),
+            '394d9499774677bc8f9910597ad63bdc27a85430'
+        )
+
+        # Unfortunately, the count is effected by design docs even when excluded:
+        doc2 = deepcopy(doc_design)
+        db.save(doc2)
+        self.assertEqual(db.tophash(),
+            '382eb4080635bfea0c3583580f96fdf176edc1f5'
+        )
+
+        # But their revision should *not* effect the tophash:
+        db.save(doc2)
+        self.assertTrue(doc2['_rev'].startswith('2-'))
+        self.assertEqual(db.tophash(),
+            '382eb4080635bfea0c3583580f96fdf176edc1f5'
+        )
+
+        # However, the revision of regular docs should effect the tophash:
+        db.save(doc1)
+        self.assertEqual(db.tophash(),
+            '9db23f4286266e2e7f081011eb21ec7c10b05ce3'
+        )
+
+        # Once more with feeling:
+        db.save(doc2)
+        self.assertEqual(db.tophash(),
+            '9db23f4286266e2e7f081011eb21ec7c10b05ce3'
+        )
+        db.save(doc1)
+        self.assertEqual(db.tophash(),
+            '329140486a7a0d5a8aaf59f44e5cc237fa4abcbd'
+        )
+
     def test_dump(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
