@@ -87,7 +87,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '12.12.0'
+__version__ = '13.01.0'
 USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__, 
     platform.dist()[0], platform.dist()[1], platform.machine()
 )
