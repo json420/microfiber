@@ -26,6 +26,3 @@ override_dh_auto_install:
 				--root=$(CURDIR)/debian/python3-microfiber; \
 	done
 
-override_dh_sphinxdoc:
-	dh_sphinxdoc -X searchtools.js
-
