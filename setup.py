@@ -38,9 +38,6 @@ from distutils.cmd import Command
 from unittest import TestLoader, TextTestRunner
 from doctest import DocTestSuite
 import os
-from os import path
-import subprocess
-from urllib.parse import urlparse
 
 import microfiber
 
