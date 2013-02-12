@@ -43,7 +43,6 @@ Launchpad project:
     https://launchpad.net/microfiber
 """
 
-from os import urandom
 from io import BufferedReader, TextIOWrapper
 from base64 import b64encode
 import json
