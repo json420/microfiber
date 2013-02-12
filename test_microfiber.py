@@ -31,7 +31,7 @@ Unit tests for `microfiber` module.
 from unittest import TestCase
 import os
 from os import path
-from base64 import b64encode, b64decode, b32encode, b32decode
+from base64 import b64encode, b64decode
 from copy import deepcopy
 import json
 import gzip
@@ -47,14 +47,13 @@ import threading
 from random import SystemRandom
 
 from usercouch.misc import TempCouch, TempPKI
-from dbase32 import db32enc, db32dec, random_id, DB32ALPHABET
+from dbase32 import db32dec, isdb32, random_id
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
 random = SystemRandom()
-
 
 # OAuth 1.0a test vector from http://oauth.net/core/1.0a/#anchor46
 
@@ -101,25 +100,21 @@ doc_design = {
 
 def test_id():
     """
-    So we can tell our random test IDs from the ones microfiber.random_id()
+    So we can tell our random test IDs from the ones random_id()
     makes, we use 160-bit IDs instead of 120-bit.
     """
-    return db32enc(os.urandom(20))
+    return random_id(20)
 
 
 def is_microfiber_id(_id):
-    assert isinstance(_id, str)
-    return (
-        len(_id) == microfiber.RANDOM_B32LEN
-        and set(_id).issubset(DB32ALPHABET)
-    )
+    return len(_id) == microfiber.RANDOM_B32LEN and isdb32(_id)
 
-assert is_microfiber_id(microfiber.random_id())
+assert is_microfiber_id(random_id())
 assert not is_microfiber_id(test_id())
 
 
 def random_dbname():
-    return 'db-' + microfiber.random_id().lower()
+    return 'db-' + random_id().lower()
 
 
 def random_oauth():
@@ -1028,7 +1023,7 @@ class TestErrors(TestCase):
         url = '/restful?and=awesome'
         for (status, klass) in microfiber.errors.items():
             self.assertTrue(klass.__doc__.startswith('{} '.format(status)))
-            reason = b32encode(os.urandom(10))
+            reason = random_id(10)
             data = os.urandom(20)
             r = FakeResponse(status, reason, data)
             inst = klass(r, method, url)
