@@ -5,5 +5,5 @@ Author: Jason Gerard DeRose <jderose@novacut.com>
 '''
 
 def add_info(report):
-    report['CrashDB'] = 'microfiber'
+    report['CrashDB'] = "{'impl': 'launchpad', 'project': 'microfiber'}"
 
