@@ -45,7 +45,7 @@ Launchpad project:
 
 from os import urandom
 from io import BufferedReader, TextIOWrapper
-from base64 import b32encode, b64encode
+from base64 import b64encode
 import json
 from gzip import GzipFile
 import time
@@ -59,6 +59,8 @@ from queue import Queue
 import math
 import platform
 from collections import namedtuple
+
+from dbase32 import db32enc
 
 # Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
 if not hasattr(ssl, 'OP_NO_COMPRESSION'):
@@ -225,7 +227,7 @@ def random_id(numbytes=RANDOM_BYTES):
     This is how dmedia/Novacut random IDs are created, so this is "Jason
     approved", for what that's worth.
     """
-    return b32encode(urandom(numbytes)).decode('utf-8')
+    return db32enc(urandom(numbytes))
 
 
 def random_id2():
@@ -238,11 +240,7 @@ def random_id2():
     '1313567384.67DFPERIOU66CT56'
 
     """
-    return '-'.join([
-        str(int(time.time())),
-        b32encode(urandom(10)).decode('utf-8')
-    ])
-
+    return '-'.join([str(int(time.time())), db32enc(urandom(10))])
 
 
 def dc3_env():
@@ -392,7 +390,7 @@ def _oauth_sign(oauth, base_string):
 def _oauth_header(oauth, method, baseurl, query, testing=None):
     if testing is None:
         timestamp = str(int(time.time()))
-        nonce = b32encode(urandom(10)).decode('utf-8')
+        nonce = random_id()
     else:
         (timestamp, nonce) = testing
     o = {
