@@ -60,7 +60,7 @@ import math
 import platform
 from collections import namedtuple
 
-from dbase32 import db32enc
+from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 
 # Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
 if not hasattr(ssl, 'OP_NO_COMPRESSION'):
@@ -96,10 +96,6 @@ USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__,
 
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
 DMEDIA_CMD = ('/usr/bin/dmedia-cli', 'GetEnv')
-
-RANDOM_BITS = 120
-RANDOM_BYTES = RANDOM_BITS // 8
-RANDOM_B32LEN = RANDOM_BITS // 5
 
 HTTP_IPv4_URL = 'http://127.0.0.1:5984/'
 HTTPS_IPv4_URL = 'https://127.0.0.1:6984/'
@@ -215,21 +211,6 @@ errors = {
 }
 
 
-def random_id(numbytes=RANDOM_BYTES):
-    """
-    Returns a 120-bit base32-encoded random ID.
-
-    The ID will be 24-characters long, URL and filesystem safe.  For example:
-
-    >>> random_id()  #doctest: +SKIP
-    'OVRHK3TUOUQCWIDMNFXGC4TP'
-
-    This is how dmedia/Novacut random IDs are created, so this is "Jason
-    approved", for what that's worth.
-    """
-    return db32enc(urandom(numbytes))
-
-
 def random_id2():
     """
     Returns a random ID with timestamp + 80 bits of base32-encoded random data.
@@ -240,7 +221,7 @@ def random_id2():
     '1313567384.67DFPERIOU66CT56'
 
     """
-    return '-'.join([str(int(time.time())), db32enc(urandom(10))])
+    return '-'.join([str(int(time.time())), random_id(10)])
 
 
 def dc3_env():
