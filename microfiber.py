@@ -61,10 +61,6 @@ from collections import namedtuple
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 
-# Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
-if not hasattr(ssl, 'OP_NO_COMPRESSION'):
-    ssl.OP_NO_COMPRESSION = 131072  
-
 
 __all__ = (
     'random_id',
