@@ -43,9 +43,8 @@ Launchpad project:
     https://launchpad.net/microfiber
 """
 
-from os import urandom
 from io import BufferedReader, TextIOWrapper
-from base64 import b32encode, b64encode
+from base64 import b64encode
 import json
 from gzip import GzipFile
 import time
@@ -60,9 +59,7 @@ import math
 import platform
 from collections import namedtuple
 
-# Monkey patch python3.2 to add ssl.OP_NO_COMPRESSION available in python3.3:
-if not hasattr(ssl, 'OP_NO_COMPRESSION'):
-    ssl.OP_NO_COMPRESSION = 131072  
+from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 
 
 __all__ = (
@@ -94,10 +91,6 @@ USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__,
 
 DC3_CMD = ('/usr/bin/dc3', 'GetEnv')
 DMEDIA_CMD = ('/usr/bin/dmedia-cli', 'GetEnv')
-
-RANDOM_BITS = 120
-RANDOM_BYTES = RANDOM_BITS // 8
-RANDOM_B32LEN = RANDOM_BITS // 5
 
 HTTP_IPv4_URL = 'http://127.0.0.1:5984/'
 HTTPS_IPv4_URL = 'https://127.0.0.1:6984/'
@@ -213,21 +206,6 @@ errors = {
 }
 
 
-def random_id(numbytes=RANDOM_BYTES):
-    """
-    Returns a 120-bit base32-encoded random ID.
-
-    The ID will be 24-characters long, URL and filesystem safe.  For example:
-
-    >>> random_id()  #doctest: +SKIP
-    'OVRHK3TUOUQCWIDMNFXGC4TP'
-
-    This is how dmedia/Novacut random IDs are created, so this is "Jason
-    approved", for what that's worth.
-    """
-    return b32encode(urandom(numbytes)).decode('utf-8')
-
-
 def random_id2():
     """
     Returns a random ID with timestamp + 80 bits of base32-encoded random data.
@@ -238,11 +216,7 @@ def random_id2():
     '1313567384.67DFPERIOU66CT56'
 
     """
-    return '-'.join([
-        str(int(time.time())),
-        b32encode(urandom(10)).decode('utf-8')
-    ])
-
+    return '-'.join([str(int(time.time())), random_id(10)])
 
 
 def dc3_env():
@@ -392,7 +366,7 @@ def _oauth_sign(oauth, base_string):
 def _oauth_header(oauth, method, baseurl, query, testing=None):
     if testing is None:
         timestamp = str(int(time.time()))
-        nonce = b32encode(urandom(10)).decode('utf-8')
+        nonce = random_id()
     else:
         (timestamp, nonce) = testing
     o = {

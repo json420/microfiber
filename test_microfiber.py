@@ -31,7 +31,7 @@ Unit tests for `microfiber` module.
 from unittest import TestCase
 import os
 from os import path
-from base64 import b64encode, b64decode, b32encode, b32decode
+from base64 import b64encode, b64decode
 from copy import deepcopy
 import json
 import gzip
@@ -45,16 +45,15 @@ from http.client import HTTPConnection, HTTPSConnection
 import ssl
 import threading
 from random import SystemRandom
+
 from usercouch.misc import TempCouch, TempPKI
+from dbase32 import db32dec, isdb32, random_id
 
 import microfiber
-from microfiber import random_id
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
 random = SystemRandom()
-B32ALPHABET = frozenset('234567ABCDEFGHIJKLMNOPQRSTUVWXYZ')
-
 
 # OAuth 1.0a test vector from http://oauth.net/core/1.0a/#anchor46
 
@@ -101,25 +100,21 @@ doc_design = {
 
 def test_id():
     """
-    So we can tell our random test IDs from the ones microfiber.random_id()
+    So we can tell our random test IDs from the ones random_id()
     makes, we use 160-bit IDs instead of 120-bit.
     """
-    return b32encode(os.urandom(20)).decode('ascii')
+    return random_id(20)
 
 
 def is_microfiber_id(_id):
-    assert isinstance(_id, str)
-    return (
-        len(_id) == microfiber.RANDOM_B32LEN
-        and set(_id).issubset(B32ALPHABET)
-    )
+    return len(_id) == microfiber.RANDOM_B32LEN and isdb32(_id)
 
-assert is_microfiber_id(microfiber.random_id())
+assert is_microfiber_id(random_id())
 assert not is_microfiber_id(test_id())
 
 
 def random_dbname():
-    return 'db-' + microfiber.random_id().lower()
+    return 'db-' + random_id().lower()
 
 
 def random_oauth():
@@ -147,14 +142,13 @@ class FakeResponse:
 
 
 class TestFunctions(TestCase):
-
     def test_random_id(self):
         _id = microfiber.random_id()
         self.assertIsInstance(_id, str)
         self.assertEqual(len(_id), 24)
-        b = b32decode(_id.encode('ascii'))
+        b = db32dec(_id)
         self.assertIsInstance(b, bytes)
-        self.assertEqual(len(b) * 8, 120)
+        self.assertEqual(len(b), 15)
 
     def test_random_id2(self):
         _id = microfiber.random_id2()
@@ -164,9 +158,9 @@ class TestFunctions(TestCase):
         self.assertEqual(len(t), 10)
         self.assertTrue(int(t) > 1234567890)
         self.assertEqual(len(r), 16)
-        b = b32decode(r.encode('ascii'))
+        b = db32dec(r)
         self.assertIsInstance(b, bytes)
-        self.assertEqual(len(b) * 8, 80)
+        self.assertEqual(len(b), 10)
 
     def test_json(self):
         """
@@ -1029,7 +1023,7 @@ class TestErrors(TestCase):
         url = '/restful?and=awesome'
         for (status, klass) in microfiber.errors.items():
             self.assertTrue(klass.__doc__.startswith('{} '.format(status)))
-            reason = b32encode(os.urandom(10))
+            reason = random_id(10)
             data = os.urandom(20)
             r = FakeResponse(status, reason, data)
             inst = klass(r, method, url)
