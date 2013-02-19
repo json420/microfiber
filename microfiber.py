@@ -59,7 +59,8 @@ import math
 import platform
 from collections import namedtuple
 
-from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
+from dbase32 import RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
+from dbase32.rfc3548 import random_id
 
 
 __all__ = (

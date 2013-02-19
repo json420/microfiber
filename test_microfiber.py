@@ -47,7 +47,7 @@ import threading
 from random import SystemRandom
 
 from usercouch.misc import TempCouch, TempPKI
-from dbase32 import db32dec, isdb32, random_id
+from dbase32.rfc3548 import b32dec, isb32, random_id
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -107,7 +107,7 @@ def test_id():
 
 
 def is_microfiber_id(_id):
-    return len(_id) == microfiber.RANDOM_B32LEN and isdb32(_id)
+    return len(_id) == microfiber.RANDOM_B32LEN and isb32(_id)
 
 assert is_microfiber_id(random_id())
 assert not is_microfiber_id(test_id())
@@ -146,7 +146,7 @@ class TestFunctions(TestCase):
         _id = microfiber.random_id()
         self.assertIsInstance(_id, str)
         self.assertEqual(len(_id), 24)
-        b = db32dec(_id)
+        b = b32dec(_id)
         self.assertIsInstance(b, bytes)
         self.assertEqual(len(b), 15)
 
@@ -158,7 +158,7 @@ class TestFunctions(TestCase):
         self.assertEqual(len(t), 10)
         self.assertTrue(int(t) > 1234567890)
         self.assertEqual(len(r), 16)
-        b = db32dec(r)
+        b = b32dec(r)
         self.assertIsInstance(b, bytes)
         self.assertEqual(len(b), 10)
 
