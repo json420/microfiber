@@ -64,7 +64,7 @@ class Test(Command):
         if self.skip_slow:
             os.environ['MICROFIBER_TEST_SKIP_SLOW'] = 'true'
 
-        pynames = ['microfiber', 'test_microfiber']
+        pynames = ['microfiber', 'microfiber.tests']
 
         # Add unit-tests:
         loader = TestLoader()
@@ -89,6 +89,6 @@ setup(
     author='Jason Gerard DeRose',
     author_email='jderose@novacut.com',
     license='LGPLv3+',
-    py_modules=['microfiber'],
+    packages=['microfiber', 'microfiber.tests'],
     cmdclass={'test': Test},
 )
