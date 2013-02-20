@@ -35,11 +35,10 @@ if sys.version_info < (3, 3):
 
 from distutils.core import setup
 from distutils.cmd import Command
-from unittest import TestLoader, TextTestRunner
-from doctest import DocTestSuite
 import os
 
 import microfiber
+from microfiber.tests.run import run_tests
 
 
 class Test(Command):
@@ -58,27 +57,12 @@ class Test(Command):
         pass
 
     def run(self):
-        # Possibly set environ variables for live test:
         if self.no_live:
             os.environ['MICROFIBER_TEST_NO_LIVE'] = 'true'
         if self.skip_slow:
             os.environ['MICROFIBER_TEST_SKIP_SLOW'] = 'true'
-
-        pynames = ['microfiber', 'microfiber.tests']
-
-        # Add unit-tests:
-        loader = TestLoader()
-        suite = loader.loadTestsFromNames(pynames)
-
-        # Add doc-tests:
-        for name in pynames:
-            suite.addTest(DocTestSuite(name))
-
-        # Run the tests:
-        runner = TextTestRunner(verbosity=2)
-        result = runner.run(suite)
-        if not result.wasSuccessful():
-            raise SystemExit(2)
+        if not run_tests():
+            raise SystemExit('2')
 
 
 setup(
