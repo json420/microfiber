@@ -70,31 +70,31 @@ print('Python: {}, {}, {}'.format(
 )
 
 print('  Saving {} documents in db {!r}...'.format(count, name))
-start = time.time()
+start = time.perf_counter()
 for _id in ids:
     doc = dict(master)
     doc['_id'] = _id
     db.save(doc)
     docs.append(doc)
-elapsed = time.time() - start
+elapsed = time.perf_counter() - start
 total += elapsed
 print('    Seconds: {:.2f}'.format(elapsed))
 print('    Saves per second: {:.1f}'.format(count / elapsed))
 
 print('  Getting {} documents from db {!r}...'.format(count, name))
-start = time.time()
+start = time.perf_counter()
 for _id in ids:
     db.get(_id)
-elapsed = time.time() - start
+elapsed = time.perf_counter() - start
 total += elapsed
 print('    Seconds: {:.2f}'.format(elapsed))
 print('    Gets per second: {:.1f}'.format(count / elapsed))
 
 print('  Deleting {} documents from db {!r}...'.format(count, name))
-start = time.time()
+start = time.perf_counter()
 for doc in docs:
     db.delete(doc['_id'], rev=doc['_rev'])
-elapsed = time.time() - start
+elapsed = time.perf_counter() - start
 total += elapsed
 print('    Seconds: {:.2f}'.format(elapsed))
 print('    Deletes per second: {:.1f}'.format(count / elapsed))
