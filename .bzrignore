@@ -1,2 +1,2 @@
-__pycache__
-doc/_build/*
+build/
+doc/_build/

@@ -1,3 +1,2 @@
 include COPYING COPYING.LESSER
-include test_microfiber.py
 include doc/*
