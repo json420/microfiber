@@ -1084,7 +1084,11 @@ class Database(CouchBase):
             ``Database.get('_design', design, '_view', view, **options)``
         """
         options.setdefault('reduce', False)
-        return self.get('_design', design, '_view', view, **options)
+        if 'keys' in options:
+            obj = {'keys': options.pop('keys')}
+            return self.post(obj, '_design', design, '_view', view, **options)
+        else:
+            return self.get('_design', design, '_view', view, **options)
 
     def tophash(self):
         """

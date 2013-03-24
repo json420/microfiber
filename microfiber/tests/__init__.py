@@ -1733,35 +1733,110 @@ class TestDatabase(TestCase):
 
     def test_view(self):
         class Mock(microfiber.Database):
-            def get(self, *parts, **options):
-                self._parts = parts
-                self._options = options
-                assert not hasattr(self, '_return')
+            def __init__(self):
+                self._call = None
+                self._return = None
+
+            def _set_call(self, call):
+                assert self._call is None
+                assert self._return is None
+                assert isinstance(call, tuple)
+                self._call = call
                 self._return = random_id()
                 return self._return
 
-        db = Mock('mydb')
-        self.assertEqual(db.view('foo', 'bar'), db._return)
-        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
-        self.assertEqual(db._options, {'reduce': False})
+            def get(self, *parts, **options):
+                return self._set_call(('get', parts, options))
 
-        db = Mock('mydb')
-        self.assertEqual(db.view('foo', 'bar', reduce=True), db._return)
-        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
-        self.assertEqual(db._options, {'reduce': True})
+            def post(self, obj, *parts, **options):
+                return self._set_call(('post', obj, parts, options))
 
-        db = Mock('mydb')
-        self.assertEqual(db.view('foo', 'bar', include_docs=True), db._return)
-        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
-        self.assertEqual(db._options, {'reduce': False, 'include_docs': True})
+        design = random_id(10)
+        view = random_id(10)
 
-        db = Mock('mydb')
+        db = Mock()
+        self.assertEqual(db.view(design, view), db._return)
+        self.assertEqual(db._call, (
+            'get',
+            ('_design', design, '_view', view),
+            {'reduce': False},
+        ))
+
+        db = Mock()
+        self.assertEqual(db.view(design, view, reduce=True), db._return)
+        self.assertEqual(db._call, (
+            'get',
+            ('_design', design, '_view', view),
+            {'reduce': True},
+        ))
+
+        db = Mock()
+        self.assertEqual(db.view(design, view, include_docs=True), db._return)
+        self.assertEqual(db._call, (
+            'get',
+            ('_design', design, '_view', view),
+            {'reduce': False, 'include_docs': True},
+        ))
+
+        db = Mock()
         self.assertEqual(
-            db.view('foo', 'bar', include_docs=True, reduce=True),
+            db.view(design, view, include_docs=True, reduce=True),
             db._return
         )
-        self.assertEqual(db._parts, ('_design', 'foo', '_view', 'bar'))
-        self.assertEqual(db._options, {'reduce': True, 'include_docs': True})
+        self.assertEqual(db._call, (
+            'get',
+            ('_design', design, '_view', view),
+            {'reduce': True, 'include_docs': True},
+        ))
+
+        # Now test with keys=[k1, k2]
+        k1 = random_id()
+        k2 = random_id()
+
+        db = Mock()
+        self.assertEqual(db.view(design, view, keys=[k1, k2]), db._return)
+        self.assertEqual(db._call, (
+            'post',
+            {'keys': [k1, k2]},
+            ('_design', design, '_view', view),
+            {'reduce': False},
+        ))
+
+        db = Mock()
+        self.assertEqual(
+            db.view(design, view, keys=[k1, k2], reduce=True),
+            db._return
+        )
+        self.assertEqual(db._call, (
+            'post',
+            {'keys': [k1, k2]},
+            ('_design', design, '_view', view),
+            {'reduce': True},
+        ))
+
+        db = Mock()
+        self.assertEqual(
+            db.view(design, view, keys=[k1, k2], include_docs=True),
+            db._return
+        )
+        self.assertEqual(db._call, (
+            'post',
+            {'keys': [k1, k2]},
+            ('_design', design, '_view', view),
+            {'reduce': False, 'include_docs': True},
+        ))
+
+        db = Mock()
+        self.assertEqual(
+            db.view(design, view, keys=[k1, k2], include_docs=True, reduce=True),
+            db._return
+        )
+        self.assertEqual(db._call, (
+            'post',
+            {'keys': [k1, k2]},
+            ('_design', design, '_view', view),
+            {'reduce': True, 'include_docs': True},
+        ))
 
 
 class LiveTestCase(TestCase):
