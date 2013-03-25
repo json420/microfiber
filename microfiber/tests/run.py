@@ -54,7 +54,6 @@ def run_tests():
     # Run the tests:
     runner = TextTestRunner(verbosity=2)
     result = runner.run(suite)
-    success =  result.wasSuccessful()
     print(
         'microfiber: {!r}'.format(path.abspath(microfiber.__file__)),
         file=sys.stderr
