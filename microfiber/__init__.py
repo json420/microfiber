@@ -58,6 +58,7 @@ from queue import Queue
 import math
 import platform
 from collections import namedtuple
+import logging
 
 from dbase32 import RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 from dbase32.rfc3548 import random_id
@@ -86,6 +87,7 @@ __all__ = (
 )
 
 __version__ = '13.04.0'
+log = logging.getLogger()
 USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__, 
     platform.dist()[0], platform.dist()[1], platform.machine()
 )
@@ -1156,3 +1158,17 @@ class Database(CouchBase):
             separators=(',', ': '),
         )
 
+    def update(self, doc, func, *args):
+        """
+        Update *doc* with *func*, then save, with one retry after a conflict.
+        """
+        func(doc, *args)
+        try:
+            self.save(doc)
+            return doc
+        except Conflict:
+            log.warning('Conflict saving %s', doc['_id'])
+        doc = self.get(doc['_id'])
+        func(doc, *args)
+        self.save(doc)
+        return doc
