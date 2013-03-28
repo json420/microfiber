@@ -1838,6 +1838,99 @@ class TestDatabase(TestCase):
             {'reduce': True, 'include_docs': True},
         ))
 
+    def test_update(self):
+        class DummyConflict(microfiber.Conflict):
+            def __init__(self):
+                pass
+
+        class DummyDatabase(microfiber.Database):
+            def __init__(self, doc, newrev):
+                self._calls = []
+                self._id = doc['_id']
+                self._rev = doc['_rev']
+                self._doc = deepcopy(doc)
+                self._newrev = newrev
+
+            def save(self, doc):
+                self._calls.append(('save', deepcopy(doc)))
+                if doc['_rev'] != self._rev:
+                    raise DummyConflict()
+                doc['_rev'] = self._newrev
+                return doc
+
+            def get(self, _id):
+                assert _id == self._id
+                self._calls.append(('get', _id))
+                return deepcopy(self._doc)
+
+            def _func(self, doc, key, value):
+                self._calls.append(('func', deepcopy(doc), key, value))
+                doc[key] = value
+
+        _id = random_id()
+        rev1 = random_id()
+        rev2 = random_id()
+        rev3 = random_id()
+        key = random_id()
+        value = random_id()
+        doc1 = {
+            '_id': _id,
+            '_rev': rev1,
+            'hello': 'world',
+        }
+        doc1a = {
+            '_id': _id,
+            '_rev': rev1,
+            'hello': 'world',
+            key: value,
+        }
+        doc2 = {
+            '_id': _id,
+            '_rev': rev2,
+            'stuff': 'junk',
+        }
+        doc2a = {
+            '_id': _id,
+            '_rev': rev2,
+            'stuff': 'junk',
+            key: value,
+        }
+
+        # Test when there is a mid-flight collision:
+        db = DummyDatabase(deepcopy(doc2), rev3)
+        self.assertEqual(
+            db.update(deepcopy(doc1), db._func, key, value),
+            {
+                '_id': _id,
+                '_rev': rev3,
+                'stuff': 'junk',
+                key: value,
+            }
+        )
+        self.assertEqual(db._calls, [
+            ('func', doc1, key, value),
+            ('save', doc1a),
+            ('get', _id),
+            ('func', doc2, key, value),
+            ('save', doc2a),
+        ])
+
+        # Test when there is no conflict:
+        db = DummyDatabase(deepcopy(doc1), rev3)
+        self.assertEqual(
+            db.update(deepcopy(doc1), db._func, key, value),
+            {
+                '_id': _id,
+                '_rev': rev3,
+                'hello': 'world',
+                key: value,
+            }
+        )
+        self.assertEqual(db._calls, [
+            ('func', doc1, key, value),
+            ('save', doc1a),
+        ])
+
 
 class LiveTestCase(TestCase):
     """
