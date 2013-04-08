@@ -60,8 +60,7 @@ import platform
 from collections import namedtuple
 import logging
 
-from dbase32 import RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
-from dbase32.rfc3548 import random_id
+from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 
 
 __all__ = (
