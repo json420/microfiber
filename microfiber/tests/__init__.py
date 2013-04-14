@@ -2867,6 +2867,13 @@ class TestDatabaseLive(CouchTestCase):
             [docs[17], None, docs[18]]
         )
 
+        # Test with null ids, needed by Dmedia.ResolveMany():
+        self.assertEqual(db.get_many([None, None, None]), [None, None, None])
+        self.assertEqual(
+            db.get_many([ids[0], None, ids[1]]),
+            [docs[0], None, docs[1]]
+        )
+
     def test_tophash(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
