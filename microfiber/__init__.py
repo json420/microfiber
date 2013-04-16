@@ -1180,20 +1180,21 @@ class Database(CouchBase):
         by *func()*, and with doc['_rev'] changed in-place by `Database.save()`.
 
         The calling code should be sure to keep a reference to the returned doc,
-        but in the case of a `Conflict`, it wont be the original ``dict``
+        because in the case of a `Conflict`, it wont be the original ``dict``
         instance that `Database.update()` was called with.
 
         In general, you'll want to use this pattern::
 
             doc = db.update(func, doc, 'foo', 'bar')
         """
+        _id = doc['_id']
         func(doc, *args)
         try:
             self.save(doc)
             return doc
         except Conflict:
-            log.warning('Conflict saving %s', doc['_id'])
-        doc = self.get(doc['_id'])
+            log.warning('Conflict saving %s', _id)
+        doc = self.get(_id)
         func(doc, *args)
         self.save(doc)
         return doc
