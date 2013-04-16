@@ -1157,9 +1157,35 @@ class Database(CouchBase):
             separators=(',', ': '),
         )
 
-    def update(self, doc, func, *args):
+    def update(self, func, doc, *args):
         """
-        Update *doc* with *func*, then save, with one retry after a conflict.
+        Use *func* to update *doc* and then save, with one conflict retry.
+
+        *func* is expected to apply an update to *doc* in-place.  It will be
+        called like this::
+
+            func(doc, *args)
+
+        Then `Database.save()` is used to try to save the doc.  If there is a
+        `Conflict`, the latest revision of doc is retrieved with `Database.get()`
+        and *func* is called again, this time to update the new doc in-place::
+
+            func(new, *args)
+
+        Then the new doc is saved to CouchDB with `Database.save()`, but this
+        time no special handling is done for a `Conflict`.  Only a single retry
+        is attempted.
+
+        The return value is the final doc, with the in-place updates performed
+        by *func()*, and with doc['_rev'] changed in-place by `Database.save()`.
+
+        The calling code should be sure to keep a reference to the returned doc,
+        but in the case of a `Conflict`, it wont be the original ``dict``
+        instance that `Database.update()` was called with.
+
+        In general, you'll want to use this pattern::
+
+            doc = db.update(func, doc, 'foo', 'bar')
         """
         func(doc, *args)
         try:

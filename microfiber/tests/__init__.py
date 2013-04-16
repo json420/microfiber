@@ -1899,7 +1899,7 @@ class TestDatabase(TestCase):
         # Test when there is a mid-flight collision:
         db = DummyDatabase(deepcopy(doc2), rev3)
         self.assertEqual(
-            db.update(deepcopy(doc1), db._func, key, value),
+            db.update(db._func, deepcopy(doc1), key, value),
             {
                 '_id': _id,
                 '_rev': rev3,
@@ -1918,7 +1918,7 @@ class TestDatabase(TestCase):
         # Test when there is no conflict:
         db = DummyDatabase(deepcopy(doc1), rev3)
         self.assertEqual(
-            db.update(deepcopy(doc1), db._func, key, value),
+            db.update(db._func, deepcopy(doc1), key, value),
             {
                 '_id': _id,
                 '_rev': rev3,
