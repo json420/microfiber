@@ -28,40 +28,58 @@
 import time
 import platform
 import json
-import optparse
-from subprocess import check_call
+from copy import deepcopy
+import os
 
 from usercouch.misc import TempCouch
 import microfiber
 
-name = 'test_benchmark_microfiber'
+name = 'dmedia-1'
 count = 2000
-keys = 50
-
-
-parser = optparse.OptionParser()
-parser.add_option('--oauth',
-    help='configure TempCouch with oauth',
-    action='store_true',
-    default=False,
-)
-(options, args) = parser.parse_args()
 
 
 tmpcouch = TempCouch()
-auth = ('oauth' if options.oauth else 'basic')
-env = tmpcouch.bootstrap(auth)
-print('\nenv = {!r}\n'.format(env))
-db = microfiber.Database(name, env)
+db = microfiber.Database(name, tmpcouch.bootstrap())
 db.put(None)
 time.sleep(3)  # Let CouchDB settle a moment
-check_call(['/bin/sync'])  # Flush any pending IO so test is more consistent
+os.sync()  # Flush any pending IO so test is more consistent
 
-master = dict(
-    ('a' * i, 'b' * i) for i in range(1, keys)
-)
-ids = tuple(microfiber.random_id() for i in range(count))
+
+master = {
+    "atime": 1355388946,
+    "bytes": 25272864,
+    "origin": "user",
+    "stored": {
+        "4MO6W5LTAFVH46EF35TEYPSF": {
+            "copies": 1,
+            "mtime": 1365931098,
+            "verified": 1366680068
+        },
+        "6E3VG6SKPTEQ7I8UKOYRAFHG": {
+            "copies": 1,
+            "mtime": 1366653493,
+            "verified": 1366943766
+        },
+        "MA6R4DFC6L7V5RC44JA4R4Q4": {
+            "copies": 1,
+            "mtime": 1365893318,
+            "verified": 1366945534
+        },
+        "T8XGJCRX8ST6SDLBPAKQ46IR": {
+            "copies": 1,
+            "mtime": 1366943766,
+            "verified": 1367029021
+        }
+    },
+    "time": 1355254766.513135,
+    "type": "dmedia/file"
+}
+ids = tuple(microfiber.random_id(30) for i in range(count))
 docs = []
+for _id in ids:
+    doc = deepcopy(master)
+    doc['_id'] = _id
+    docs.append(doc)
 total = 0
 
 print('*** Benchmarking microfiber ***')
@@ -71,11 +89,8 @@ print('Python: {}, {}, {}'.format(
 
 print('  Saving {} documents in db {!r}...'.format(count, name))
 start = time.perf_counter()
-for _id in ids:
-    doc = dict(master)
-    doc['_id'] = _id
+for doc in docs:
     db.save(doc)
-    docs.append(doc)
 elapsed = time.perf_counter() - start
 total += elapsed
 print('    Seconds: {:.2f}'.format(elapsed))
