@@ -298,10 +298,13 @@ def encode_attachment(attachment):
 
     :param attachment: an `Attachment` namedtuple
     """
-    assert isinstance(attachment, Attachment)    
+    assert isinstance(attachment, tuple)
+    assert len(attachment) == 2
+    (content_type, data) = attachment
+    assert isinstance(content_type, str)
     return {
-        'content_type': attachment.content_type,
-        'data': b64encode(attachment.data).decode('utf-8'),        
+        'content_type': content_type,
+        'data': b64encode(data).decode('utf-8'),        
     }
 
 

@@ -254,6 +254,14 @@ class TestFunctions(TestCase):
                 'data': b64encode(data).decode('utf-8'),
             }
         )
+        att = ('image/jpeg', data)
+        self.assertEqual(
+            microfiber.encode_attachment(att),
+            {
+                'content_type': 'image/jpeg',
+                'data': b64encode(data).decode('utf-8'),
+            }
+        )
 
     def test_has_attachment(self):
         self.assertIs(microfiber.has_attachment({}, 'thumb'), False)
