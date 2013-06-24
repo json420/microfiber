@@ -1,0 +1,7 @@
+Good docs on CouchDB replication protocol:
+
+https://github.com/refuge/rcouch/wiki/Replication-Algorithm
+
+https://github.com/couchbase/couchbase-lite-ios/wiki/Replication-Algorithm
+
+http://www.dataprotocols.org/en/latest/couchdb_replication.html
