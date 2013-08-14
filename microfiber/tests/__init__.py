@@ -2272,7 +2272,12 @@ class TestCouchBaseLive(CouchTestCase):
         self.assertRaises(MethodNotAllowed, inst.delete)
         ret = inst.get()
         self.assertIsInstance(ret, dict)
-        self.assertEqual(set(ret), set(['couchdb', 'version']))
+        self.assertTrue(
+            set(ret).issuperset(['couchdb', 'version'])
+        )
+        self.assertTrue(
+            set(ret).issubset(['couchdb', 'version', 'uuid', 'vendor'])
+        )
         self.assertEqual(ret['couchdb'], 'Welcome')
         self.assertIsInstance(ret['version'], str)
 
