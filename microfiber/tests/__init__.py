@@ -2902,6 +2902,28 @@ class TestDatabaseLive(CouchTestCase):
             [docs[0], None, docs[1]]
         )
 
+    def test_get_defaults(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertTrue(db.ensure())
+        self.assertEqual(db.get_defaults([]), [])
+        id1 = random_id()
+        id2 = random_id()
+        id3 = random_id()
+        d1 = {'_id': id1}
+        d2 = {'_id': id2}
+        d3 = {'_id': id3}
+        defaults = [d1, d2, d3]
+        self.assertEqual(db.get_defaults(defaults), [d1, d2, d3])
+        s3 = {'_id': id3, 'marker': random_id()}
+        db.save(s3)
+        self.assertEqual(db.get_defaults(defaults), [d1, d2, s3])
+        s1 = {'_id': id1, 'marker': random_id()}
+        db.save(s1)
+        self.assertEqual(db.get_defaults(defaults), [s1, d2, s3])
+        s2 = {'_id': id2, 'marker': random_id()}
+        db.save(s2)
+        self.assertEqual(db.get_defaults(defaults), [s1, s2, s3])
+
     def test_dump(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())

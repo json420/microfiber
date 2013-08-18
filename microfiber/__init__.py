@@ -1074,6 +1074,17 @@ class Database(CouchBase):
         result = self.post({'keys': doc_ids}, '_all_docs', include_docs=True)
         return [row.get('doc') for row in result['rows']]
 
+    def get_defaults(self, defaults):
+        """
+        Experiemental, not part of stable API yet!
+        """
+        assert isinstance(defaults, list)
+        docs = self.get_many([d['_id'] for d in defaults])
+        return [
+            default if doc is None else doc
+            for (default, doc) in zip(defaults, docs)
+        ]
+
     def view(self, design, view, **options):
         """
         Shortcut for making a GET request to a view.
