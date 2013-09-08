@@ -702,7 +702,7 @@ class CouchBase(object):
                 conn.request(method, path, body, headers)
                 response = conn.getresponse()
                 break
-            except BadStatusLine as e:
+            except (ConnectionError, BadStatusLine) as e:
                 conn.close()
                 if retry == 1:
                     raise e
