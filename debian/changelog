@@ -1,5 +1,5 @@
-microfiber (13.10.0-0~saucy) saucy; urgency=low
+microfiber (13.11.0-0~trusty) trusty; urgency=low
 
   * Upstream pre-release
 
- -- Jason Gerard DeRose <jderose@novacut.com>  Fri, 24 May 2013 16:18:38 +0000
+ -- Jason Gerard DeRose <jderose@novacut.com>  Sun, 27 Oct 2013 15:34:36 -0600
