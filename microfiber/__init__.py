@@ -985,6 +985,49 @@ class Database(CouchBase):
         except PreconditionFailed:
             return False
 
+    def iter_all_docs(self, chunksize=50):
+        """
+        Iterate through all docs in the database without duplicates.
+
+        Experiemental, not part of the stable API yet!
+        """
+        assert isinstance(chunksize, int)
+        assert chunksize >= 10
+        kw = {
+            'limit': chunksize,
+            'include_docs': True,
+        }
+        while True:
+            rows = self.get('_all_docs', **kw)['rows']
+            if not rows:
+                break
+            if rows[0]['id'] != kw.get('startkey_docid'):
+                yield rows[0]['doc']
+            for row in rows[1:]:
+                yield row['doc']
+            if len(rows) < chunksize:
+                break
+            kw['startkey_docid'] = rows[-1]['id']
+
+    def _bad_iter_all_docs(self, chunksize=50):
+        """
+        Just here to verify our assumptions about "skip".
+        """
+        assert isinstance(chunksize, int)
+        assert chunksize >= 10
+        kw = {
+            'limit': chunksize,
+            'include_docs': True,
+            'skip': 0,
+        }
+        while True:
+            rows = self.get('_all_docs', **kw)['rows']
+            if not rows:
+                break
+            for row in rows:
+                yield row['doc']
+            kw['skip'] += len(rows)
+
     def save(self, doc):
         """
         POST doc to CouchDB, update doc _rev in place.
