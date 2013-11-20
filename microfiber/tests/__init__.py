@@ -2847,6 +2847,45 @@ class TestDatabaseLive(CouchTestCase):
                 self.assertEqual(row['rev'], doc['_rev'])
                 self.assertEqual(real, doc)
 
+    def test_delete_many(self):
+        db = microfiber.Database('mydb', self.env)
+        self.assertTrue(db.ensure())
+
+        # Test when empty:
+        self.assertEqual(db.delete_many([]), [])
+        self.assertEqual(db.get('_all_docs'),
+            {'total_rows': 0, 'offset': 0, 'rows': []}
+        )
+
+        # Test when populated:
+        docs = [{'_id': test_id()} for i in range(17)]
+        db.save_many(docs)
+        self.assertEqual(db.delete_many([]), [])
+        self.assertEqual(db.get('_all_docs'),
+            {
+                'total_rows': 17,
+                'offset': 0,
+                'rows': [
+                    {'key': doc['_id'], 'id': doc['_id'], 'value': {'rev': doc['_rev']}}
+                    for doc in sorted(docs, key=lambda d: d['_id'])
+                ],
+            }
+        )
+
+        # After delete:
+        ids = [doc['_id'] for doc in docs]
+        result = db.delete_many(docs)
+        self.assertIsInstance(result, list)
+        self.assertEqual(len(result), 17)
+        for (_id, row) in zip(ids, result):
+            self.assertEqual(set(row), {'ok', 'id', 'rev'})
+            self.assertIs(row['ok'], True)
+            self.assertEqual(row['id'], _id)
+            self.assertEqual(row['rev'][:2], '2-')
+        self.assertEqual(db.get('_all_docs'),
+            {'total_rows': 0, 'offset': 0, 'rows': []}
+        )
+
     def test_bulksave(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())

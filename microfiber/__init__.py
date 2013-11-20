@@ -1089,6 +1089,17 @@ class Database(CouchBase):
             raise BulkConflict(conflicts, rows)
         return rows
 
+    def delete_many(self, docs):
+        """
+        Deleted a list of docs.
+
+        Experimental, not part of the stable API yet!
+        """
+        for doc in docs:
+            doc['_deleted'] = True
+            assert '_id' in doc
+        return self.save_many(docs)
+
     def bulksave(self, docs):
         """
         Bulk-save using all-or-nothing semantics, updates all _rev in-place.
