@@ -3015,22 +3015,34 @@ class TestDatabaseLive(CouchTestCase):
         db.post(deepcopy(doc_design))
         self.assertEqual(list(db.iter_view('doc', 'type', 'foo')), [])
 
-        # Populated DB:
+        # Populated DB (note default chunksize is 50):
         docs1 = [
-            {'_id': random_id(), 'type': 'foo'} for i in range(50)
+            {'_id': random_id(), 'type': 'foo'} for i in range(49)
         ]
         docs2 = [
-            {'_id': random_id(), 'type': 'bar'} for i in range(51)
+            {'_id': random_id(), 'type': 'bar'} for i in range(50)
         ]
         docs3 = [
-            {'_id': random_id(), 'type': 'baz'} for i in range(117)
+            {'_id': random_id(), 'type': 'baz'} for i in range(51)
         ]
-        for docs in (docs1, docs2, docs3):
+        docs4 = [
+            {'_id': random_id(), 'type': 'hello'} for i in range(117)
+        ]
+        for docs in (docs1, docs2, docs3, docs4):
             db.save_many(docs)
             docs.sort(key=lambda d: d['_id'])
         self.assertEqual(list(db.iter_view('doc', 'type', 'foo')), docs1)
         self.assertEqual(list(db.iter_view('doc', 'type', 'bar')), docs2)
         self.assertEqual(list(db.iter_view('doc', 'type', 'baz')), docs3)
+        self.assertEqual(list(db.iter_view('doc', 'type', 'hello')), docs4)
+        self.assertEqual(
+            list(db.iter_view('doc', 'type', 'hello', chunksize=17)),
+            docs4
+        )
+        self.assertEqual(
+            list(db.iter_view('doc', 'type', 'hello', chunksize=200)),
+            docs4
+        )
 
     def test_dump(self):
         db = microfiber.Database('foo', self.env)

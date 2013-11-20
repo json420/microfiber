@@ -989,7 +989,7 @@ class Database(CouchBase):
         """
         Iterate through all docs in the database without duplicates.
 
-        Experiemental, not part of the stable API yet!
+        Experimental, not part of the stable API yet!
         """
         assert isinstance(chunksize, int)
         assert chunksize >= 10
@@ -1149,6 +1149,13 @@ class Database(CouchBase):
             return self.get('_design', design, '_view', view, **options)
 
     def iter_view(self, design, view, key, chunksize=50):
+        """
+        Iterate through all docs in a view for a specific key.
+
+        The docs with be yielded in sorted order by ``doc['_id']``.
+
+        Experimental, not part of the stable API yet!
+        """
         assert isinstance(chunksize, int) and chunksize >= 10
         kw = {
             'key': key,
