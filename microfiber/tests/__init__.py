@@ -2536,43 +2536,6 @@ class TestDatabaseLive(CouchTestCase):
         # And the DB should be empty again:
         self.assertEqual(list(db.iter_all_docs()), [])
 
-        ###################################################################
-        # Now do basically everything again, just to verify our assumptions
-        # about how "skip" works using Database._bad_iter_all_docs():
-        db = microfiber.Database('bar', self.env)
-        self.assertTrue(db.ensure())
-
-        # Test when DB is empty:
-        self.assertEqual(list(db._bad_iter_all_docs()), [])
-
-        # Start with 1 less than chunksize number of docs:
-        docs = [{'_id': random_id()} for i in range(49)]
-        db.save_many(docs)
-        docs.sort(key=lambda d: d['_id'])
-        self.assertEqual(list(db._bad_iter_all_docs()), docs)
-
-        # Add 101 docs one by one:
-        for i in range(101):
-            new = {'_id': random_id()}
-            db.save(new)
-            docs.append(new)
-            docs.sort(key=lambda d: d['_id'])
-            self.assertEqual(list(db._bad_iter_all_docs()), docs)
-        self.assertEqual(len(docs), 150)
-
-        # Delete docs as they're yielded:
-        ids = [d['_id'] for d in docs]
-        got = []
-        for doc in db._bad_iter_all_docs():
-            got.append(doc['_id'])
-            doc['_deleted'] = True
-            db.save(doc)
-        self.assertEqual(len(got), 100)
-        self.assertEqual(got, ids[0:50] + ids[100:150])
-
-        # Nope, the DB wont be empty this time!
-        self.assertEqual(list(db._bad_iter_all_docs()), docs[50:100])
-
     def test_save(self):
         inst = microfiber.Database('foo', self.env)
 

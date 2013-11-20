@@ -1009,25 +1009,6 @@ class Database(CouchBase):
                 break
             kw['startkey_docid'] = rows[-1]['id']
 
-    def _bad_iter_all_docs(self, chunksize=50):
-        """
-        Just here to verify our assumptions about "skip".
-        """
-        assert isinstance(chunksize, int)
-        assert chunksize >= 10
-        kw = {
-            'limit': chunksize,
-            'include_docs': True,
-            'skip': 0,
-        }
-        while True:
-            rows = self.get('_all_docs', **kw)['rows']
-            if not rows:
-                break
-            for row in rows:
-                yield row['doc']
-            kw['skip'] += len(rows)
-
     def save(self, doc):
         """
         POST doc to CouchDB, update doc _rev in place.
