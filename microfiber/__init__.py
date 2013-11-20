@@ -962,7 +962,7 @@ class Database(CouchBase):
         Create a `Server` with the same `Context` as this `Database`.
         """
         return Server(ctx=self.ctx)
- 
+
     def database(self, name):
         """
         Create a `Database` with the same `Context` as this `Database`.
@@ -1147,6 +1147,25 @@ class Database(CouchBase):
             return self.post(obj, '_design', design, '_view', view, **options)
         else:
             return self.get('_design', design, '_view', view, **options)
+
+    def iter_view(self, design, view, key, chunksize=50):
+        assert isinstance(chunksize, int) and chunksize >= 10
+        kw = {
+            'key': key,
+            'limit': chunksize,
+            'include_docs': True,
+        }
+        while True:
+            rows = self.view(design, view, **kw)['rows']
+            if not rows:
+                break
+            if rows[0]['id'] != kw.get('startkey_docid'):
+                yield rows[0]['doc']
+            for row in rows[1:]:
+                yield row['doc']
+            if len(rows) < chunksize:
+                break
+            kw['startkey_docid'] = rows[-1]['id']
 
     def dump(self, filename):
         """

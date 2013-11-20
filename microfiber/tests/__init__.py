@@ -3003,6 +3003,35 @@ class TestDatabaseLive(CouchTestCase):
         db.save(s2)
         self.assertEqual(db.get_defaults(defaults), [s1, s2, s3])
 
+    def test_iter_view(self):
+        db = microfiber.Database('mydb', self.env)
+        self.assertTrue(db.ensure())
+
+        # Design doc missing:
+        with self.assertRaises(NotFound) as cm:
+            list(db.iter_view('doc', 'type', 'foo'))
+
+        # Empty DB:
+        db.post(deepcopy(doc_design))
+        self.assertEqual(list(db.iter_view('doc', 'type', 'foo')), [])
+
+        # Populated DB:
+        docs1 = [
+            {'_id': random_id(), 'type': 'foo'} for i in range(50)
+        ]
+        docs2 = [
+            {'_id': random_id(), 'type': 'bar'} for i in range(51)
+        ]
+        docs3 = [
+            {'_id': random_id(), 'type': 'baz'} for i in range(117)
+        ]
+        for docs in (docs1, docs2, docs3):
+            db.save_many(docs)
+            docs.sort(key=lambda d: d['_id'])
+        self.assertEqual(list(db.iter_view('doc', 'type', 'foo')), docs1)
+        self.assertEqual(list(db.iter_view('doc', 'type', 'bar')), docs2)
+        self.assertEqual(list(db.iter_view('doc', 'type', 'baz')), docs3)
+
     def test_dump(self):
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
