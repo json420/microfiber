@@ -5,15 +5,15 @@ Maintainer: Jason Gerard DeRose <jderose@novacut.com>
 Build-Depends: debhelper (>= 9),
     python3-all (>= 3.3),
     python3-sphinx,
-    python3-usercouch (>= 13.08),
-    python3-dbase32 (>= 0.7),
+    python3-usercouch (>= 13.11),
+    python3-dbase32 (>= 0.9),
 Standards-Version: 3.9.4
 X-Python3-Version: >= 3.3
 Homepage: https://launchpad.net/microfiber
 
 Package: python3-microfiber
 Architecture: all
-Depends: ${python3:Depends}, ${misc:Depends}, python3-dbase32 (>= 0.7)
+Depends: ${python3:Depends}, ${misc:Depends}, python3-dbase32 (>= 0.9)
 Suggests: python3-usercouch, python3-microfiber-doc
 Description: fabric for a lightweight Couch
  Microfiber is an abstract adapter for making HTTP requests to an arbitrary JSON
