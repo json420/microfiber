@@ -985,7 +985,7 @@ class Database(CouchBase):
         except PreconditionFailed:
             return False
 
-    def iter_all_docs(self, chunksize=50):
+    def iter_all_docs(self, chunksize=53):
         """
         Iterate through all docs in the database without duplicates.
 
@@ -1140,7 +1140,7 @@ class Database(CouchBase):
         else:
             return self.get('_design', design, '_view', view, **options)
 
-    def iter_view(self, design, view, key, chunksize=50):
+    def iter_view(self, design, view, key, chunksize=53):
         """
         Iterate through all docs in a view for a specific key.
 
