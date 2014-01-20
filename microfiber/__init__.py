@@ -389,7 +389,7 @@ def _oauth_header(oauth, method, baseurl, query, testing=None):
     value = ', '.join(
         '{}="{}"'.format(k, o[k]) for k in sorted(o)
     )
-    return {'Authorization': value}
+    return {'authorization': value}
 
 
 def basic_auth_header(basic):
@@ -398,7 +398,7 @@ def basic_auth_header(basic):
 
 
 def _basic_auth_header(basic):
-    return {'Authorization': basic_auth_header(basic)}
+    return {'authorization': basic_auth_header(basic)}
 
 
 REPLICATION_KW = frozenset([
@@ -695,7 +695,6 @@ class CouchBase(object):
 
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
-        headers = dict((k.casefold(), v) for (k, v) in headers.items())
         for retry in range(2):
             try:
                 response = conn.request(method, path, headers, body)
@@ -710,7 +709,7 @@ class CouchBase(object):
         return response
 
     def request(self, method, parts, options, body=None, headers=None):
-        h = {'User-Agent': USER_AGENT}
+        h = {'user-agent': USER_AGENT}
         if headers:
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
@@ -729,7 +728,7 @@ class CouchBase(object):
     def recv_json(self, method, parts, options, body=None, headers=None):
         if headers is None:
             headers = {}
-        headers['Accept'] = 'application/json'
+        headers['accept'] = 'application/json'
         response = self.request(method, parts, options, body, headers)
         data = (b'' if response.body is None else response.body.read())
         return json.loads(data.decode('utf-8'))
@@ -751,7 +750,7 @@ class CouchBase(object):
 
         """
         return self.recv_json('POST', parts, options, _json_body(obj),
-            {'Content-Type': 'application/json'}
+            {'content-type': 'application/json'}
         )
 
     def put(self, obj, *parts, **options):
@@ -771,7 +770,7 @@ class CouchBase(object):
 
         """
         return self.recv_json('PUT', parts, options, _json_body(obj),
-            {'Content-Type': 'application/json'}
+            {'content-type': 'application/json'}
         )
 
     def get(self, *parts, **options):
@@ -841,7 +840,7 @@ class CouchBase(object):
         :param options: optional keyword arguments to include in query
         """
         return self.recv_json('PUT', parts, options, data,
-            {'Content-Type': mime}
+            {'content-type': mime}
         )
 
     def put_att2(self, attachment, *parts, **options):
@@ -852,7 +851,7 @@ class CouchBase(object):
         removed!
         """
         return self.recv_json('PUT', parts, options, attachment.data,
-            {'Content-Type': attachment.content_type}
+            {'content-type': attachment.content_type}
         )
 
     def get_att(self, *parts, **options):

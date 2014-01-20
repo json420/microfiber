@@ -387,7 +387,7 @@ class TestFunctions(TestCase):
         testing = ('1191242096', 'kllo9940pd9333jh')
         self.assertEqual(
             microfiber._oauth_header(tokens, method, baseurl, query, testing),
-            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+            {'authorization': SAMPLE_OAUTH_AUTHORIZATION},
         )
 
     def test_basic_auth_header(self):
@@ -395,7 +395,7 @@ class TestFunctions(TestCase):
         basic = {'username': 'Aladdin', 'password': 'open sesame'}
         self.assertEqual(
             f(basic),
-            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+            {'authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
         )
 
     def test_build_ssl_context(self):
@@ -1532,7 +1532,7 @@ class TestContext(TestCase):
         ctx = microfiber.Context(env)
         self.assertEqual(
             ctx.get_auth_headers(method, path, query, testing),
-            {'Authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
+            {'authorization': 'Basic QWxhZGRpbjpvcGVuIHNlc2FtZQ=='}
         )
 
         # Test with oauth:
@@ -1543,7 +1543,7 @@ class TestContext(TestCase):
         ctx = microfiber.Context(env)
         self.assertEqual(
             ctx.get_auth_headers(method, path, query, testing),
-            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+            {'authorization': SAMPLE_OAUTH_AUTHORIZATION},
         )
 
         # Make sure oauth overrides basic
@@ -1555,7 +1555,7 @@ class TestContext(TestCase):
         ctx = microfiber.Context(env)
         self.assertEqual(
             ctx.get_auth_headers(method, path, query, testing),
-            {'Authorization': SAMPLE_OAUTH_AUTHORIZATION},
+            {'authorization': SAMPLE_OAUTH_AUTHORIZATION},
         )
 
 
