@@ -51,7 +51,6 @@ import time
 from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
-from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 import ssl
 import threading
 from queue import Queue
@@ -61,6 +60,7 @@ from collections import namedtuple
 import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
+from degu.client import Client, SSLClient
 
 
 __all__ = (
@@ -626,19 +626,17 @@ class Context:
         if t.scheme == 'https':
             ssl_config = self.env.get('ssl', {})
             self.ssl_ctx = build_ssl_context(ssl_config)
-            self.check_hostname = ssl_config.get('check_hostname')
+            self.check_hostname = ssl_config.get('check_hostname', True)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
 
     def get_connection(self):
+        (hostname, port) = (self.t.hostname, self.t.port)
         if self.t.scheme == 'http':
-            return HTTPConnection(self.t.netloc)
+            return Client(hostname, port)
         else:
-            return HTTPSConnection(self.t.netloc,
-                context=self.ssl_ctx,
-                check_hostname=self.check_hostname
-            )
+            return SSLClient(hostname, port, self.ssl_ctx, self.check_hostname)
 
     def get_threadlocal_connection(self):
         if not hasattr(self.threadlocal, 'connection'):
