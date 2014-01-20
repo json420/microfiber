@@ -636,7 +636,7 @@ class Context:
         if self.t.scheme == 'http':
             return Client(hostname, port)
         else:
-            return SSLClient(hostname, port, self.ssl_ctx, self.check_hostname)
+            return SSLClient(self.ssl_ctx, hostname, port, self.check_hostname)
 
     def get_threadlocal_connection(self):
         if not hasattr(self.threadlocal, 'connection'):
