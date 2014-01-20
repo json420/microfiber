@@ -128,7 +128,7 @@ class HTTPError(Exception):
 
     def __init__(self, response, method, url):
         self.response = response
-        self.data = response.read()
+        self.data = (b'' if response.body is None else response.body.read())
         self.method = method
         self.url = url
         super().__init__()
@@ -695,12 +695,12 @@ class CouchBase(object):
 
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
+        headers = dict((k.casefold(), v) for (k, v) in headers.items())
         for retry in range(2):
             try:
-                conn.request(method, path, body, headers)
-                response = conn.getresponse()
+                response = conn.request(method, path, headers, body)
                 break
-            except (ConnectionError, BadStatusLine) as e:
+            except ConnectionError as e:
                 conn.close()
                 if retry == 1:
                     raise e
@@ -731,7 +731,7 @@ class CouchBase(object):
             headers = {}
         headers['Accept'] = 'application/json'
         response = self.request(method, parts, options, body, headers)
-        data = response.read()
+        data = (b'' if response.body is None else response.body.read())
         return json.loads(data.decode('utf-8'))
 
     def post(self, obj, *parts, **options):
@@ -818,7 +818,7 @@ class CouchBase(object):
         request.
         """
         response = self.request('HEAD', parts, options)
-        return dict(response.getheaders())
+        return response.headers
 
     def put_att(self, mime, data, *parts, **options):
         """
@@ -874,8 +874,8 @@ class CouchBase(object):
         :param options: optional keyword arguments to include in query
         """
         response = self.request('GET', parts, options)
-        content_type = response.getheader('Content-Type')
-        data = response.read()
+        content_type = response.headers['content-type']
+        data = (b'' if response.body is None else response.body.read())
         return Attachment(content_type, data)
 
 
