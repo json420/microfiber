@@ -676,18 +676,14 @@ class CouchBase(object):
 
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
-        for retry in range(2):
-            try:
-                response = conn.request(method, path, headers, body)
-                break
-            except (ConnectionError, EmptyLineError) as e:
-                conn.close()
-                if retry == 1:
-                    raise e
-            except Exception as e:
-                conn.close()
-                raise e
-        return response
+        # We automatically retry in 
+        try:
+            return conn.request(method, path, headers, body)
+        except (OSError, EmptyLineError):
+            pass
+        # degu.client.Client.request() will close its connection when there is
+        # an exception:
+        return conn.request(method, path, headers, body)
 
     def request(self, method, parts, options, body=None, headers=None):
         h = {'user-agent': USER_AGENT}
