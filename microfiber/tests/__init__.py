@@ -47,7 +47,7 @@ from random import SystemRandom
 
 from usercouch.misc import TempCouch, TempPKI
 from dbase32 import db32dec, isdb32, random_id
-from degu.client import Client, SSLClient
+from degu.client import Client, SSLClient, Response
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -131,10 +131,8 @@ def random_basic():
     )
 
 
-class FakeResponse:
-    def __init__(self, status, reason, data):
-        self.status = status
-        self.reason = reason
+class FakeBody:
+    def __init__(self, data):
         self.__data = data
 
     def read(self):
@@ -409,7 +407,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
-        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide ca_file
         config = {
@@ -419,7 +417,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
-        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide cert_file and key_file (uses openssl default ca_path)
         config = {
@@ -430,7 +428,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
-        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide all three
         config = {
@@ -442,7 +440,7 @@ class TestFunctions(TestCase):
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
-        self.assertEqual(ctx.options, ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide junk ca_file, make sure ca_file is actually being used
         config = {
@@ -1048,12 +1046,24 @@ class TestErrors(TestCase):
             self.assertTrue(klass.__doc__.startswith('{} '.format(status)))
             reason = random_id(10)
             data = os.urandom(20)
-            r = FakeResponse(status, reason, data)
+            # With a body:
+            r = Response(status, reason, {}, FakeBody(data))
             inst = klass(r, method, url)
             self.assertIs(inst.response, r)
             self.assertEqual(inst.method, method)
             self.assertEqual(inst.url, url)
             self.assertEqual(inst.data, data)
+            self.assertEqual(
+                str(inst),
+                '{} {}: {} {}'.format(status, reason, method, url)
+            )
+            # Body is None:
+            r = Response(status, reason, {}, None)
+            inst = klass(r, method, url)
+            self.assertIs(inst.response, r)
+            self.assertEqual(inst.method, method)
+            self.assertEqual(inst.url, url)
+            self.assertEqual(inst.data, b'')
             self.assertEqual(
                 str(inst),
                 '{} {}: {} {}'.format(status, reason, method, url)
@@ -1411,7 +1421,7 @@ class TestContext(TestCase):
         self.assertIsInstance(conn, SSLClient)
         self.assertEqual(conn.hostname, '127.0.0.1')
         self.assertEqual(conn.port, 6984)
-        self.assertIs(conn.ssl_ctx, ctx.ssl_ctx)
+        self.assertIs(conn.sslctx, ctx.ssl_ctx)
         self.assertIs(conn.check_hostname, True)
 
         ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
@@ -1420,7 +1430,7 @@ class TestContext(TestCase):
         self.assertIsInstance(conn, SSLClient)
         self.assertEqual(conn.hostname, '::1')
         self.assertEqual(conn.port, 6984)
-        self.assertIs(conn.ssl_ctx, ctx.ssl_ctx)
+        self.assertIs(conn.sslctx, ctx.ssl_ctx)
         self.assertIs(conn.check_hostname, True)
 
         env = {
@@ -1433,7 +1443,7 @@ class TestContext(TestCase):
         self.assertIsInstance(conn, SSLClient)
         self.assertEqual(conn.hostname, '127.0.0.1')
         self.assertEqual(conn.port, 6984)
-        self.assertIs(conn.ssl_ctx, ctx.ssl_ctx)
+        self.assertIs(conn.sslctx, ctx.ssl_ctx)
         self.assertIs(conn.check_hostname, False)
 
         env = {
@@ -1446,7 +1456,7 @@ class TestContext(TestCase):
         self.assertIsInstance(conn, SSLClient)
         self.assertEqual(conn.hostname, '::1')
         self.assertEqual(conn.port, 6984)
-        self.assertIs(conn.ssl_ctx, ctx.ssl_ctx)
+        self.assertIs(conn.sslctx, ctx.ssl_ctx)
         self.assertIs(conn.check_hostname, False)
 
     def test_get_threadlocal_connection(self):
@@ -1503,7 +1513,7 @@ class TestContext(TestCase):
         self.assertIsInstance(conn, SSLClient)
         self.assertEqual(conn.hostname, '::1')
         self.assertEqual(conn.port, 6984)
-        self.assertIs(conn.ssl_ctx, ctx.ssl_ctx)
+        self.assertIs(conn.sslctx, ctx.ssl_ctx)
         self.assertIs(conn.check_hostname, True)
         self.assertIs(ctx.get_threadlocal_connection(), conn)
         self.assertIs(conn, ctx.threadlocal.connection)

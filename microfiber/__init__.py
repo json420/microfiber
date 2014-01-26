@@ -60,7 +60,8 @@ from collections import namedtuple
 import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
-from degu.client import Client, SSLClient
+from degu.client import Client, SSLClient, build_client_sslctx
+from degu.base import EmptyLineError
 
 
 __all__ = (
@@ -538,29 +539,9 @@ def build_ssl_context(config):
         assert isinstance(ctx, ssl.SSLContext)
         assert ctx.protocol == ssl.PROTOCOL_TLSv1
         assert ctx.verify_mode == ssl.CERT_REQUIRED
-        assert ctx.options == (ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        assert ctx.options & ssl.OP_NO_COMPRESSION
         return ctx
-
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-    ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.options |= ssl.OP_NO_COMPRESSION  # Protect against CRIME-like attacks
-
-    # Configure certificate authorities used to verify server certs
-    if 'ca_file' in config or 'ca_path' in config:
-        ctx.load_verify_locations(
-            cafile=config.get('ca_file'),
-            capath=config.get('ca_path'),
-        )
-    else:
-        ctx.set_default_verify_paths()
-
-    # Configure client certificate, if provided
-    if 'cert_file' in config:
-        ctx.load_cert_chain(config['cert_file'],
-            keyfile=config.get('key_file')
-        )
-
-    return ctx
+    return build_client_sslctx(config)
 
 
 class Context:
@@ -699,7 +680,7 @@ class CouchBase(object):
             try:
                 response = conn.request(method, path, headers, body)
                 break
-            except ConnectionError as e:
+            except (ConnectionError, EmptyLineError) as e:
                 conn.close()
                 if retry == 1:
                     raise e
