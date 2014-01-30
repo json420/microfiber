@@ -51,7 +51,6 @@ import time
 from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
-from http.client import HTTPConnection, HTTPSConnection, BadStatusLine
 import ssl
 import threading
 from queue import Queue
@@ -61,6 +60,8 @@ from collections import namedtuple
 import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
+from degu.client import Client, SSLClient, build_client_sslctx
+from degu.base import EmptyLineError
 
 
 __all__ = (
@@ -128,7 +129,7 @@ class HTTPError(Exception):
 
     def __init__(self, response, method, url):
         self.response = response
-        self.data = response.read()
+        self.data = (b'' if response.body is None else response.body.read())
         self.method = method
         self.url = url
         super().__init__()
@@ -389,7 +390,7 @@ def _oauth_header(oauth, method, baseurl, query, testing=None):
     value = ', '.join(
         '{}="{}"'.format(k, o[k]) for k in sorted(o)
     )
-    return {'Authorization': value}
+    return {'authorization': value}
 
 
 def basic_auth_header(basic):
@@ -398,7 +399,7 @@ def basic_auth_header(basic):
 
 
 def _basic_auth_header(basic):
-    return {'Authorization': basic_auth_header(basic)}
+    return {'authorization': basic_auth_header(basic)}
 
 
 REPLICATION_KW = frozenset([
@@ -538,29 +539,9 @@ def build_ssl_context(config):
         assert isinstance(ctx, ssl.SSLContext)
         assert ctx.protocol == ssl.PROTOCOL_TLSv1
         assert ctx.verify_mode == ssl.CERT_REQUIRED
-        assert ctx.options == (ssl.OP_ALL | ssl.OP_NO_COMPRESSION)
+        assert ctx.options & ssl.OP_NO_COMPRESSION
         return ctx
-
-    ctx = ssl.SSLContext(ssl.PROTOCOL_TLSv1)
-    ctx.verify_mode = ssl.CERT_REQUIRED
-    ctx.options |= ssl.OP_NO_COMPRESSION  # Protect against CRIME-like attacks
-
-    # Configure certificate authorities used to verify server certs
-    if 'ca_file' in config or 'ca_path' in config:
-        ctx.load_verify_locations(
-            cafile=config.get('ca_file'),
-            capath=config.get('ca_path'),
-        )
-    else:
-        ctx.set_default_verify_paths()
-
-    # Configure client certificate, if provided
-    if 'cert_file' in config:
-        ctx.load_cert_chain(config['cert_file'],
-            keyfile=config.get('key_file')
-        )
-
-    return ctx
+    return build_client_sslctx(config)
 
 
 class Context:
@@ -626,19 +607,17 @@ class Context:
         if t.scheme == 'https':
             ssl_config = self.env.get('ssl', {})
             self.ssl_ctx = build_ssl_context(ssl_config)
-            self.check_hostname = ssl_config.get('check_hostname')
+            self.check_hostname = ssl_config.get('check_hostname', True)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
 
     def get_connection(self):
+        (hostname, port) = (self.t.hostname, self.t.port)
         if self.t.scheme == 'http':
-            return HTTPConnection(self.t.netloc)
+            return Client(hostname, port)
         else:
-            return HTTPSConnection(self.t.netloc,
-                context=self.ssl_ctx,
-                check_hostname=self.check_hostname
-            )
+            return SSLClient(self.ssl_ctx, hostname, port, self.check_hostname)
 
     def get_threadlocal_connection(self):
         if not hasattr(self.threadlocal, 'connection'):
@@ -697,22 +676,17 @@ class CouchBase(object):
 
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
-        for retry in range(2):
-            try:
-                conn.request(method, path, body, headers)
-                response = conn.getresponse()
-                break
-            except (ConnectionError, BadStatusLine) as e:
-                conn.close()
-                if retry == 1:
-                    raise e
-            except Exception as e:
-                conn.close()
-                raise e
-        return response
+        # We automatically retry in 
+        try:
+            return conn.request(method, path, headers, body)
+        except (OSError, EmptyLineError):
+            pass
+        # degu.client.Client.request() will close its connection when there is
+        # an exception:
+        return conn.request(method, path, headers, body)
 
     def request(self, method, parts, options, body=None, headers=None):
-        h = {'User-Agent': USER_AGENT}
+        h = {'user-agent': USER_AGENT}
         if headers:
             h.update(headers)
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
@@ -731,9 +705,9 @@ class CouchBase(object):
     def recv_json(self, method, parts, options, body=None, headers=None):
         if headers is None:
             headers = {}
-        headers['Accept'] = 'application/json'
+        headers['accept'] = 'application/json'
         response = self.request(method, parts, options, body, headers)
-        data = response.read()
+        data = (b'' if response.body is None else response.body.read())
         return json.loads(data.decode('utf-8'))
 
     def post(self, obj, *parts, **options):
@@ -753,7 +727,7 @@ class CouchBase(object):
 
         """
         return self.recv_json('POST', parts, options, _json_body(obj),
-            {'Content-Type': 'application/json'}
+            {'content-type': 'application/json'}
         )
 
     def put(self, obj, *parts, **options):
@@ -773,7 +747,7 @@ class CouchBase(object):
 
         """
         return self.recv_json('PUT', parts, options, _json_body(obj),
-            {'Content-Type': 'application/json'}
+            {'content-type': 'application/json'}
         )
 
     def get(self, *parts, **options):
@@ -820,7 +794,7 @@ class CouchBase(object):
         request.
         """
         response = self.request('HEAD', parts, options)
-        return dict(response.getheaders())
+        return response.headers
 
     def put_att(self, mime, data, *parts, **options):
         """
@@ -843,7 +817,7 @@ class CouchBase(object):
         :param options: optional keyword arguments to include in query
         """
         return self.recv_json('PUT', parts, options, data,
-            {'Content-Type': mime}
+            {'content-type': mime}
         )
 
     def put_att2(self, attachment, *parts, **options):
@@ -854,7 +828,7 @@ class CouchBase(object):
         removed!
         """
         return self.recv_json('PUT', parts, options, attachment.data,
-            {'Content-Type': attachment.content_type}
+            {'content-type': attachment.content_type}
         )
 
     def get_att(self, *parts, **options):
@@ -876,8 +850,8 @@ class CouchBase(object):
         :param options: optional keyword arguments to include in query
         """
         response = self.request('GET', parts, options)
-        content_type = response.getheader('Content-Type')
-        data = response.read()
+        content_type = response.headers['content-type']
+        data = (b'' if response.body is None else response.body.read())
         return Attachment(content_type, data)
 
 
