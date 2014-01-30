@@ -61,7 +61,7 @@ import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 from degu.client import Client, SSLClient, build_client_sslctx
-from degu.base import EmptyLineError
+from degu.base import EmptyLineError, TLS
 
 
 __all__ = (
@@ -537,7 +537,7 @@ def build_ssl_context(config):
     if 'context' in config:
         ctx = config['context']
         assert isinstance(ctx, ssl.SSLContext)
-        assert ctx.protocol == ssl.PROTOCOL_TLSv1
+        assert ctx.protocol == TLS.protocol
         assert ctx.verify_mode == ssl.CERT_REQUIRED
         assert ctx.options & ssl.OP_NO_COMPRESSION
         return ctx
