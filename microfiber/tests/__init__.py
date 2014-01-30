@@ -47,6 +47,7 @@ from random import SystemRandom
 
 from usercouch.misc import TempCouch, TempPKI
 from dbase32 import db32dec, isdb32, random_id
+from degu.base import TLS
 from degu.client import Client, SSLClient, Response
 
 import microfiber
@@ -405,7 +406,7 @@ class TestFunctions(TestCase):
         # Empty config, uses openssl default ca_path
         ctx = microfiber.build_ssl_context({})
         self.assertIsInstance(ctx, ssl.SSLContext)
-        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.protocol, TLS.protocol)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
@@ -415,7 +416,7 @@ class TestFunctions(TestCase):
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
-        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.protocol, TLS.protocol)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
@@ -426,7 +427,7 @@ class TestFunctions(TestCase):
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
-        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.protocol, TLS.protocol)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
@@ -438,7 +439,7 @@ class TestFunctions(TestCase):
         }
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
-        self.assertEqual(ctx.protocol, ssl.PROTOCOL_TLSv1)
+        self.assertEqual(ctx.protocol, TLS.protocol)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
