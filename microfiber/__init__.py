@@ -60,7 +60,7 @@ from collections import namedtuple
 import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
-from degu.client import Client, SSLClient, build_client_sslctx
+from degu.client import create_client, create_sslclient, build_client_sslctx
 from degu.base import EmptyLineError, TLS
 
 
@@ -613,11 +613,10 @@ class Context:
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
 
     def get_connection(self):
-        (hostname, port) = (self.t.hostname, self.t.port)
         if self.t.scheme == 'http':
-            return Client(hostname, port)
+            return create_client(self.t)
         else:
-            return SSLClient(self.ssl_ctx, hostname, port, self.check_hostname)
+            return create_sslclient(self.ssl_ctx, self.t)
 
     def get_threadlocal_connection(self):
         if not hasattr(self.threadlocal, 'connection'):
