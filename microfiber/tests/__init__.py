@@ -1406,33 +1406,27 @@ class TestContext(TestCase):
         conn = ctx.get_connection()
         self.assertIsInstance(conn, Client)
         self.assertNotIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '127.0.0.1')
-        self.assertEqual(conn.port, 5984)
+        self.assertEqual(conn.address, ('127.0.0.1', 5984))
 
         ctx = microfiber.Context(microfiber.HTTP_IPv6_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, Client)
         self.assertNotIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '::1')
-        self.assertEqual(conn.port, 5984)
+        self.assertEqual(conn.address, ('::1', 5984))
 
         ctx = microfiber.Context(microfiber.HTTPS_IPv4_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, Client)
         self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '127.0.0.1')
-        self.assertEqual(conn.port, 6984)
+        self.assertEqual(conn.address, ('127.0.0.1', 6984))
         self.assertIs(conn.sslctx, ctx.ssl_ctx)
-        self.assertIs(conn.check_hostname, True)
 
         ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
         conn = ctx.get_connection()
         self.assertIsInstance(conn, Client)
         self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '::1')
-        self.assertEqual(conn.port, 6984)
+        self.assertEqual(conn.address, ('::1', 6984))
         self.assertIs(conn.sslctx, ctx.ssl_ctx)
-        self.assertIs(conn.check_hostname, True)
 
         env = {
             'url': microfiber.HTTPS_IPv4_URL,
@@ -1442,10 +1436,8 @@ class TestContext(TestCase):
         conn = ctx.get_connection()
         self.assertIsInstance(conn, Client)
         self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '127.0.0.1')
-        self.assertEqual(conn.port, 6984)
+        self.assertEqual(conn.address, ('127.0.0.1', 6984))
         self.assertIs(conn.sslctx, ctx.ssl_ctx)
-        self.assertIs(conn.check_hostname, False)
 
         env = {
             'url': microfiber.HTTPS_IPv6_URL,
@@ -1455,10 +1447,8 @@ class TestContext(TestCase):
         conn = ctx.get_connection()
         self.assertIsInstance(conn, Client)
         self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '::1')
-        self.assertEqual(conn.port, 6984)
+        self.assertEqual(conn.address, ('::1', 6984))
         self.assertIs(conn.sslctx, ctx.ssl_ctx)
-        self.assertIs(conn.check_hostname, False)
 
     def test_get_threadlocal_connection(self):
         id1 = test_id()
@@ -1512,10 +1502,8 @@ class TestContext(TestCase):
         self.assertIs(conn, ctx.threadlocal.connection)
         self.assertIsInstance(conn, Client)
         self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.hostname, '::1')
-        self.assertEqual(conn.port, 6984)
+        self.assertEqual(conn.address, ('::1', 6984))
         self.assertIs(conn.sslctx, ctx.ssl_ctx)
-        self.assertIs(conn.check_hostname, True)
         self.assertIs(ctx.get_threadlocal_connection(), conn)
         self.assertIs(conn, ctx.threadlocal.connection)
 
@@ -2477,12 +2465,23 @@ class TestPermutations(LiveTestCase):
                 with self.assertRaises(ssl.SSLError) as cm:
                     uc.get()
 
+                # FIXME: In Python 3.4, ssl.SSLContext.wrap_socket() will do the
+                # hostname checking for you when ssl.SSLContext.check_hostname
+                # is True.  This is a much better design as all the SSL
+                # behaviors can be configured via the ssl.SSLContext alone.
+                #
+                # Because we're going to drop Python 3.3 support soon, the Degu
+                # SSLCLient does not take an HTTPSConnection-style
+                # *check_hostname* argument.  This means that Degu can't do
+                # hostname checking under Python 3.3.
+
+                # # FIXME: Re-enable when we drop Python 3.3 support!
                 # Make sure things fail without {'check_hostname': False}
-                bad = deepcopy(env)
-                del bad['ssl']['check_hostname']
-                uc = microfiber.CouchBase(bad)
-                with self.assertRaises(ssl.CertificateError) as cm:
-                    uc.get()
+                # bad = deepcopy(env)
+                # del bad['ssl']['check_hostname']
+                # uc = microfiber.CouchBase(bad)
+                # with self.assertRaises(ssl.CertificateError) as cm:
+                #    uc.get()
 
 
 class TestDatabaseLive(CouchTestCase):
