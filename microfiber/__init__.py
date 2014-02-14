@@ -504,79 +504,102 @@ def get_checkpoint(db, replication_id):
         return {'_id': local_id}
 
 
-def update_checkpoint(doc, session_id, update_seq):
-    doc['session_id'] = session_id
-    doc['update_seq'] = update_seq
-
-
-class TimeDelta:
-    def __init__(self):
-        self.start = time.monotonic()
-        self.last = self.start
-
-    def next(self):
-        cur = time.monotonic()
-        delta = cur - self.last
-        self.last = cur
-        return delta
-
-
-def replicate_db(src, src_id, dst, dst_id):
+def load_replication_session(src, src_id, dst, dst_id):
     replication_id = build_replication_id(src_id, dst_id)
-    src_cp = get_checkpoint(src, replication_id)
-    dst_cp = get_checkpoint(dst, replication_id)
-    print('src checkpoint:', dumps(src_cp, True))
-    print('dst checkpoint:', dumps(dst_cp, True))
-    kw = {
-        'limit': 50,
-        'style': 'all_docs',
+    src_doc = get_checkpoint(src, replication_id)
+    dst_doc = get_checkpoint(dst, replication_id)
+    session_id = src_doc.get('session_id')
+    src_update_seq = src_doc.get('update_seq')
+    dst_update_seq = dst_doc.get('update_seq')
+    session = {
+        'replication_id': replication_id,
+        'src_doc': src_doc,
+        'dst_doc': dst_doc,
+        'session_id': log_id(),  # ID for this new session
     }
-    session_id = src_cp.get('session_id')
-    src_update_seq = src_cp.get('update_seq')
-    dst_update_seq = dst_cp.get('update_seq')
     if (
-            session_id == dst_cp.get('session_id')
+            session_id == dst_doc.get('session_id')
         and isinstance(session_id, str) and isdb32(session_id)
         and isinstance(src_update_seq, int) and src_update_seq > 0
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
-        update_seq = min(src_update_seq, dst_update_seq)
-        print('resuming from', update_seq)
-        kw['since'] = update_seq
-    session_id = log_id()
+        session['update_seq'] = min(src_update_seq, dst_update_seq)
+    return session
+
+
+def mark_checkpoint(doc, session_id, update_seq):
+    doc['session_id'] = session_id
+    doc['update_seq'] = update_seq
+
+
+def save_replication_session(src, dst, session):
+    dst.post(None, '_ensure_full_commit')
+    session_id = session['session_id']
+    update_seq = session['update_seq']
+    for (db, key) in [(dst, 'dst_doc'), (src, 'src_doc')]:
+        session[key] = db.update(
+            mark_checkpoint, session[key], session_id, update_seq
+        )
+    print(dumps(session, True))
+
+
+def get_missing_changes(src, dst, kw):
+    r = src.get('_changes', **kw)
+    kw['since'] = r['last_seq']
+    changes = {}
+    for row in r['results']:
+        if row['id'][0] != '_':
+            changes[row['id']] = [c['rev'] for c in row['changes']]
+    if changes:
+        return dst.post(changes, '_revs_diff')
+    return {}
+
+
+class BufferedSave:
+    __slots__ = ('db', 'size', 'docs', 'count')
+
+    def __init__(self, db, size=25):
+        self.db = db
+        self.size = size
+        self.docs = []
+        self.count = 0
+
+    def __del__(self):
+        self.flush()
+
+    def save(self, doc):
+        self.docs.append(doc)
+        if len(self.docs) >= self.size:
+            self.flush()
+
+    def flush(self):
+        if self.docs:
+            self.count += len(self.docs)
+            self.db.post({'docs': self.docs, 'new_edits': False}, '_bulk_docs')
+            self.docs = []
+
+
+def replicate_db(src, src_id, dst, dst_id, batch_size=250):
+    kw = {
+        'limit': batch_size,
+        'style': 'all_docs',
+    }
+    session = load_replication_session(src, src_id, dst, dst_id)
+    if 'update_seq' in session:
+        kw['since'] = session['update_seq']
     while True:
-        t = TimeDelta()
-        r = src.get('_changes', **kw)
-        print('get changes', t.next())
-        if not r['results']:
+        missing = get_missing_changes(src, dst, kw)
+        if not missing:
             break
-        update_seq = r['last_seq']
-        kw['since'] = update_seq
-        changed = {}
-        for row in r['results']:
-            if not row['id'].startswith('_'):
-                changed[row['id']] = [c['rev'] for c in row['changes']]
-        if not changed:
-            continue
-        print('filter needed', t.next())
-        needed = dst.post(changed, '_revs_diff')
-        docs = []
-        for (_id, info) in needed.items():
+        buf = BufferedSave(dst)
+        for (_id, info) in missing.items():
             for _rev in info['missing']:
-                docs.append(src.get(_id, rev=_rev, attachments=True, revs=True))
-        print('get docs', t.next())
-        if not docs:
-            continue
-        dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
-        print('save docs', t.next())
-        dst.post(None, '_ensure_full_commit')
-        print('full commit', t.next())
-        src_cp = src.update(update_checkpoint, src_cp, session_id, update_seq)
-        dst_cp = dst.update(update_checkpoint, dst_cp, session_id, update_seq)
-        print('checkpoint', t.next())
-        address = src.ctx.get_threadlocal_connection().conn.sock.getsockname()
-        print(update_seq, address)
-        print('')
+                doc = src.get(_id, rev=_rev, attachments=True, revs=True)
+                buf.save(doc)
+        buf.flush()
+        assert buf.count >= len(missing)
+        session['update_seq'] = kw['since']
+        save_replication_session(src, dst, session)
 
 
 def _start_thread(target, *args):
