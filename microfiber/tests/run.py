@@ -38,6 +38,7 @@ import microfiber
 
 pynames = (
     'microfiber',
+    'microfiber.replicator',
     'microfiber.tests',
 )
 
