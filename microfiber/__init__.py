@@ -48,7 +48,7 @@ from base64 import b64encode
 import json
 from gzip import GzipFile
 import time
-from hashlib import sha1
+from hashlib import sha1, sha512
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 import ssl
@@ -59,7 +59,7 @@ import platform
 from collections import namedtuple
 import logging
 
-from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
+from dbase32 import random_id, log_id, db32enc, isdb32, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 from degu.client import create_client, create_sslclient, build_client_sslctx
 from degu.base import EmptyLineError, TLS
 
@@ -461,6 +461,122 @@ def pull_replication(local_db, remote_db, remote_env, **kw):
 def id_slice_iter(rows, size=25):
     for i in range(math.ceil(len(rows) / size)):
         yield [row['id'] for row in rows[i*size : (i+1)*size]]
+
+
+def build_replication_id(src_id, dst_id):
+    """
+    Build a replication ID for replicating changes from *src_id* to *dst_id*.
+
+    For example:
+
+    >>> build_replication_id('node-A', 'node-B')
+    'T5TDN9EJ5OT4WMUFMRGHW5NAGO54I3M7A94TAMUHMJCSNGJG'
+
+    Note that the replication ID is directional, ie, that A=>B does not get the
+    same replication ID as B=>A:
+
+    >>> build_replication_id('node-B', 'node-A')
+    'OW76TN3J8X3JCWXCWOGUUSQAWN5KXVIUSVDNNQA9KM8UNBTJ'
+
+    Also note that the resulting ID will be the same whether a replicator
+    running on the source is pushing to the destination, or a replicator running
+    on the destination is pulling from the source.  The only important thing is
+    which is the source and which is the destination, regardless where the
+    replicator is running.  In fact, the replicator could be running on a third
+    machine altogether.
+    """
+    assert src_id != dst_id
+    info = {
+        'src_id': src_id,
+        'dst_id': dst_id,
+        'replicator': 'microfiber/protocol0',
+    }
+    data = dumps(info).encode()
+    digest = sha512(data).digest()
+    return db32enc(digest[:30])
+
+
+def get_checkpoint(db, replication_id):
+    local_id = '_local/' + replication_id
+    try:
+        return db.get(local_id)
+    except NotFound:
+        return {'_id': local_id}
+
+
+def update_checkpoint(doc, session_id, update_seq):
+    doc['session_id'] = session_id
+    doc['update_seq'] = update_seq
+
+
+class TimeDelta:
+    def __init__(self):
+        self.start = time.monotonic()
+        self.last = self.start
+
+    def next(self):
+        cur = time.monotonic()
+        delta = cur - self.last
+        self.last = cur
+        return delta
+
+
+def replicate_db(src, src_id, dst, dst_id):
+    replication_id = build_replication_id(src_id, dst_id)
+    src_cp = get_checkpoint(src, replication_id)
+    dst_cp = get_checkpoint(dst, replication_id)
+    print('src checkpoint:', dumps(src_cp, True))
+    print('dst checkpoint:', dumps(dst_cp, True))
+    kw = {
+        'limit': 50,
+        'style': 'all_docs',
+    }
+    session_id = src_cp.get('session_id')
+    src_update_seq = src_cp.get('update_seq')
+    dst_update_seq = dst_cp.get('update_seq')
+    if (
+            session_id == dst_cp.get('session_id')
+        and isinstance(session_id, str) and isdb32(session_id)
+        and isinstance(src_update_seq, int) and src_update_seq > 0
+        and isinstance(dst_update_seq, int) and dst_update_seq > 0
+    ):
+        update_seq = min(src_update_seq, dst_update_seq)
+        print('resuming from', update_seq)
+        kw['since'] = update_seq
+    session_id = log_id()
+    while True:
+        t = TimeDelta()
+        r = src.get('_changes', **kw)
+        print('get changes', t.next())
+        if not r['results']:
+            break
+        update_seq = r['last_seq']
+        kw['since'] = update_seq
+        changed = {}
+        for row in r['results']:
+            if not row['id'].startswith('_'):
+                changed[row['id']] = [c['rev'] for c in row['changes']]
+        if not changed:
+            continue
+        print('filter needed', t.next())
+        needed = dst.post(changed, '_revs_diff')
+        docs = []
+        for (_id, info) in needed.items():
+            for _rev in info['missing']:
+                docs.append(src.get(_id, rev=_rev, attachments=True, revs=True))
+        print('get docs', t.next())
+        if not docs:
+            continue
+        dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
+        print('save docs', t.next())
+        dst.post(None, '_ensure_full_commit')
+        print('full commit', t.next())
+        src_cp = src.update(update_checkpoint, src_cp, session_id, update_seq)
+        dst_cp = dst.update(update_checkpoint, dst_cp, session_id, update_seq)
+        print('checkpoint', t.next())
+        address = src.ctx.get_threadlocal_connection().conn.sock.getsockname()
+        print(update_seq, address)
+        print('')
 
 
 def _start_thread(target, *args):
