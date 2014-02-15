@@ -255,7 +255,8 @@ class Replicator:
         delta = time.monotonic() - start
         if delta < 10:
             time.sleep(10 - delta)
-        names = self.get_names()
+        self.dst.get()  # Make sure we can still reach dst server
+        names = self.get_names()  # Will do same of src server
         for name in set(names) - set(self.threads):
             self.restart_thread(name)
 
