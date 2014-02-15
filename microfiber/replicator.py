@@ -120,7 +120,8 @@ def load_session(src_id, src, dst_id, dst):
         'replication_id': replication_id,
         'src_doc': src_doc,
         'dst_doc': dst_doc,
-        'session_id': log_id(),  # ID for this new session
+        'session_id': log_id(),  # ID for this new session,
+        'doc_count': 0,
     }
     if (
             session_id == dst_doc.get('session_id')
@@ -195,6 +196,7 @@ def replicate_one_batch(src, dst, session):
             kw['atts_since'].append(_rev)
     if docs:
         dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
+        session['doc_count'] += len(docs)
     return sequence_was_updated(session)
 
 
@@ -211,7 +213,8 @@ def replicate(src, dst, session):
             )
             break
     elapsed = time.monotonic() - start
-    log.info('%.3f to replicate %r to %r', elapsed, src, dst)
+    log.info('%.3f seconds to replicate %d docs from %r to %r',
+            elapsed, session['doc_count'], src, dst)
 
 
 def replicate_continuously(src, dst, session):
@@ -246,11 +249,11 @@ class Replicator:
     def run(self):
         names = self.get_names()
         self.bring_up(names)
+        log.info('current replications: %r', sorted(self.threads))
         while True:
             self.monitor_once()
 
     def monitor_once(self):
-        log.info('current replications: %r', sorted(self.threads))
         start = time.monotonic()
         self.reap_threads()
         delta = time.monotonic() - start
@@ -266,7 +269,7 @@ class Replicator:
         Gracefully do initial sync-up.
         """
         assert self.threads == {}
-        for name in sorted(names):
+        for name in names:
             assert name not in self.threads
             src = self.src.database(name)
             dst = self.dst.database(name)
