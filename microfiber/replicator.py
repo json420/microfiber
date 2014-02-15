@@ -24,10 +24,10 @@
 A CouchDB replicator for Python.
 
 WARNING: This replicator does *not* replicate design documents or any other
-special documents whose ID starts with "-".  In the context of Novacut and
-Dmedia, this is a feature and is largely why we wrote our own replicator.  This
-way we can replicate, minus design docs, without having to use a filter function
-(which is slow and seems to have reliability issues anyway).
+special documents whose ID starts with "_" (underscore).  In the context of
+Novacut and Dmedia, this is a feature and is largely why we wrote our own
+replicator.  This way we can replicate, minus design docs, without having to use
+a filter function (which is slow and seems to have reliability issues anyway).
 
 The replication session resume used here is based on the excellent design used
 by the rcouch replicator:
@@ -43,10 +43,12 @@ correctly resume a replication session started by another.
 
 from hashlib import sha512
 import logging
+import time
+import threading
 
 from dbase32 import log_id, db32enc, isdb32
 
-from . import dumps, NotFound, BadRequest
+from . import dumps, NotFound, BadRequest, Server
 
 
 log = logging.getLogger()
@@ -146,12 +148,12 @@ def save_session(src, dst, session):
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
-    log.info('checkpoint %s at %d', session['replication_id'], update_seq)
+    log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
 def get_missing_changes(src, dst, session):
     kw = {
-        'limit': 100,
+        'limit': 50,
         'style': 'all_docs',
     }
     if 'feed' in session:
@@ -197,13 +199,129 @@ def replicate_one_batch(src, dst, session):
 
 
 def replicate(src, dst, session):
+    log.info('%r => %r', src, dst)
     session.pop('feed', None)
+    stop_at_seq = src.get()['update_seq']
+    start = time.monotonic()
     while replicate_one_batch(src, dst, session):
         save_session(src, dst, session)
+        if session['update_seq'] >= stop_at_seq:
+            log.info('current update_seq %d >= stop_at_seq %d', 
+                session['update_seq'], stop_at_seq 
+            )
+            break
+    elapsed = time.monotonic() - start
+    log.info('%.3f to replicate %r to %r', elapsed, src, dst)
 
 
 def replicate_continuously(src, dst, session):
+    log.info('Continuous %r => %r', src, dst)
     session['feed'] = 'longpoll'
     while True:
         if replicate_one_batch(src, dst, session):
             save_session(src, dst, session)
+
+
+def iter_normal_names(src):
+    for name in src.get('_all_dbs'):
+        if not name.startswith('_'):
+            yield name
+
+
+class Replicator:
+    def __init__(self, src_env, dst_env, names_filter_func=None):
+        self.src = Server(src_env)
+        self.src_id = self.src.get()['uuid']
+        self.dst = Server(dst_env)
+        self.dst_id = self.dst.get()['uuid']
+        assert names_filter_func is None or callable(names_filter_func)
+        self.names_filter_func = names_filter_func
+        self.threads = {}
+
+    def get_names(self):
+        return sorted(
+            filter(self.names_filter_func, iter_normal_names(self.src))
+        )
+
+    def run(self):
+        names = self.get_names()
+        self.bring_up(names)
+        while True:
+            self.monitor_once()
+
+    def monitor_once(self):
+        start = time.monotonic()
+        self.reap_threads()
+        delta = time.monotonic() - start
+        if delta < 10:
+            time.sleep(10 - delta)
+        names = self.get_names()
+        for name in set(names) - set(self.threads):
+            self.restart_thread(name)
+
+    def bring_up(self, names):
+        """
+        Gracefully do initial sync-up.
+        """
+        assert self.threads == {}
+        for name in sorted(names):
+            assert name not in self.threads
+            src = self.src.database(name)
+            dst = self.dst.database(name)
+            session = load_session(self.src_id, src, self.dst_id, dst)
+            replicate(src, dst, session)
+            thread = threading.Thread(
+                target=replicate_continuously,
+                args=(src, dst, session),
+                daemon=True,
+            )
+            thread.start()
+            self.threads[name] = thread
+
+    def reap_threads(self, timeout=1):
+        reaped = []
+        for name in sorted(self.threads):
+            thread = self.threads[name]
+            thread.join(timeout=timeout)
+            if not thread.is_alive():
+                reaped.append(name)
+        for name in reaped:
+            thread = self.threads.pop(name)
+            thread.join()  # Little safety check
+            log.warning('reaped thread for %r (possible crash)', name)
+        return reaped
+
+    def restart_thread(self, name):
+        """
+        Start continuous replication in a new thread.
+
+        Unlike the initial bring up, when a replication thread crashes, or when
+        a new database is added, we go directly to continuous replication.
+        """
+        assert name not in self.threads
+        src = self.src.database(name)
+        dst = self.dst.database(name)
+        session = load_session(self.src_id, src, self.dst_id, dst)
+        thread = threading.Thread(
+            target=replicate_continuously,
+            args=(src, dst, session),
+            daemon=True,
+        )
+        thread.start()
+        self.threads[name] = thread
+
+
+def _run_replicator(src_env, dst_env, names_filter_func):
+    replicator = Replicator(src_env, dst_env, names_filter_func)
+    replicator.run()
+
+
+def start_replicator(src_env, dst_env, names_filter_func=None):
+    import multiprocessing
+    process = multiprocessing.Process(
+        target=_run_replicator,
+        args=(src_env, dst_env, names_filter_func),
+        daemon=True,
+    )
+    process.start()
+    return process
