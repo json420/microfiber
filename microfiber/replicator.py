@@ -148,7 +148,7 @@ def save_session(src, dst, session):
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
-    log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
+    #log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
 def get_missing_changes(src, dst, session):
@@ -250,11 +250,12 @@ class Replicator:
             self.monitor_once()
 
     def monitor_once(self):
+        log.info('current replications: %r', sorted(self.threads))
         start = time.monotonic()
         self.reap_threads()
         delta = time.monotonic() - start
-        if delta < 10:
-            time.sleep(10 - delta)
+        if delta < 15:
+            time.sleep(15 - delta)
         self.dst.get()  # Make sure we can still reach dst server
         names = self.get_names()  # Will do same of src server
         for name in set(names) - set(self.threads):
@@ -279,7 +280,7 @@ class Replicator:
             thread.start()
             self.threads[name] = thread
 
-    def reap_threads(self, timeout=1):
+    def reap_threads(self, timeout=2):
         reaped = []
         for name in sorted(self.threads):
             thread = self.threads[name]
