@@ -42,10 +42,14 @@ correctly resume a replication session started by another.
 """
 
 from hashlib import sha512
+import logging
 
 from dbase32 import log_id, db32enc, isdb32
 
-from . import dumps, NotFound
+from . import dumps, NotFound, BadRequest
+
+
+log = logging.getLogger()
 
 
 def build_replication_id(src_id, dst_id):
@@ -92,6 +96,7 @@ def get_checkpoint(db, replication_id):
 def load_replication_session(src, src_id, dst, dst_id):
     replication_id = build_replication_id(src_id, dst_id)
     src_doc = get_checkpoint(src, replication_id)
+    dst.ensure()  # Create destination DB if needed
     dst_doc = get_checkpoint(dst, replication_id)
     session_id = src_doc.get('session_id')
     src_update_seq = src_doc.get('update_seq')
@@ -109,6 +114,9 @@ def load_replication_session(src, src_id, dst, dst_id):
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
         session['update_seq'] = min(src_update_seq, dst_update_seq)
+        log.info('resuming replication session: %s', dumps(session, True))
+    else:
+        log.warning('cannot resume replication: %s', dumps(session, True))
     return session
 
 
@@ -125,11 +133,15 @@ def save_replication_session(src, dst, session):
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
-    print(dumps(session, True))
+    log.info('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
 def get_missing_changes(src, dst, kw):
-    r = src.get('_changes', **kw)
+    try:
+        r = src.get('_changes', **kw)
+    except (OSError, BadRequest):
+        log.exception('Exception while waiting for changes feed:')
+        return {}
     kw['since'] = r['last_seq']
     changes = {}
     for row in r['results']:
@@ -140,49 +152,41 @@ def get_missing_changes(src, dst, kw):
     return {}
 
 
-class BufferedSave:
-    __slots__ = ('db', 'size', 'docs', 'count')
-
-    def __init__(self, db, size=25):
-        self.db = db
-        self.size = size
-        self.docs = []
-        self.count = 0
-
-    def __del__(self):
-        self.flush()
-
-    def save(self, doc):
-        self.docs.append(doc)
-        if len(self.docs) >= self.size:
-            self.flush()
-
-    def flush(self):
-        if self.docs:
-            self.count += len(self.docs)
-            self.db.post({'docs': self.docs, 'new_edits': False}, '_bulk_docs')
-            self.docs = []
+def replicate_one_batch(src, dst, kw, session):
+    missing = get_missing_changes(src, dst, kw)
+    if not missing:
+        return 0
+    docs = []
+    count = 0
+    for (_id, info) in missing.items():
+        for _rev in info['missing']:
+            docs.append(src.get(_id, rev=_rev, attachments=True, revs=True))
+            if len(docs) >= 25:
+                dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
+                count += len(docs)
+                docs = []
+    if docs:
+        dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
+        count += len(docs)
+    session['update_seq'] = kw['since']
+    save_replication_session(src, dst, session)
+    return len(docs)
 
 
-def replicate_db(src, src_id, dst, dst_id, batch_size=250):
+def replicate_db(src, src_id, dst, dst_id):
     kw = {
-        'limit': batch_size,
+        'limit': 500,
         'style': 'all_docs',
+        #'feed': 'longpoll',
     }
     session = load_replication_session(src, src_id, dst, dst_id)
     if 'update_seq' in session:
         kw['since'] = session['update_seq']
+    last_seq = kw.get('since')
     while True:
-        missing = get_missing_changes(src, dst, kw)
-        if not missing:
+        replicate_one_batch(src, dst, kw, session)
+        if last_seq == kw['since']:
             break
-        buf = BufferedSave(dst)
-        for (_id, info) in missing.items():
-            for _rev in info['missing']:
-                doc = src.get(_id, rev=_rev, attachments=True, revs=True)
-                buf.save(doc)
-        buf.flush()
-        assert buf.count >= len(missing)
-        session['update_seq'] = kw['since']
-        save_replication_session(src, dst, session)
+        last_seq = kw['since']
+
 
