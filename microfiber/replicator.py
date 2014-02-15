@@ -52,33 +52,46 @@ from . import dumps, NotFound, BadRequest
 log = logging.getLogger()
 
 
-def build_replication_id(src_id, dst_id):
+def build_replication_id(src_node, src_db, dst_node, dst_db):
     """
-    Build a replication ID for replicating changes from *src_id* to *dst_id*.
+    Build a replication ID.
 
     For example:
 
-    >>> build_replication_id('node-A', 'node-B')
-    'T5TDN9EJ5OT4WMUFMRGHW5NAGO54I3M7A94TAMUHMJCSNGJG'
+    >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO')
+    'I9HEKKQC6IUCLKY7B7NC6PD4KFCHP8TRKU4V37AUVSLWS4X3'
 
     Note that the replication ID is directional, ie, that A=>B does not get the
     same replication ID as B=>A:
 
-    >>> build_replication_id('node-B', 'node-A')
-    'OW76TN3J8X3JCWXCWOGUUSQAWN5KXVIUSVDNNQA9KM8UNBTJ'
+    >>> build_replication_id('node-B', 'db-FOO', 'node-A', 'db-FOO')
+    '5MRNDPQEJ7WF8QJFF4PVAWGMUGQSOVP4SVCHOPC34G9X48GA'
 
-    Also note that the resulting ID will be the same whether a replicator
+    Also note that the source and destination database names influence the
+    replication ID:
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-BAR')
+    'JSU5ACIFAVHYLOF593CPXP6IYT9DEPGFVMKK737ETAYAX8WQ'
+
+    And likewise have the same directional property:
+
+    >>> build_replication_id('node-A', 'db-BAR', 'node-B', 'db-FOO')
+    '6CBC7U6VVWARESMEG9D4YTQF78RJRVFDCAPHEC8ONSAKEMW9'
+
+    Finally, note that the resulting ID will be the same whether a replicator
     running on the source is pushing to the destination, or a replicator running
     on the destination is pulling from the source.  The only important thing is
     which is the source and which is the destination, regardless where the
     replicator is running.  In fact, the replicator could be running on a third
     machine altogether.
     """
-    assert src_id != dst_id
+    assert (src_node, src_db) != (dst_node, dst_db)
     info = {
-        'src_id': src_id,
-        'dst_id': dst_id,
         'replicator': 'microfiber/protocol0',
+        'src_node': src_node,
+        'src_db': src_db,
+        'dst_node': dst_node,
+        'dst_db': dst_db,
     }
     data = dumps(info).encode()
     digest = sha512(data).digest()
@@ -93,8 +106,8 @@ def get_checkpoint(db, replication_id):
         return {'_id': local_id}
 
 
-def load_replication_session(src, src_id, dst, dst_id):
-    replication_id = build_replication_id(src_id, dst_id)
+def load_session(src_id, src, dst_id, dst):
+    replication_id = build_replication_id(src_id, src.name, dst_id, dst.name)
     src_doc = get_checkpoint(src, replication_id)
     dst.ensure()  # Create destination DB if needed
     dst_doc = get_checkpoint(dst, replication_id)
@@ -125,7 +138,7 @@ def mark_checkpoint(doc, session_id, update_seq):
     doc['update_seq'] = update_seq
 
 
-def save_replication_session(src, dst, session):
+def save_session(src, dst, session):
     dst.post(None, '_ensure_full_commit')
     session_id = session['session_id']
     update_seq = session['update_seq']
@@ -136,13 +149,17 @@ def save_replication_session(src, dst, session):
     log.info('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
-def get_missing_changes(src, dst, kw):
-    try:
-        r = src.get('_changes', **kw)
-    except (OSError, BadRequest):
-        log.exception('Exception while waiting for changes feed:')
-        return {}
-    kw['since'] = r['last_seq']
+def get_missing_changes(src, dst, session):
+    kw = {
+        'limit': 100,
+        'style': 'all_docs',
+    }
+    if 'feed' in session:
+        kw['feed'] = 'longpoll'
+    if 'update_seq' in session:
+        kw['since'] = session['update_seq']
+    r = src.get('_changes', **kw)
+    session['new_update_seq'] = r['last_seq']
     changes = {}
     for row in r['results']:
         if row['id'][0] != '_':
@@ -152,41 +169,41 @@ def get_missing_changes(src, dst, kw):
     return {}
 
 
-def replicate_one_batch(src, dst, kw, session):
-    missing = get_missing_changes(src, dst, kw)
-    if not missing:
-        return 0
+def sequence_was_updated(session):
+    new_update_seq = session.pop('new_update_seq', None)
+    if session.get('update_seq') == new_update_seq:
+        return False
+    session['update_seq'] = new_update_seq
+    return True
+
+
+def replicate_one_batch(src, dst, session):
+    missing = get_missing_changes(src, dst, session)
     docs = []
-    count = 0
     for (_id, info) in missing.items():
+        kw = {
+            'revs': True,
+            'attachments': True,
+            'atts_since': [],
+        }
+        if 'possible_ancestors' in info:
+            kw['atts_since'].extend(info['possible_ancestors'])
         for _rev in info['missing']:
-            docs.append(src.get(_id, rev=_rev, attachments=True, revs=True))
-            if len(docs) >= 25:
-                dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
-                count += len(docs)
-                docs = []
+            docs.append(src.get(_id, rev=_rev, **kw))
+            kw['atts_since'].append(_rev)
     if docs:
         dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
-        count += len(docs)
-    session['update_seq'] = kw['since']
-    save_replication_session(src, dst, session)
-    return len(docs)
+    return sequence_was_updated(session)
 
 
-def replicate_db(src, src_id, dst, dst_id):
-    kw = {
-        'limit': 500,
-        'style': 'all_docs',
-        #'feed': 'longpoll',
-    }
-    session = load_replication_session(src, src_id, dst, dst_id)
-    if 'update_seq' in session:
-        kw['since'] = session['update_seq']
-    last_seq = kw.get('since')
+def replicate(src, dst, session):
+    session.pop('feed', None)
+    while replicate_one_batch(src, dst, session):
+        save_session(src, dst, session)
+
+
+def replicate_continuously(src, dst, session):
+    session['feed'] = 'longpoll'
     while True:
-        replicate_one_batch(src, dst, kw, session)
-        if last_seq == kw['since']:
-            break
-        last_seq = kw['since']
-
-
+        if replicate_one_batch(src, dst, session):
+            save_session(src, dst, session)
