@@ -133,6 +133,8 @@ def load_session(src_id, src, dst_id, dst):
         log.info('resuming replication session: %s', dumps(session, True))
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
+    session['src'] = src
+    session['dst'] = dst
     return session
 
 
@@ -141,18 +143,20 @@ def mark_checkpoint(doc, session_id, update_seq):
     doc['update_seq'] = update_seq
 
 
-def save_session(src, dst, session):
+def save_session(session):
+    src = session['src']
+    dst = session['dst']
     dst.post(None, '_ensure_full_commit')
     session_id = session['session_id']
     update_seq = session['update_seq']
-    for (db, key) in [(dst, 'dst_doc'), (src, 'src_doc')]:
+    for (db, key) in [(src, 'src_doc'), (dst, 'dst_doc')]:
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
-    #log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
+    log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
-def get_missing_changes(src, dst, session):
+def get_missing_changes(session):
     kw = {
         'limit': 50,
         'style': 'all_docs',
@@ -161,14 +165,14 @@ def get_missing_changes(src, dst, session):
         kw['feed'] = 'longpoll'
     if 'update_seq' in session:
         kw['since'] = session['update_seq']
-    r = src.get('_changes', **kw)
+    r = session['src'].get('_changes', **kw)
     session['new_update_seq'] = r['last_seq']
     changes = {}
     for row in r['results']:
         if row['id'][0] != '_':
             changes[row['id']] = [c['rev'] for c in row['changes']]
     if changes:
-        return dst.post(changes, '_revs_diff')
+        return session['dst'].post(changes, '_revs_diff')
     return {}
 
 
@@ -180,8 +184,9 @@ def sequence_was_updated(session):
     return True
 
 
-def replicate_one_batch(src, dst, session):
-    missing = get_missing_changes(src, dst, session)
+def replicate_one_batch(session):
+    missing = get_missing_changes(session)
+    src = session['src']
     docs = []
     for (_id, info) in missing.items():
         kw = {
@@ -195,18 +200,18 @@ def replicate_one_batch(src, dst, session):
             docs.append(src.get(_id, rev=_rev, **kw))
             kw['atts_since'].append(_rev)
     if docs:
-        dst.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
+        session['dst'].post({'docs': docs, 'new_edits': False}, '_bulk_docs')
         session['doc_count'] += len(docs)
     return sequence_was_updated(session)
 
 
-def replicate(src, dst, session):
-    log.info('%r => %r', src, dst)
+def replicate(session):
+    log.info('%r => %r', session['src'], session['dst'])
     session.pop('feed', None)
-    stop_at_seq = src.get()['update_seq']
+    stop_at_seq = session['src'].get()['update_seq']
     start = time.monotonic()
-    while replicate_one_batch(src, dst, session):
-        save_session(src, dst, session)
+    while replicate_one_batch(session):
+        save_session(session)
         if session['update_seq'] >= stop_at_seq:
             log.info('current update_seq %d >= stop_at_seq %d', 
                 session['update_seq'], stop_at_seq 
@@ -214,15 +219,16 @@ def replicate(src, dst, session):
             break
     elapsed = time.monotonic() - start
     log.info('%.3f seconds to replicate %d docs from %r to %r',
-            elapsed, session['doc_count'], src, dst)
+        elapsed, session['doc_count'], session['src'], session['dst']
+    )
 
 
-def replicate_continuously(src, dst, session):
-    log.info('Continuous %r => %r', src, dst)
+def replicate_continuously(session):
+    log.info('%r => %r', session['src'], session['dst'])
     session['feed'] = 'longpoll'
     while True:
-        if replicate_one_batch(src, dst, session):
-            save_session(src, dst, session)
+        if replicate_one_batch(session):
+            save_session(session)
 
 
 def iter_normal_names(src):
@@ -274,10 +280,10 @@ class Replicator:
             src = self.src.database(name)
             dst = self.dst.database(name)
             session = load_session(self.src_id, src, self.dst_id, dst)
-            replicate(src, dst, session)
+            replicate(session)
             thread = threading.Thread(
                 target=replicate_continuously,
-                args=(src, dst, session),
+                args=(session,),
                 daemon=True,
             )
             thread.start()
@@ -309,7 +315,7 @@ class Replicator:
         session = load_session(self.src_id, src, self.dst_id, dst)
         thread = threading.Thread(
             target=replicate_continuously,
-            args=(src, dst, session),
+            args=(session,),
             daemon=True,
         )
         thread.start()
