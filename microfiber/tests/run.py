@@ -40,6 +40,7 @@ pynames = (
     'microfiber',
     'microfiber.replicator',
     'microfiber.tests',
+    'microfiber.tests.test_replicator',
 )
 
 

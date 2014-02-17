@@ -29,16 +29,129 @@ Novacut and Dmedia, this is a feature and is largely why we wrote our own
 replicator.  This way we can replicate, minus design docs, without having to use
 a filter function (which is slow and seems to have reliability issues anyway).
 
-The replication session resume used here is based on the excellent design used
-by the rcouch replicator:
 
-    https://github.com/refuge/rcouch/wiki/Replication-Algorithm
+Replication loop
+----------------
 
-Note that although the design is similar, they aren't directly compatible as
-they don't calculate the same replication ID and so one could not resume 
-replication started by the other.  This is "a good thing" (TM) as each offers
-slightly different options and it's not prudent to assume one replicator can
-correctly resume a replication session started by another.
+The low-level replication is done by calling `replicate_one_batch()` over and
+over, which will:
+
+To get started, we need two `TempCouch` instances and a `Database` instance for
+each:
+
+>>> from usercouch.misc import TempCouch
+>>> from microfiber import Database, dumps
+>>> couch1 = TempCouch()
+>>> db1 = Database('mydb', couch1.bootstrap())
+>>> db1.put(None)  # Create DB
+{'ok': True}
+>>> couch2 = TempCouch()
+>>> db2 = Database('mydb', couch2.bootstrap())
+>>> db2.put(None)  # Create DB
+{'ok': True}
+
+Now we'll save a few documents in db1:
+
+>>> docs = [
+...     {'_id': 'foo'},
+...     {'_id': 'bar'},
+...     {'_id': 'baz'},
+... ]
+...
+>>> result = db1.save_many(docs)
+>>> print(dumps(result, pretty=True))
+[
+    {
+        "id": "foo",
+        "ok": true,
+        "rev": "1-967a00dff5e02add41819138abb3284d"
+    },
+    {
+        "id": "bar",
+        "ok": true,
+        "rev": "1-967a00dff5e02add41819138abb3284d"
+    },
+    {
+        "id": "baz",
+        "ok": true,
+        "rev": "1-967a00dff5e02add41819138abb3284d"
+    }
+]
+
+>>> changes = db1.get('_changes', style='all_docs', limit=50)
+>>> print(dumps(changes, pretty=True))
+{
+    "last_seq": 3,
+    "results": [
+        {
+            "changes": [
+                {
+                    "rev": "1-967a00dff5e02add41819138abb3284d"
+                }
+            ],
+            "id": "bar",
+            "seq": 1
+        },
+        {
+            "changes": [
+                {
+                    "rev": "1-967a00dff5e02add41819138abb3284d"
+                }
+            ],
+            "id": "baz",
+            "seq": 2
+        },
+        {
+            "changes": [
+                {
+                    "rev": "1-967a00dff5e02add41819138abb3284d"
+                }
+            ],
+            "id": "foo",
+            "seq": 3
+        }
+    ]
+}
+
+The changes feed must be transformed into the format needed by
+"POST /db/_revs_diff", which is done using the `changes_for_revs_diff()`
+function, for example:
+
+>>> for_revs_diff = changes_for_revs_diff(changes)
+>>> print(dumps(for_revs_diff, pretty=True))
+{
+    "bar": [
+        "1-967a00dff5e02add41819138abb3284d"
+    ],
+    "baz": [
+        "1-967a00dff5e02add41819138abb3284d"
+    ],
+    "foo": [
+        "1-967a00dff5e02add41819138abb3284d"
+    ]
+}
+
+>>> missing = db2.post(for_revs_diff, '_revs_diff')
+>>> print(dumps(missing, pretty=True))
+{
+    "bar": {
+        "missing": [
+            "1-967a00dff5e02add41819138abb3284d"
+        ]
+    },
+    "baz": {
+        "missing": [
+            "1-967a00dff5e02add41819138abb3284d"
+        ]
+    },
+    "foo": {
+        "missing": [
+            "1-967a00dff5e02add41819138abb3284d"
+        ]
+    }
+}
+
+
 """
 
 from hashlib import sha512
@@ -156,6 +269,14 @@ def save_session(session):
     log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
+def changes_for_revs_diff(result):
+    changes = {}
+    for row in result['results']:
+        if row['id'][0] != '_':
+            changes[row['id']] = [c['rev'] for c in row['changes']]
+    return changes 
+
+
 def get_missing_changes(session):
     kw = {
         'limit': 50,
@@ -165,12 +286,9 @@ def get_missing_changes(session):
         kw['feed'] = 'longpoll'
     if 'update_seq' in session:
         kw['since'] = session['update_seq']
-    r = session['src'].get('_changes', **kw)
-    session['new_update_seq'] = r['last_seq']
-    changes = {}
-    for row in r['results']:
-        if row['id'][0] != '_':
-            changes[row['id']] = [c['rev'] for c in row['changes']]
+    result = session['src'].get('_changes', **kw)
+    session['new_update_seq'] = result['last_seq']
+    changes = changes_for_revs_diff(result)
     if changes:
         return session['dst'].post(changes, '_revs_diff')
     return {}
@@ -266,13 +384,32 @@ class Replicator:
         if delta < 15:
             time.sleep(15 - delta)
         self.dst.get()  # Make sure we can still reach dst server
-        names = self.get_names()  # Will do same of src server
+        names = self.get_names()  # Will do same for src server
         for name in set(names) - set(self.threads):
             self.restart_thread(name)
 
     def bring_up(self, names):
         """
         Gracefully do initial sync-up.
+
+        With how Dmedia historically used the CouchDB replicator, there was a
+        crashing tidal wave of parallel connections and requests when a peer
+        first came online.  There were a number of problems with this:
+
+            1. Bad user experience - the CPU fans tend to kick up on a laptop,
+               there's a lot of IO, and as CouchDB is very fsync happy, other
+               applications can get very unresponsive while waiting for writes
+               to complete during this initial sync-up
+
+            2. Poor connection reuse - now that we've enabled perfect-forward-
+               secrecy (and with ``ssl.OP_SINGLE_ECDH_USE`` at  that), creating
+               connections is quite expensive; however, once the connection is
+               created, there's surprisingly little overhead when making, say,
+               hundreds of HTTP requests through that same SSL connection
+
+            3. No way to prioritize what gets synced first - above all else, we
+               want to get "dmedia-1" in sync as quickly as possible, and we
+               don't want the syncing of other DBs to slow this down
         """
         assert self.threads == {}
         for name in names:
