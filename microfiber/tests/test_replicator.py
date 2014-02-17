@@ -575,4 +575,9 @@ class TestReplicator(TestCase):
         tophash_c = wait_for_sync(db1c, db2c)
         self.assertNotIn(tophash_c, {tophash_1c, tophash_2c})
 
+        # Check database names on each in for kicks:
+        expected = sorted(['_users', '_replicator', name_a, name_b, name_c])
+        self.assertEqual(s1.get('_all_dbs'), expected)
+        self.assertEqual(s2.get('_all_dbs'), expected)
+
 
