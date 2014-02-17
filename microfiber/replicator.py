@@ -258,7 +258,6 @@ def load_session(src_id, src, dst_id, dst):
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
         session['update_seq'] = min(src_update_seq, dst_update_seq)
-        log.info('resuming replication session: %s', dumps(session, True))
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
     # Other session state we don't want to log above:
@@ -370,9 +369,23 @@ def replicate_continuously(session):
         session['dst_fqn'],
     )
     session['feed'] = 'longpoll'
+    last = time.monotonic()
     while True:
         if replicate_one_batch(session):
-            save_session(session)
+            now = time.monotonic()
+            if now - last > 30:
+                last = now
+                save_session(session)
+                log.info('checkpoint at %d: %s =>  %s',
+                    session['update_seq'],
+                    session['src_fqn'],
+                    session['dst_fqn'],
+                )
+
+
+def replicate_then_replicate_continuously(session):
+    replicate(session)
+    replicate_continuously(session)
 
 
 def iter_normal_names(src):
@@ -398,8 +411,8 @@ class Replicator:
 
     def run(self):
         names = self.get_names()
+        log.info('initial replications: %r', names)
         self.bring_up(names)
-        log.info('current replications: %r', sorted(self.threads))
         while True:
             self.monitor_once()
 
@@ -468,16 +481,13 @@ class Replicator:
     def restart_thread(self, name):
         """
         Start continuous replication in a new thread.
-
-        Unlike the initial bring up, when a replication thread crashes, or when
-        a new database is added, we go directly to continuous replication.
         """
         assert name not in self.threads
         src = self.src.database(name)
         dst = self.dst.database(name)
         session = load_session(self.src_id, src, self.dst_id, dst)
         thread = threading.Thread(
-            target=replicate_continuously,
+            target=replicate_then_replicate_continuously,
             args=(session,),
             daemon=True,
         )
