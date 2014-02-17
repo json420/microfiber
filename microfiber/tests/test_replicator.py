@@ -76,12 +76,14 @@ def random_doc(i):
 
 
 def wait_for_sync(db1, db2):
+    assert db1.url != db2.url
+    assert db1.name == db2.name
     for i in range(30):
-        time.sleep(0.5)
         tophash1 = db1.get_tophash()
         tophash2 = db2.get_tophash()
         if tophash1 == tophash2:
             return tophash1
+        time.sleep(0.5)
     raise Exception(
         'could not achive sync: {} != {}'.format(tophash1, tophash2)
     )
@@ -527,6 +529,18 @@ class TestReplicator(TestCase):
         # Shutdown Replicators, create a bunch O conflicts:
         s1_to_s2.terminate()
         s2_to_s1.terminate()
+
+        # a will have no changes
+
+        # b will have chances just on s1 end:
+        for doc in db1b.iter_all_docs():
+            add_random_attachment(doc)
+            db1b.save(doc)
+        db1b.save_many([random_doc(i) for i in range(69)])
+        tophash_1b = db1b.get_tophash()
+        self.assertNotEqual(tophash_1b, tophash_b)
+
+        # c will get changes on both ends:
         docs = list(db1c.iter_all_docs())
         ids = tuple(d['_id'] for d in docs)
         for doc in docs:
@@ -548,12 +562,17 @@ class TestReplicator(TestCase):
         # Start replicator back up:
         s1_to_s2 = replicator.TempReplicator(s1.env, s2.env)
         s2_to_s1 = replicator.TempReplicator(s2.env, s1.env)
+
+        # A not have changed:
+        self.assertEqual(db1a.get_tophash(), tophash_a)
+        self.assertEqual(db2a.get_tophash(), tophash_a)
+
+        # B should have be in the state that db1b was in:
+        tophash_b = wait_for_sync(db1b, db2b)
+        self.assertEqual(tophash_b, tophash_1b)
+
+        # C should be in new a state neither were in:
         tophash_c = wait_for_sync(db1c, db2c)
         self.assertNotIn(tophash_c, {tophash_1c, tophash_2c})
 
-        # A and B are should not have changed:
-        self.assertEqual(db1a.get_tophash(), tophash_a)
-        self.assertEqual(db2a.get_tophash(), tophash_a)
-        self.assertEqual(db1b.get_tophash(), tophash_b)
-        self.assertEqual(db2b.get_tophash(), tophash_b)
 
