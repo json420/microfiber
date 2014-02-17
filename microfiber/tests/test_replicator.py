@@ -425,3 +425,5 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
+
+        self.assertEqual(db1.get_tophash(), db2.get_tophash())
