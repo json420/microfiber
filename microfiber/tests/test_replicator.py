@@ -400,6 +400,7 @@ class TestFunctions(TestCase):
             doc['marker'] = 'baz'
         db2.save_many(docs2)
 
+        self.assertNotEqual(db1.get_tophash(), db2.get_tophash())
         self.assertIsNone(replicator.replicate(session))
         self.assertEqual(session['doc_count'], 207)
         self.assertEqual(session['update_seq'], 311)
@@ -425,5 +426,4 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
-
         self.assertEqual(db1.get_tophash(), db2.get_tophash())
