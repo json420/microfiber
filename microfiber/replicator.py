@@ -420,8 +420,8 @@ class Replicator:
         start = time.monotonic()
         self.reap_threads()
         delta = time.monotonic() - start
-        if delta < 15:
-            time.sleep(15 - delta)
+        if delta < 5:
+            time.sleep(5 - delta)
         self.dst.get()  # Make sure we can still reach dst server
         names = self.get_names()  # Will do same for src server
         for name in set(names) - set(self.threads):
@@ -465,7 +465,7 @@ class Replicator:
             thread.start()
             self.threads[name] = thread
 
-    def reap_threads(self, timeout=2):
+    def reap_threads(self, timeout=1):
         reaped = []
         for name in sorted(self.threads):
             thread = self.threads[name]
@@ -509,3 +509,18 @@ def start_replicator(src_env, dst_env, names_filter_func=None):
     )
     process.start()
     return process
+
+
+class TempReplicator:
+    def __init__(self, src_env, dst_env, names_filter_func=None):
+        self.process = start_replicator(src_env, dst_env, names_filter_func)
+
+    def __del__(self):
+        self.terminate()
+
+    def terminate(self):
+        if getattr(self, 'process', None) is not None:
+            self.process.terminate()
+            self.process.join()
+            self.process = None
+
