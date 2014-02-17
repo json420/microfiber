@@ -385,3 +385,43 @@ class TestFunctions(TestCase):
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
+
+        # Lets try with conflicts:
+        docs1 = db1.get_many(ids)
+        for doc in docs1:
+            doc['marker'] = 'foo'
+        db1.save_many(docs1)
+        for doc in docs1:
+            doc['marker'] = 'bar'
+        db1.save_many(docs1)
+
+        docs2 = db2.get_many(ids)
+        for doc in docs2:
+            doc['marker'] = 'baz'
+        db2.save_many(docs2)
+
+        self.assertIsNone(replicator.replicate(session))
+        self.assertEqual(session['doc_count'], 207)
+        self.assertEqual(session['update_seq'], 311)
+        self.assertEqual(session, 
+            {
+                'src': db1,
+                'dst': db2,
+                'src_doc': {
+                    '_id': '_local/myrep',
+                    '_rev': '0-7',
+                    'session_id': 'mysession',
+                    'update_seq': 311,
+                },
+                'dst_doc': {
+                   '_id': '_local/myrep',
+                    '_rev': '0-7',
+                    'session_id': 'mysession',
+                    'update_seq': 311,
+                },
+                'session_id': 'mysession',
+                'doc_count': 207,
+                'update_seq': 311,
+            }
+        )
+        self.assertEqual(db1.get_many(ids), db2.get_many(ids))
