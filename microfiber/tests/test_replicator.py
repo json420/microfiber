@@ -25,12 +25,46 @@ Unit tests for the `microfiber.replicator` module.
 """
 
 from unittest import TestCase
+import os
+from random import SystemRandom
 
 from dbase32 import random_id
 from usercouch.misc import TempCouch
 
-from microfiber import Database
+from microfiber import Database, Attachment, encode_attachment
 from microfiber import replicator
+
+
+random = SystemRandom()
+
+
+def random_dbname():
+    return 'db-' + random_id().lower()
+
+
+def random_attachment():
+    size = random.randint(1, 34969)
+    data = os.urandom(size)
+    return Attachment('application/octet-stream', data)
+
+
+def add_random_attachment(doc):
+    att = random_attachment()
+    doc['_attachments'][random_id()] = encode_attachment(att) 
+
+
+def random_doc(i):
+    """
+    1/3rd of docs will have an attachment.
+    """
+    doc = {
+        '_id': random_id(30),
+        '_attachments': {},
+        'i': i,
+    }
+    if i % 3 == 0:
+        add_random_attachment(doc)
+    return doc
 
 
 class TestFunctions(TestCase):
@@ -217,4 +251,137 @@ class TestFunctions(TestCase):
 
         # Directly make sure docs actually match:
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
-        
+
+    def test_replicate(self):
+        # Create two CouchDB instances, a Database for each:
+        couch1 = TempCouch()
+        db1 = Database('mydb', couch1.bootstrap())
+        db1.put(None)  # Create DB1
+        couch2 = TempCouch()
+        db2 = Database('mydb', couch2.bootstrap())
+        db2.put(None)  # Create DB2
+
+        # We'll need a minimal session dict:
+        session = {
+            'src': db1,
+            'dst': db2,
+            'src_doc': {'_id': '_local/myrep'},
+            'dst_doc': {'_id': '_local/myrep'},
+            'session_id': 'mysession',
+            'doc_count': 0,
+        }
+
+        # First try when src is empty:
+        self.assertIsNone(replicator.replicate(session))
+        self.assertEqual(session, 
+            {
+                'src': db1,
+                'dst': db2,
+                'src_doc': {
+                    '_id': '_local/myrep',
+                    '_rev': '0-1',
+                    'session_id': 'mysession',
+                    'update_seq': 0,
+                },
+                'dst_doc': {
+                   '_id': '_local/myrep',
+                    '_rev': '0-1',
+                    'session_id': 'mysession',
+                    'update_seq': 0,
+                },
+                'session_id': 'mysession',
+                'doc_count': 0,
+                'update_seq': 0,
+            }
+        )
+
+        # Create and save some random test docs, replicate:
+        docs = [random_doc(i) for i in range(69)]
+        ids = tuple(d['_id'] for d in docs)
+        db1.save_many(docs)
+        self.assertIsNone(replicator.replicate(session))
+        self.assertEqual(session, 
+            {
+                'src': db1,
+                'dst': db2,
+                'src_doc': {
+                    '_id': '_local/myrep',
+                    '_rev': '0-3',
+                    'session_id': 'mysession',
+                    'update_seq': 69,
+                },
+                'dst_doc': {
+                   '_id': '_local/myrep',
+                    '_rev': '0-3',
+                    'session_id': 'mysession',
+                    'update_seq': 69,
+                },
+                'session_id': 'mysession',
+                'doc_count': 69,
+                'update_seq': 69,
+            }
+        )
+        self.assertEqual(db1.get_many(ids), db2.get_many(ids))
+
+        # Should have no change if run again from current session:
+        self.assertIsNone(replicator.replicate(session))
+        self.assertEqual(session, 
+            {
+                'src': db1,
+                'dst': db2,
+                'src_doc': {
+                    '_id': '_local/myrep',
+                    '_rev': '0-3',
+                    'session_id': 'mysession',
+                    'update_seq': 69,
+                },
+                'dst_doc': {
+                   '_id': '_local/myrep',
+                    '_rev': '0-3',
+                    'session_id': 'mysession',
+                    'update_seq': 69,
+                },
+                'session_id': 'mysession',
+                'doc_count': 69,
+                'update_seq': 69,
+            }
+        )
+        self.assertEqual(db1.get_many(ids), db2.get_many(ids))
+
+        # Add a random attachment on the first 17 docs:
+        for doc in docs[:17]:
+            add_random_attachment(doc)
+            db1.save(doc)
+
+        # Make a no-change update on all 69 docs:
+        db1.save_many(docs)
+
+        # Add a random attachment on the last 18 docs:
+        for doc in docs[-18:]:
+            add_random_attachment(doc)
+            db1.save(doc)
+
+        # Run again
+        self.assertIsNone(replicator.replicate(session))
+        self.assertEqual(session, 
+            {
+                'src': db1,
+                'dst': db2,
+                'src_doc': {
+                    '_id': '_local/myrep',
+                    '_rev': '0-5',
+                    'session_id': 'mysession',
+                    'update_seq': 173,
+                },
+                'dst_doc': {
+                   '_id': '_local/myrep',
+                    '_rev': '0-5',
+                    'session_id': 'mysession',
+                    'update_seq': 173,
+                },
+                'session_id': 'mysession',
+                'doc_count': 138,
+                'update_seq': 173,
+            }
+        )
+        self.assertEqual(db1.get_many(ids), db2.get_many(ids))

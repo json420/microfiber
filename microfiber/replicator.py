@@ -229,12 +229,13 @@ def load_session(src_id, src, dst_id, dst):
     session_id = src_doc.get('session_id')
     src_update_seq = src_doc.get('update_seq')
     dst_update_seq = dst_doc.get('update_seq')
+
+    # Some session state is just to make logging/debugging easier:
     session = {
-        'replication_id': replication_id,
+        'src_fqn': '{}.{}'.format(src_id, src.name),
         'src_doc': src_doc,
         'dst_doc': dst_doc,
-        'session_id': log_id(),  # ID for this new session,
-        'doc_count': 0,
+        'dst_fqn': '{}.{}'.format(dst_id, dst.name),
     }
     if (
             session_id == dst_doc.get('session_id')
@@ -246,8 +247,11 @@ def load_session(src_id, src, dst_id, dst):
         log.info('resuming replication session: %s', dumps(session, True))
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
+    # Other session state we don't want to log above:
     session['src'] = src
     session['dst'] = dst
+    session['session_id'] = log_id()  # ID for this new session
+    session['doc_count'] = 0
     return session
 
 
@@ -266,7 +270,6 @@ def save_session(session):
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
-    log.debug('checkpoint %s at %d', session['replication_id'], update_seq)
 
 
 def changes_for_revs_diff(result):
@@ -324,7 +327,7 @@ def replicate_one_batch(session):
 
 
 def replicate(session):
-    log.info('%r => %r', session['src'], session['dst'])
+    log.info('replicate: %s =>  %s', session['src'], session['dst'])
     session.pop('feed', None)
     stop_at_seq = session['src'].get()['update_seq']
     start = time.monotonic()
@@ -336,13 +339,16 @@ def replicate(session):
             )
             break
     elapsed = time.monotonic() - start
-    log.info('%.3f seconds to replicate %d docs from %r to %r',
+    log.info('%.3fs to replicate %d docs from %r to %r',
         elapsed, session['doc_count'], session['src'], session['dst']
     )
 
 
 def replicate_continuously(session):
-    log.info('%r => %r', session['src'], session['dst'])
+    log.info('replicate_continuously: %s =>  %s',
+        session['src_fqn'],
+        session['dst_fqn'],
+    )
     session['feed'] = 'longpoll'
     while True:
         if replicate_one_batch(session):
