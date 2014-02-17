@@ -181,42 +181,67 @@ from . import dumps, NotFound, BadRequest, Server
 log = logging.getLogger()
 
 
-def build_replication_id(src_node, src_db, dst_node, dst_db):
+def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     """
     Build a replication ID.
 
     For example:
 
     >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO')
-    'I9HEKKQC6IUCLKY7B7NC6PD4KFCHP8TRKU4V37AUVSLWS4X3'
+    'SLAIFEESGWH9C4DASBK4PMGI58F89IQWMI3FKCI6E3P7PSLU'
 
     Note that the replication ID is directional, ie, that A=>B does not get the
     same replication ID as B=>A:
 
     >>> build_replication_id('node-B', 'db-FOO', 'node-A', 'db-FOO')
-    '5MRNDPQEJ7WF8QJFF4PVAWGMUGQSOVP4SVCHOPC34G9X48GA'
+    'D8AD3O8WBA679Q35XVL58CEX3UKEFPD8BNUU6HTX7G3RUVWP'
 
     Also note that the source and destination database names influence the
     replication ID:
 
     >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-BAR')
-    'JSU5ACIFAVHYLOF593CPXP6IYT9DEPGFVMKK737ETAYAX8WQ'
+    'RDJXJIY6R8JNDRMVBI3VYDUN8IF76VNOT66CVICJDE3Y6XQG'
 
     And likewise have the same directional property:
 
     >>> build_replication_id('node-A', 'db-BAR', 'node-B', 'db-FOO')
-    '6CBC7U6VVWARESMEG9D4YTQF78RJRVFDCAPHEC8ONSAKEMW9'
+    '4FYW5LTBNFWJKBDJ8TGIBG9ERVG7RJ7936SM696FSO6RY5J6'
 
-    Finally, note that the resulting ID will be the same whether a replicator
-    running on the source is pushing to the destination, or a replicator running
-    on the destination is pulling from the source.  The only important thing is
-    which is the source and which is the destination, regardless where the
-    replicator is running.  In fact, the replicator could be running on a third
-    machine altogether.
+    Finally, the ID is different depending on whether your intent is "push" mode
+    or "pull" mode:
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO', mode='push')
+    'SLAIFEESGWH9C4DASBK4PMGI58F89IQWMI3FKCI6E3P7PSLU'
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO', mode='pull')
+    '9VUNRR98XJVHG7BBU4VUVQW7MDB9HFX8FU7NHPN8UO53AI5L'
+
+    In a nutshell, the hashed JSON Object includes a "replication_node"
+    attribute for the ID of the machine the replicator is running on, which
+    could actually be a 3rd machine altogether.  However, for now we don't need
+    that, so the API just exposes the 'push' or 'pull' mode flag to select
+    either the *src_node* or the *dst_node* as the replicator_node,
+    respectively.
+
+    It's tempting to use the same replication ID in each the push and pull
+    direction, so that, say, a push replication on the *src_node* could later be
+    resumed as pull replication running on the *dst_node*.  However, it's
+    prudent for one replicator not to trust the work done by another.  It could
+    be different versions of the software, etc.  In Dmedia in particular, we
+    want to use pull replication as independent mechanism for verifying that the
+    push replication is working, and as a fall-back mechanism if the push
+    replication fails for any reason.
     """
     assert (src_node, src_db) != (dst_node, dst_db)
+    if mode == 'push':
+        replicator_node = src_node
+    elif mode == 'pull':
+        replicator_node = dst_node
+    else:
+        raise ValueError("mode must be 'push' or 'pull'; got {!r}".format(mode))
     info = {
         'replicator': 'microfiber/protocol0',
+        'replicator_node': replicator_node,
         'src_node': src_node,
         'src_db': src_db,
         'dst_node': dst_node,
@@ -235,11 +260,11 @@ def get_checkpoint(db, replication_id):
         return {'_id': local_id}
 
 
-def load_session(src_id, src, dst_id, dst):
-    replication_id = build_replication_id(src_id, src.name, dst_id, dst.name)
-    src_doc = get_checkpoint(src, replication_id)
+def load_session(src_id, src, dst_id, dst, mode='push'):
+    _id = build_replication_id(src_id, src.name, dst_id, dst.name, mode)
+    src_doc = get_checkpoint(src, _id)
     dst.ensure()  # Create destination DB if needed
-    dst_doc = get_checkpoint(dst, replication_id)
+    dst_doc = get_checkpoint(dst, _id)
     session_id = src_doc.get('session_id')
     src_update_seq = src_doc.get('update_seq')
     dst_update_seq = dst_doc.get('update_seq')
