@@ -1,9 +1,5 @@
-# -*- coding: utf-8; tab-width: 4; mode: python -*-
-# emacs: -*- mode: python; py-indent-offset: 4; indent-tabs-mode: t -*-
-# vi: set ft=python sts=4 ts=4 sw=4 noet 
-#
 # microfiber: fabric for a lightweight Couch
-# Copyright (C) 2011-2012 Novacut Inc
+# Copyright (C) 2011-2014 Novacut Inc
 #
 # This file is part of `microfiber`.
 #
@@ -1222,3 +1218,18 @@ class Database(CouchBase):
         func(doc, *args)
         self.save(doc)
         return doc
+
+    def get_tophash(self):
+        parts = ('_all_docs',)
+        options = {'include_docs': True}
+        headers = {'accept': 'application/json'}
+        response = self.request('GET', parts, options, None, headers)
+        assert response.headers['content-type'] == 'application/json'
+        assert response.headers['transfer-encoding'] == 'chunked'
+        h = sha1()
+        while True:
+            chunk = response.body.readchunk()
+            if not chunk:
+                break
+            h.update(chunk)
+        return h.hexdigest()
