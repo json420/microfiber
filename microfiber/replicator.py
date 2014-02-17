@@ -36,6 +36,21 @@ Replication loop
 The low-level replication is done by calling `replicate_one_batch()` over and
 over, which will:
 
+    1. GET /src/_changes to get up to 50 changes, optionally from *since*
+
+    2. Transform above changes into format needed by POST /dst/_revs_diff,
+       filtering docs whose ID starts with "_" (underscore)
+
+    3. POST /dst/_revs_diff with transformed changes from above, to get a list
+       of missing revisions
+
+    4. GET /src/doc for each missing revision
+
+    5. POST /dst/_bulk_docs with docs collected above
+
+    6. Checkpoint session at /src/_local/rep_id and /dst/_local/rep_id
+
+
 To get started, we need two `TempCouch` instances and a `Database` instance for
 each:
 
@@ -150,7 +165,6 @@ function, for example:
         ]
     }
 }
-
 
 """
 
@@ -273,6 +287,12 @@ def save_session(session):
 
 
 def changes_for_revs_diff(result):
+    """
+    Transform a _changes feed into form needed for posting to _revs_diff.
+
+    WARNING: This will filter out design documents and any other special docs
+    whose ID starts with "_" (underscore).
+    """
     changes = {}
     for row in result['results']:
         if row['id'][0] != '_':
