@@ -242,15 +242,21 @@ All the method examples below assume this setup:
 
         POST *obj*.
 
-        For example, to create the doc "doc2" in the database "db1":
+        For example, to create the doc "doc2" in the database "db2", we'll first
+        create "db2":
 
         >>> cb = CouchBase(env)
-        >>> cb.post({'_id': 'doc2'}, 'db1')['rev']
+        >>> cb.put(None, "db2")
+        {'ok': True}
+
+        And now we'll save the "doc2" document:
+
+        >>> cb.post({'_id': 'doc2'}, 'db2')['rev']
         '1-967a00dff5e02add41819138abb3284d'
 
-        Or to compact the database "db1":
+        Or to compact the database "db2":
 
-        >>> cb.post(None, 'db1', '_compact')
+        >>> cb.post(None, 'db2', '_compact')
         {'ok': True}
 
 
@@ -293,11 +299,16 @@ All the method examples below assume this setup:
     
         Make a DELETE request.
 
-        For example, to delete the doc "doc2" in the database "db1":
+        For example, to delete the doc "doc2" in the database "db2":
 
         >>> cb = CouchBase(env)
-        >>> cb.delete('db1', 'doc2', rev='1-967a00dff5e02add41819138abb3284d')['rev']
+        >>> cb.delete('db2', 'doc2', rev='1-967a00dff5e02add41819138abb3284d')['rev']
         '2-eec205a9d413992850a6e32678485900'
+
+        Or two delete the "db2" database:
+
+        >>> cb.delete('db2')
+        {'ok': True}
 
 
     .. method:: put_att(content_type, data, *parts, **options)
@@ -582,6 +593,7 @@ Functions
 
     For example:
 
+    >>> from microfiber import dumps
     >>> doc = {
     ...     'hello': 'мир',
     ...     'welcome': 'все',
@@ -591,8 +603,9 @@ Functions
 
     Whereas if you directly call ``json.dumps()`` without *ensure_ascii=False*:
 
+    >>> import json
     >>> json.dumps(doc, sort_keys=True)
-    '{"hello": "\\\\u043c\\\\u0438\\\\u0440", "welcome": "\\\\u0432\\\\u0441\\\\u0435"}'
+    '{"hello": "\\u043c\\u0438\\u0440", "welcome": "\\u0432\\u0441\\u0435"}'
 
     By default compact encoding is used, but if you supply *pretty=True*,
     4-space indentation will be used:
@@ -604,18 +617,6 @@ Functions
     }
 
 
-.. function:: dc3_env()
-
-    Return the dc3 environment information.
-
-    For example, to create a :class:`Database` with the correct per-user `dc3`_
-    environment:
-
-    >>> from microfiber import dc3_env, Database
-    >>> db = Database('dmedia-0', dc3_env())
-    >>> db.url
-    'http://localhost:41289/'
-
 
 .. function:: dmedia_env()
 
@@ -625,9 +626,7 @@ Functions
     `Dmedia`_ environment:
 
     >>> from microfiber import dmedia_env, Database
-    >>> db = Database('dmedia-0', dmedia_env())
-    >>> db.url
-    'http://localhost:41289/'
+    >>> db = Database('dmedia-1', dmedia_env())  #doctest: +SKIP 
 
     If you're using Microfiber to work with `Dmedia`_ or `Novacut`_, please use
     this function instead of :func:`dc3_env()` as starting with the Dmedia 12.01
