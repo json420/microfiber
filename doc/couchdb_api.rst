@@ -4,9 +4,9 @@ CouchDB REST API
 
 .. py:currentmodule:: microfiber
 
-This is a quick tour of the CouchDB REST API, as you would use it from
-Microfiber.  This is indented as a quick reference, and as such not all the API
-is documented here.  For more details, see the full `CouchDB REST API`_.
+This is a tour of some key aspects of CouchDB REST API, as used from Microfiber.
+This is indented as a quick reference, and as such not all the API is documented
+here.  For that, see the full `CouchDB REST API`_ documentation.
 
 All the examples assume the following setup:
 
@@ -199,8 +199,8 @@ Or using a :class:`Server`:
 
 
 
-Documents
-=========
+Document
+========
 
 You'll generally perform document-level actions using a :class:`Database`
 instance, but you can do the same using a :class:`Server` instance.
@@ -274,42 +274,108 @@ Or using a :class:`Server`:
 {'_rev': '2-7051cbe5c8faecd085a3fa619e6e6337', '_id': 'mydoc'}
 
 
+``DELETE /db/doc``
+------------------
 
-Delete
-------
+This will delete a document.  Note that a small document tombstone will still
+exist so that the deletion can be replicated between nodes.
 
-**DELETE /db/doc**
+>>> couch = TempCouch()
+>>> env = couch.bootstrap()
+>>> server = Server(env)
+>>> db = Database('mydb', env)
+>>> db.put(None)
+{'ok': True}
 
-This will delete a document.  A :exc:`NotFound` exception is raised if the
-document does not exist.
+For example, using a :class:`Server`:
 
-A :exc:`Conflict` exception is raised if the *rev* keyword argument doesn't
+>>> server.post({'_id': 'doc1'}, 'mydb')['rev']
+'1-967a00dff5e02add41819138abb3284d'
+>>> server.delete('mydb', 'doc1', rev='1-967a00dff5e02add41819138abb3284d')['rev']
+'2-eec205a9d413992850a6e32678485900'
+
+Or using a :class:`Database`:
+
+>>> db.post({'_id': 'doc2'})['rev']
+'1-967a00dff5e02add41819138abb3284d'
+>>> db.delete('doc2', rev='1-967a00dff5e02add41819138abb3284d')['rev']
+'2-eec205a9d413992850a6e32678485900'
+
+A :exc:`NotFound` exception is raised if the document does not exist.  For
+example, using a :class:`Server`:
+
+>>> server.delete('mydb', 'mydoc')
+Traceback (most recent call last):
+  ...
+microfiber.NotFound: 404 Object Not Found: DELETE /mydb/mydoc
+
+Or using a :class:`Database`:
+
+>>> db.delete('mydoc')
+Traceback (most recent call last):
+  ...
+microfiber.NotFound: 404 Object Not Found: DELETE /mydb/mydoc
+
+When the document exists, a :exc:`Conflict` exception is raised if you don't
+supply the *rev* keyword argument.
+
+For example, we'll create a document:
+
+>>> mydoc = {'_id': 'mydoc'}
+>>> mydoc['_rev'] = db.post(mydoc)['rev']
+>>> mydoc['_rev']
+'1-967a00dff5e02add41819138abb3284d'
+
+And then try to delete it using a :class:`Server`:
+
+>>> server.delete('mydb', 'mydoc')
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: DELETE /mydb/mydoc
+
+Or try deleting it using a :class:`Database`:
+
+>>> db.delete('mydoc')
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: DELETE /mydb/mydoc
+
+Likewise, a :exc:`Conflict` exception is raised the *rev* you supply doesn't
 match the latest revision of the document in CouchDB (meaning the document has
 been updated since you last retrieved it).
 
-Using a :class:`Database`:
+For example, we'll modify "mydoc":
 
->>> db = Database('mydb')
->>> db.delete('mydoc', rev='2-7051cbe5c8faecd085a3fa619e6e6337')
-{'rev': '3-7379b9e515b161226c6559d90c4dc49f', 'ok': True, 'id': 'mydoc'}
+>>> mydoc['message'] = 'hello, world'
+>>> db.post(mydoc)['rev']
+'2-91babf69deda1e2767615ba457c80807'
+
+And then try to delete the document using the outdated revision
+``'1-967a00dff5e02add41819138abb3284d'``, first using a :class:`Server`:
+
+>>> server.delete('mydb', 'mydoc', rev='1-967a00dff5e02add41819138abb3284d')
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: DELETE /mydb/mydoc?rev=1-967a00dff5e02add41819138abb3284d
+
+And second using a :class:`Database`:
+
+>>> db.delete('mydoc', rev='1-967a00dff5e02add41819138abb3284d')
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: DELETE /mydb/mydoc?rev=1-967a00dff5e02add41819138abb3284d
 
 
-Or using a :class:`Server`:
 
->>> s = Server()
->>> s.delete('mydb', 'mydoc', rev='2-7051cbe5c8faecd085a3fa619e6e6337')
-{'rev': '3-7379b9e515b161226c6559d90c4dc49f', 'ok': True, 'id': 'mydoc'}
-
-
-
-Attachments
-===========
+Attachment
+==========
 
 You'll generally perform attachment-level actions using a :class:`Database`
 instance, but you can do the same using a :class:`Server` instance.
 
-PUT /db/doc/att
----------------
+
+``PUT /db/doc/att``
+-------------------
 
 You create document attachments using the :meth:`CouchBase.put_att()` method.
 
@@ -327,49 +393,49 @@ If you're creating an attachment for a document that does not yet exists, the
 by CouchDB.  For example, using a :class:`Server`:
 
 >>> server.put_att('text/plain', b'Foo', 'mydb', 'doc1', 'foo')['rev']
-'1-03cca5d29ff7a7f15562e52789ff4e8f'
+'1-383671a0277edeb17918f714d1c5b63e'
 
 Or using using a :class:`Database`:
 
->>> db.put_att('text/plain', b'Foo', 'mydb', 'doc1', 'foo')['rev']
-'1-03cca5d29ff7a7f15562e52789ff4e8f'
+>>> db.put_att('text/plain', b'Foo', 'mydb', 'doc2', 'foo')['rev']
+'1-183074fa494ac6e04d360e6354057360'
 
-If the document exists, you must include *rev*.
+If the document exists, you must provide *rev* keyword argument.  For example,
+to add a 2nd attachment to "doc1" using a :class:`Server`:
 
-A :exc:`Conflict` exception is raised if the *rev* keyword argument doesn't
-match the latest revision of the document in CouchDB (meaning the document has
-been updated since you last retrieved it).
+>>> server.put_att('text/plain', b'Bar', 'mydb', 'doc1', 'bar', rev='1-383671a0277edeb17918f714d1c5b63e')['rev']
+'2-8654772d9053f1c949bffe3cf7ef4aa2'
 
-Using a :class:`Database` when the document does *not* exists:
+Or to add a 2nd attachment to "doc2" using using a :class:`Database`:
 
->>> db = Database('mydb')
->>> db.put_att('image/png', b'PNG Data', 'mydoc', 'myatt')
-{'rev': '1-904eb7a25f6c4df64f49b0eeeb27dbbc', 'ok': True, 'id': 'mydoc'}
+>>> db.put_att('text/plain', b'Bar', 'mydb', 'doc2', 'bar', rev='1-183074fa494ac6e04d360e6354057360')['rev']
+'2-d37c9c0cedace0a2a857deed922b330e'
 
-Or using a :class:`Database` when the document does exists:
+A :exc:`Conflict` exception is raised if you don't include the *rev* keyword
+argument, of if the *rev* doesn't match the latest revision of the document in
+CouchDB (meaning the document has been updated since you last retrieved it).
 
->>> db.put_att('image/png', b'PNG Data', 'mydoc', 'myatt2',
-...     rev='1-904eb7a25f6c4df64f49b0eeeb27dbbc'
-... )
-{'rev': '2-1e294b322cd16610bf3becb62167f7f2', 'ok': True, 'id': 'mydoc'}
+For example, if trying to add a 3rd attachment to "doc1" using a
+:class:`Server` and the outdated revision
+``'1-383671a0277edeb17918f714d1c5b63e'``:
+
+>>> server.put_att('text/plain', b'Baz', 'mydb', 'doc1', 'baz', rev='1-383671a0277edeb17918f714d1c5b63e')['rev']
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: PUT /mydb/doc1/baz?rev=1-383671a0277edeb17918f714d1c5b63e
+
+Or if trying to add a 3rd attachment to "doc2" using a
+:class:`Database` and the outdated revision
+``'1-183074fa494ac6e04d360e6354057360'``:
+
+>>> db.put_att('text/plain', b'Baz', 'mydb', 'doc2', 'baz', rev='1-183074fa494ac6e04d360e6354057360')['rev']
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: PUT /mydb/doc2/baz?rev=1-183074fa494ac6e04d360e6354057360
 
 
-Using a :class:`Server` when the document does *not* exists:
-
->>> s = Server()
->>> s.put_att('image/png', b'PNG Data', 'mydb', 'mydoc', 'myatt')
-{'rev': '1-904eb7a25f6c4df64f49b0eeeb27dbbc', 'ok': True, 'id': 'mydoc'}
-
-Or using a :class:`Server` when the document does exists:
-
->>> s.put_att('image/png', b'PNG Data', 'mydb', 'mydoc', 'myatt2',
-...     rev='1-904eb7a25f6c4df64f49b0eeeb27dbbc'
-... )
-{'rev': '2-1e294b322cd16610bf3becb62167f7f2', 'ok': True, 'id': 'mydoc'}
-
-
-GET /db/doc/att
----------------
+``GET /db/doc/att``
+-------------------
 
 You retrieve document attachments using the :meth:`CouchBase.get_att()` method.
 
@@ -415,8 +481,8 @@ Or using :class:`Database`:
 Attachment(content_type='text/plain', data=b'hello, world')
 
 
-DELETE /db/doc/att
-------------------
+``DELETE /db/doc/att``
+----------------------
 
 For setup, we'll do this:
 
@@ -481,6 +547,7 @@ Or using :class:`Database`:
 '5-aca674de3a1607e3003e5d4e7c0337d6'
 
 
+
 Server
 ======
 
@@ -493,8 +560,8 @@ Setup for the examples:
 >>> s = Server(env)
 
 
-GET /
------
+``GET /``
+---------
 
 This will retrieve a ``dict`` containing the CouchDB welcome response, which
 will include the CouchDB version and other useful info.
@@ -503,8 +570,8 @@ will include the CouchDB version and other useful info.
 ['couchdb', 'uuid', 'vendor', 'version']
 
 
-GET /_all_dbs
--------------
+``GET /_all_dbs``
+-----------------
 
 This will retrieve the list of databases in this CouchDB instance.  For example,
 when no user-created databases exists:
