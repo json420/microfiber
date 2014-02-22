@@ -24,47 +24,47 @@ You'll generally perform database-level actions using a :class:`Database`
 instance, but you can do the same using a :class:`Server` instance.
 
 
-Create
-------
-
-**PUT /db**
+``PUT /db``
+-----------
 
 This will create a new CouchDB database.  A :exc:`PreconditionFailed` exception
 is raised if a database with the same name already exists.
 
-Using a :class:`Database`:
+As setup for our examples, we'll do this:
 
 >>> couch = TempCouch()
->>> db = Database('mydb', couch.bootstrap())
+>>> env = couch.bootstrap()
+>>> server = Server(env)
+>>> db = Database('db2', env)
+
+Now we'll create "db1" using our :class:`Server`:
+
+>>> server.put(None, 'db1')
+{'ok': True}
+
+And then we'll create "db2" using our :class:`Database`:
+
 >>> db.put(None)
 {'ok': True}
 
-Or using a :class:`Database`, when the database already exists:
+A :exc:`PreconditionFailed` will be raised if we try again to create "db1":
+
+>>> server.put(None, 'db1')
+Traceback (most recent call last):
+  ...
+microfiber.PreconditionFailed: 412 Precondition Failed: PUT /db1
+
+Likewise, a :exc:`PreconditionFailed` will be raised if we try again to
+create "db2":
 
 >>> db.put(None)
 Traceback (most recent call last):
   ...
-microfiber.PreconditionFailed: 412 Precondition Failed: PUT /mydb/
-
-Using a :class:`Server`:
-
->>> couch = TempCouch()
->>> s = Server(couch.bootstrap())
->>> s.put(None, 'mydb')
-{'ok': True}
-
-Or using a :class:`Server`, when the database already exists:
-
->>> s.put(None, 'mydb')
-Traceback (most recent call last):
-  ...
-microfiber.PreconditionFailed: 412 Precondition Failed: PUT /mydb/
+microfiber.PreconditionFailed: 412 Precondition Failed: PUT /db2/
 
 
-Retrieve
---------
-
-**GET /db**
+``GET /db``
+-----------
 
 This will return a ``dict`` with useful information about the database. A
 :exc:`NotFound` exception is raised if the database does not exist.
@@ -102,10 +102,8 @@ Or using a :class:`Server`, when the database exists:
 ['committed_update_seq', 'compact_running', 'data_size', 'db_name', 'disk_format_version', 'disk_size', 'doc_count', 'doc_del_count', 'instance_start_time', 'purge_seq', 'update_seq']
 
 
-Changes
--------
-
-**GET /db/_changes**
+``GET /db/_changes``
+--------------------
 
 Using a :class:`Database`:
 
