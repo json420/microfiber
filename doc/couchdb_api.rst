@@ -5,10 +5,10 @@ CouchDB REST API
 .. py:currentmodule:: microfiber
 
 This is a tour of some key aspects of CouchDB REST API, as used from Microfiber.
-This is indented as a quick reference, and as such not all the API is documented
+This is intended as a quick reference, and as such not all the API is documented
 here.  For that, see the full `CouchDB REST API`_ documentation.
 
-All the examples assume the following setup:
+All the examples below need the following setup:
 
 >>> from usercouch.misc import TempCouch
 >>> from microfiber import Database, Server, dumps
@@ -154,131 +154,289 @@ Or using a :class:`Server`:
 }
 
 
-Compact
--------
+``POST /db/_compact``
+---------------------
 
-**POST /db/_compact**
-
-Using a :class:`Database`:
+This will trigger database compaction.  Note this has no effect if compaction
+is already running (in other words, only a single compaction task will ever be
+running per database).  As setup for our examples, we'll do this:
 
 >>> couch = TempCouch()
 >>> env = couch.bootstrap()
->>> db = Database('mydb', env)
->>> db.put(None)  # Create database 'mydb'
+>>> server = Server(env)
+>>> server.put(None, 'db1')
+{'ok': True}
+>>> db = Database('db2', env)
+>>> db.put(None)
+{'ok': True}
+
+To compact "db1" using our :class:`Server`:
+
+>>> server.post(None, 'db1', '_compact')
+{'ok': True}
+
+And to compact "db2" using our :class:`Database`:
+
 >>> db.post(None, '_compact')
 {'ok': True}
 
-Or using a :class:`Server`:
 
->>> s = Server(env)
->>> s.post(None, 'mydb', '_compact')
-{'ok': True}
+``DELETE /db``
+--------------
 
-
-Delete
-------
-
-**DELETE /db**
-
-This will delete the CouchDB database.  A :exc:`NotFound` exception is raised if
-the database does not exist.
-
-Using a :class:`Database`, when the database does *not* exist:
+This will delete the CouchDB database.  As setup for our examples, we'll do
+this:
 
 >>> couch = TempCouch()
 >>> env = couch.bootstrap()
->>> db = Database('mydb', env)
+>>> server = Server(env)
+>>> server.put(None, 'db1')
+{'ok': True}
+>>> db = Database('db2', env)
+>>> db.put(None)
+{'ok': True}
+
+For example, to delete "db1" using our :class:`Server`:
+
+>>> server.delete('db1')
+{'ok': True}
+
+Or to delete "db2' using our :class:`Database`:
+
 >>> db.delete()
 {'ok': True}
 
-Or using a :class:`Server`:
+A :exc:`NotFound` exception is raised if the database does not exist.  For
+example, if we try to delete the now non-existent "db1" using our
+:class:`Server`:
 
->>> s = Server()
->>> s.delete('mydb')
-{'ok': True}
+>>> server.delete('db1')
+Traceback (most recent call last):
+  ...
+microfiber.NotFound: 404 Object Not Found: DELETE /db1
+
+And if we try to delete the now non-existent "db2" using our :class:`Database`:
+
+>>> db.delete()
+Traceback (most recent call last):
+  ...
+microfiber.NotFound: 404 Object Not Found: DELETE /db2
 
 
 
-Document
-========
+Documents
+=========
 
 You'll generally perform document-level actions using a :class:`Database`
 instance, but you can do the same using a :class:`Server` instance.
 
 
-Create
-------
+``PUT /db/doc``
+---------------
 
-**POST /db**
+This can be used to create a new document, and likewise to update an existing
+document.
 
-This will create a new document.  A :exc:`Conflict` exception is raised if the
-document already exists.
+.. note::
 
-Using a :class:`Database`:
+    :meth:`Database.save()` is a better way to create and update documents as
+    it will automatically update ``doc['_rev']`` in-place for you
 
->>> db = Database('mydb')
->>> db.post({'_id': 'mydoc'})
-{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'mydoc'}
+As setup for our examples, we'll do this:
 
+>>> couch = TempCouch()
+>>> env = couch.bootstrap()
+>>> server = Server(env)
+>>> db = Database('mydb', env)
+>>> db.put(None)
+{'ok': True}
 
-Or using a :class:`Server`:
+For example, we'll create "doc1" using our :class:`Server`:
 
->>> s = Server()
->>> s.post({'_id': 'mydoc'}, 'mydb')
-{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'mydoc'}
+>>> server.put({'foo': 'bar'}, 'mydb', 'doc1')['rev']
+'1-4c6114c65e295552ab1019e2b046b10e'
 
+And we'll create "doc2" using our :class:`Database`:
 
-
-Update
-------
-
-**POST /db**
-
-This will update an existing document.  A :exc:`Conflict` exception is raised if
-``doc['_rev']`` doesn't match the latest revision of the document in CouchDB
-(meaning the document has been updated since you last retrieved it).
-
-Using a :class:`Database`:
-
->>> db = Database('mydb')
->>> db.post({'_id': 'mydoc', '_rev': '1-967a00dff5e02add41819138abb3284d'})
-{'rev': '2-7051cbe5c8faecd085a3fa619e6e6337', 'ok': True, 'id': 'mydoc'}
+>>> db.put({'foo': 'bar'}, 'doc2')['rev']
+'1-4c6114c65e295552ab1019e2b046b10e'
 
 
-Or using a :class:`Server`:
+``POST /db``
+------------
 
->>> s = Server()
->>> s.post({'_id': 'mydoc', '_rev': '1-967a00dff5e02add41819138abb3284d'}, 'mydb')
-{'rev': '2-7051cbe5c8faecd085a3fa619e6e6337', 'ok': True, 'id': 'mydoc'}
+This can be used to create a new document, and likewise to update an existing
+document.
+
+.. note::
+
+    :meth:`Database.save()` is a better way to create and update documents as
+    it will automatically update ``doc['_rev']`` in-place for you
+
+As setup for our examples, we'll do this:
+
+>>> couch = TempCouch()
+>>> env = couch.bootstrap()
+>>> server = Server(env)
+>>> db = Database('mydb', env)
+>>> db.put(None)
+{'ok': True}
+
+For example, we can create "doc1" using our :class:`Server`:
+
+>>> doc1 = {'_id': 'doc1'}
+>>> doc1['_rev'] = server.post(doc1, 'mydb')['rev']
+>>> doc1['_rev']
+'1-967a00dff5e02add41819138abb3284d'
+
+And we can create "doc2" using our :class:`Database`:
+
+>>> doc2 = {'_id': 'doc2'}
+>>> doc2['_rev'] = db.post(doc2)['rev']
+>>> doc2['_rev']
+'1-967a00dff5e02add41819138abb3284d'
+
+When updated a document, ``doc['_rev']`` must be included, otherwise a
+:exc:`Conflict` exception will be raised.
+
+Note that above we updated ``doc1`` and ``doc2`` in-place with the correct
+revision.  So now we can update "doc1" using our :class:`Server` like this:
+
+>>> server.post(doc1, 'mydb')['rev']
+'2-7051cbe5c8faecd085a3fa619e6e6337'
+
+And update "doc2" using our :class:`Database` like this:
+
+>>> db.post(doc2)['rev']
+'2-7051cbe5c8faecd085a3fa619e6e6337'
+
+A :exc:`Conflict` exception is raised if ``doc['_rev']`` doesn't match the
+latest revision of the document in CouchDB (meaning the document has been
+updated since you last retrieved it).
+
+Note that in the above updates, we did not update ``doc1`` and ``doc2`` with the
+correct revision:
+
+>>> print(dumps(doc1))
+{"_id":"doc1","_rev":"1-967a00dff5e02add41819138abb3284d"}
+>>> print(dumps(doc2))
+{"_id":"doc2","_rev":"1-967a00dff5e02add41819138abb3284d"}
+
+So when we try to update "doc1" this time using our :class:`Server`, a
+:exc:`Conflict` will be raised:
+
+>>> server.post(doc1, 'mydb')
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: POST /mydb
+
+And likewise when we try to update "doc2" using our :class:`Database`:
+
+>>> db.post(doc2)
+Traceback (most recent call last):
+  ...
+microfiber.Conflict: 409 Conflict: POST /
 
 
+``GET /db/doc``
+---------------
 
-Retrieve
---------
+This will retrieve a document from a database.  As setup for our examples, we'll
+do this:
 
-**GET /db/doc**
+>>> couch = TempCouch()
+>>> env = couch.bootstrap()
+>>> server = Server(env)
+>>> db = Database('mydb', env)
+>>> db.put(None)
+{'ok': True}
 
-A :exc:`NotFound` exception is raised if the document does not exist.
+A :exc:`NotFound` exception is raised if the document does not exist.  For
+example, using our :class:`Server`:
 
-Using a :class:`Database`:
+>>> server.get('mydb', 'mydoc')
+Traceback (most recent call last):
+  ...
+microfiber.NotFound: 404 Object Not Found: GET /mydb/mydoc
 
->>> db = Database('mydb')
+Or using our :class:`Database`:
+
 >>> db.get('mydoc')
-{'_rev': '2-7051cbe5c8faecd085a3fa619e6e6337', '_id': 'mydoc'}
+Traceback (most recent call last):
+  ...
+microfiber.NotFound: 404 Object Not Found: GET /mydb/mydoc
 
+On the other hand, if we create "mydoc":
 
-Or using a :class:`Server`:
+>>> mydoc = {'_id': 'mydoc'}
+>>> mydoc['_rev'] = db.post(mydoc)['rev']
+>>> mydoc['_rev']
+'1-967a00dff5e02add41819138abb3284d'
 
->>> s = Server()
->>> s.get('mydb', 'mydoc')
-{'_rev': '2-7051cbe5c8faecd085a3fa619e6e6337', '_id': 'mydoc'}
+We can retrieve it using our :class:`Server`:
+
+>>> doc = server.get('mydb', 'mydoc')
+>>> print(dumps(doc, pretty=True))
+{
+    "_id": "mydoc",
+    "_rev": "1-967a00dff5e02add41819138abb3284d"
+}
+
+Or retrieve it using our :class:`Database`:
+
+>>> doc = db.get('mydoc')
+>>> print(dumps(doc, pretty=True))
+{
+    "_id": "mydoc",
+    "_rev": "1-967a00dff5e02add41819138abb3284d"
+}
+
+If you supply the *rev* keyword argument, you can retrieve the contents of an
+older revisions of a document (assuming the database hasn't yet been compacted).
+
+.. warning::
+
+    You should *never* assume that older document revisions will be available!
+    When a database is compacted, only the latest revision of each document
+    will be preserved!
+
+    The term "revision" is quite suggestive, but CouchDB is *not* a version
+    control system.  CouchDB uses "revisions" as a concurrency control
+    mechanism, and nothing more.
+
+For example, let's create a new revision of "mydoc":
+
+>>> mydoc['message'] = 'hello, world'
+>>> db.post(mydoc)['rev']
+'2-91babf69deda1e2767615ba457c80807'
+
+We can explicitly retrieve ``'2-91babf69deda1e2767615ba457c80807'`` (which also
+happens to be the latest revision):
+
+>>> doc = db.get('mydoc', rev='2-91babf69deda1e2767615ba457c80807')
+>>> print(dumps(doc, pretty=True))
+{
+    "_id": "mydoc",
+    "_rev": "2-91babf69deda1e2767615ba457c80807",
+    "message": "hello, world"
+}
+
+Or we can retrieve ``'1-967a00dff5e02add41819138abb3284d'``, the previous
+revision:
+
+>>> doc = db.get('mydoc', rev='1-967a00dff5e02add41819138abb3284d')
+>>> print(dumps(doc, pretty=True))
+{
+    "_id": "mydoc",
+    "_rev": "1-967a00dff5e02add41819138abb3284d"
+}
 
 
 ``DELETE /db/doc``
 ------------------
 
-This will delete a document.  Note that a small document tombstone will still
-exist so that the deletion can be replicated between nodes.
+This will delete a document from a database.  Note that a small document
+tombstone will still exist so that the deletion can be replicated between nodes.
 
 >>> couch = TempCouch()
 >>> env = couch.bootstrap()
@@ -367,8 +525,8 @@ microfiber.Conflict: 409 Conflict: DELETE /mydb/mydoc?rev=1-967a00dff5e02add4181
 
 
 
-Attachment
-==========
+Attachments
+===========
 
 You'll generally perform attachment-level actions using a :class:`Database`
 instance, but you can do the same using a :class:`Server` instance.
