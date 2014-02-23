@@ -66,7 +66,7 @@ microfiber.PreconditionFailed: 412 Precondition Failed: PUT /db2/
 ``GET /db``
 -----------
 
-This will return a ``dict`` with useful information about the database. A
+This will return a ``dict`` with useful information about the database.  A
 :exc:`NotFound` exception is raised if the database does not exist.
 
 Using a :class:`Database`, when the database does *not* exist:
