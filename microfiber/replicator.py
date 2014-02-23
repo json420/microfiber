@@ -420,13 +420,15 @@ def iter_normal_names(src):
 
 
 class Replicator:
-    def __init__(self, src_env, dst_env, names_filter_func=None):
+    def __init__(self, src_env, dst_env, names_filter_func=None, mode='push'):
         self.src = Server(src_env)
         self.src_id = self.src.get()['uuid']
         self.dst = Server(dst_env)
         self.dst_id = self.dst.get()['uuid']
         assert names_filter_func is None or callable(names_filter_func)
         self.names_filter_func = names_filter_func
+        assert mode in ('push', 'pull')
+        self.mode = mode
         self.threads = {}
 
     def get_names(self):
@@ -480,7 +482,7 @@ class Replicator:
             assert name not in self.threads
             src = self.src.database(name)
             dst = self.dst.database(name)
-            session = load_session(self.src_id, src, self.dst_id, dst)
+            session = load_session(self.src_id, src, self.dst_id, dst, self.mode)
             replicate(session)
             thread = threading.Thread(
                 target=replicate_continuously,
@@ -510,7 +512,7 @@ class Replicator:
         assert name not in self.threads
         src = self.src.database(name)
         dst = self.dst.database(name)
-        session = load_session(self.src_id, src, self.dst_id, dst)
+        session = load_session(self.src_id, src, self.dst_id, dst, self.mode)
         thread = threading.Thread(
             target=replicate_then_replicate_continuously,
             args=(session,),
@@ -520,16 +522,16 @@ class Replicator:
         self.threads[name] = thread
 
 
-def _run_replicator(src_env, dst_env, names_filter_func):
-    replicator = Replicator(src_env, dst_env, names_filter_func)
+def _run_replicator(src_env, dst_env, names_filter_func, mode):
+    replicator = Replicator(src_env, dst_env, names_filter_func, mode)
     replicator.run()
 
 
-def start_replicator(src_env, dst_env, names_filter_func=None):
+def start_replicator(src_env, dst_env, names_filter_func=None, mode='push'):
     import multiprocessing
     process = multiprocessing.Process(
         target=_run_replicator,
-        args=(src_env, dst_env, names_filter_func),
+        args=(src_env, dst_env, names_filter_func, mode),
         daemon=True,
     )
     process.start()
@@ -537,8 +539,8 @@ def start_replicator(src_env, dst_env, names_filter_func=None):
 
 
 class TempReplicator:
-    def __init__(self, src_env, dst_env, names_filter_func=None):
-        self.process = start_replicator(src_env, dst_env, names_filter_func)
+    def __init__(self, src_env, dst_env, names_filter_func=None, mode='push'):
+        self.process = start_replicator(src_env, dst_env, names_filter_func, mode)
 
     def __del__(self):
         self.terminate()
