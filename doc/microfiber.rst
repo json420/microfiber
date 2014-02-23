@@ -5,21 +5,47 @@
 .. py:module:: microfiber
     :synopsis: fabric for a lightweight couch
 
-In a nutshell, the Microfiber API is the CouchDB API, nothing more.  For
-example:
+In a nutshell, Microfiber is generic REST adapter that allows you to make
+requests to an arbitrary JSON-centric REST API like CouchDB.  This means that by
+and large the Microfiber API *is*  `CouchDB REST API`_, as expressed through the
+Microfiber REST adapter.
+
+In all our examples, we'll create throw-away CouchDB instances using
+`UserCouch`_.
+
+First, well create a ``TempCouch``, and bootstrap it get the *env* we'll pass to
+a :class:`Server` or :class:`Database`.
+
+>>> from usercouch.misc import TempCouch
+>>> couch = TempCouch()
+>>> env = couch.bootstrap()
+
+A :class:`Server` expose the REST API relative to the root URL.  For example:
+
+>>> from microfiber import Server
+>>> server = Server(env)
+>>> server.get()['couchdb']  # GET /
+'Welcome'
+>>> server.put(None, 'mydb')  # PUT /mydb
+{'ok': True}
+>>> doc = {'_id': 'mydoc'}
+>>> doc['_rev'] = server.post(doc, 'mydb')['rev']  # POST /mydb
+>>> server.get('mydb', 'mydoc') == doc  # GET /mydb/mydoc
+True
+
+A :class:`Database` expose the exact same REST API relative to the root URL.
+For example:
 
 >>> from microfiber import Database
->>> db = Database('foo')
->>> db.put(None)  # PUT /foo
-{'ok': True}
->>> db.put({}, 'bar')  # PUT /foo/bar
-{'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
->>> db.get('bar')  # GET /foo/bar
-{'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
->>> db.delete('bar', rev='1-967a00dff5e02add41819138abb3284d')  # DELETE /foo/bar
-{'rev': '2-eec205a9d413992850a6e32678485900', 'ok': True, 'id': 'bar'}
->>> db.delete()  # DELETE /foo
-{'ok': True}
+>>> db = Database('mydb', env)
+>>> db.get()['db_name']  # GET /mydb
+'mydb'
+>>> db.put(None)  # PUT /mydb ('mydb' already exists!)
+Traceback (most recent call last):
+  ...
+microfiber.PreconditionFailed: 412 Precondition Failed: PUT /mydb/
+>>> db.get('mydoc') == doc  # GET /mydb/mydoc
+True
 
 Chances are you'll use the :class:`Database` class most of all.
 
@@ -131,7 +157,7 @@ an SSL *env* looks like this:
 ...     'url': 'https://example.com/',
 ...     'ssl': {
 ...         'ca_file': '/trusted/server.ca',
-...         'ca_path': 'trusted/ca.directory/',
+...         'ca_path': '/trusted/ca.directory/',
 ...         'check_hostname': False,
 ...         'cert_file': '/my/client.cert',
 ...         'key_file': '/my/client.key',
@@ -181,9 +207,17 @@ adapter:
     * :meth:`CouchBase.delete()`
     * :meth:`CouchBase.put_att()`
     * :meth:`CouchBase.get_att()`
-    
+
 All these methods are inherited unchanged by the :class:`Server` and
 :class:`Database` classes.
+
+All the method examples below assume this setup:
+
+>>> from usercouch.misc import TempCouch
+>>> from microfiber import CouchBase, dumps
+>>> couch = TempCouch()
+>>> env = couch.bootstrap()
+
 
 .. class:: CouchBase(env='http://localhost:5984/')
 
@@ -192,50 +226,59 @@ All these methods are inherited unchanged by the :class:`Server` and
     
         PUT *obj*.
 
-        For example, to create the database "foo":
+        For example, to create the database "db1":
 
-        >>> cb = CouchBase()
-        >>> cb.put(None, 'foo')  #doctest: +SKIP
+        >>> cb = CouchBase(env)
+        >>> cb.put(None, 'db1')
         {'ok': True}
 
-        Or to create the doc "baz" in the database "foo":
+        Or to create the doc "doc1" in the database "db1":
 
-        >>> cb.put({'micro': 'fiber'}, 'foo', 'baz')  #doctest: +SKIP
-        {'rev': '1-fae0708c46b4a6c9c497c3a687170ad6', 'ok': True, 'id': 'bar'}
+        >>> cb.put({'micro': 'fiber'}, 'db1', 'doc1')['rev']
+        '1-fae0708c46b4a6c9c497c3a687170ad6'
 
 
     .. method:: post(obj, *parts, **options)
-    
+
         POST *obj*.
 
-        For example, to create the doc "bar" in the database "foo":
+        For example, to create the doc "doc2" in the database "db2", we'll first
+        create "db2":
 
-        >>> cb = CouchBase()
-        >>> cb.post({'_id': 'bar'}, 'foo')  #doctest: +SKIP
-        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
-
-        Or to compact the database "foo":
-
-        >>> cb.post(None, 'foo', '_compact')  #doctest: +SKIP
+        >>> cb = CouchBase(env)
+        >>> cb.put(None, "db2")
         {'ok': True}
-    
-    
+
+        And now we'll save the "doc2" document:
+
+        >>> cb.post({'_id': 'doc2'}, 'db2')['rev']
+        '1-967a00dff5e02add41819138abb3284d'
+
+        Or to compact the database "db2":
+
+        >>> cb.post(None, 'db2', '_compact')
+        {'ok': True}
+
+
     .. method:: get(*parts, **options)
     
         Make a GET request.
 
         For example, to get the welcome info from CouchDB:
 
-        >>> cb = CouchBase()
-        >>> cb.get()  #doctest: +SKIP
-        {'couchdb': 'Welcome', 'version': '1.1.0'}
+        >>> cb = CouchBase(env)
+        >>> cb.get()['couchdb']
+        'Welcome'
 
-        Or to request the doc "bar" from the database "foo", including any
-        attachments:
+        Or to request the doc "db1" from the database "doc1":
 
-        >>> cb.get('foo', 'bar', attachments=True)  #doctest: +SKIP
-        {'_rev': '1-967a00dff5e02add41819138abb3284d', '_id': 'bar'}
-
+        >>> doc = cb.get('db1', 'doc1')
+        >>> print(dumps(doc, pretty=True))
+        {
+            "_id": "doc1",
+            "_rev": "1-fae0708c46b4a6c9c497c3a687170ad6",
+            "micro": "fiber"
+        }
 
     .. method:: head(*parts, **options)
     
@@ -243,28 +286,28 @@ All these methods are inherited unchanged by the :class:`Server` and
 
         Returns a ``dict`` containing the response headers from the HEAD
         request.
-        
-        For example, to make a HEAD request on the doc "bar" in the database
-        "foo":
-        
-        >>> cb = CouchBase()
-        >>> cb.head('foo', 'baz')['Etag']  #doctest: +SKIP
-        '"1-967a00dff5e02add41819138abb3284d"'
+
+        For example, to make a HEAD request on the doc "doc1" in the database
+        "db1":
+
+        >>> cb = CouchBase(env)
+        >>> cb.head('db1', 'doc1')['etag']
+        '"1-fae0708c46b4a6c9c497c3a687170ad6"'
 
 
     .. method:: delete(*parts, **options)
     
         Make a DELETE request.
 
-        For example, to delete the doc "bar" in the database "foo":
+        For example, to delete the doc "doc2" in the database "db2":
 
-        >>> cb = CouchBase()
-        >>> cb.delete('foo', 'bar', rev='1-967a00dff5e02add41819138abb3284d')  #doctest: +SKIP
-        {'rev': '1-967a00dff5e02add41819138abb3284d', 'ok': True, 'id': 'bar'}
+        >>> cb = CouchBase(env)
+        >>> cb.delete('db2', 'doc2', rev='1-967a00dff5e02add41819138abb3284d')['rev']
+        '2-eec205a9d413992850a6e32678485900'
 
-        Or to delete the database "foo":
+        Or two delete the "db2" database:
 
-        >>> cb.delete('foo')  #doctest: +SKIP
+        >>> cb.delete('db2')
         {'ok': True}
 
 
@@ -272,30 +315,40 @@ All these methods are inherited unchanged by the :class:`Server` and
     
         PUT an attachment.
 
-        For example, to upload the attachment "baz" for the doc "bar" in the
-        database "foo":
+        If uploading an attachment for a document that already exist, you don't
+        need to specify the *rev*.  For example, to upload the attachment "att1"
+        for the doc "doc1" in the database "db1".
 
-        >>> cb = CouchBase()
-        >>> cb.put_att('image/png', b'da pic', 'foo', 'bar', 'baz')  #doctest: +SKIP
-        {'rev': '1-d536771b631a30c2ab4c0340adc72570', 'ok': True, 'id': 'bar'}
+        >>> cb = CouchBase(env)
+        >>> cb.put_att('text/plain', b'hello, world', 'db1', 'doc1', 'att1',
+        ...     rev='1-fae0708c46b4a6c9c497c3a687170ad6',
+        ... )['rev']
+        '2-bd4ac0c5ca963e5b4f0f3b09ea540de2'
+
+        On the other hand, if uploading an attachment for a doc that doesn't
+        exist yet, you don't need to specify the *rev*.  For example, to upload
+        the attachment "newatt" for the doc "newdoc" in "db":
+
+        >>> cb.put_att('text/plain', b'New', 'db1', 'newdoc', 'newatt')['rev']
+        '1-b2c33fbf19cadc92ab7b9860e116bb25'
 
         Note that you don't need any attachment-specific method for DELETE. 
         Just use :meth:`CouchBase.delete()`, like this:
-        
-        >>> cb.delete('foo', 'bar', 'baz', rev='1-d536771b631a30c2ab4c0340adc72570')  #doctest: +SKIP
-        {'rev': '2-082e66867f6d4d1753d7d0bf08122425', 'ok': True, 'id': 'bar'}
 
-        
+        >>> cb.delete('db1', 'newdoc', 'newatt', rev='1-b2c33fbf19cadc92ab7b9860e116bb25')['rev']
+        '2-5a5ecda09b7010bc3f190d8766398cff'
+
+
     .. method:: get_att(*parts, **options)
     
         GET an attachment.
 
         Returns a ``(content_type, data)`` tuple.  For example, to download the
-        attachment "baz" for the doc "bar" in the database "foo":
+        attachment "att1" for the doc "doc1" in the database "db1":
 
-        >>> cb = CouchBase()
-        >>> cb.get_att('foo', 'bar', 'baz')  #doctest: +SKIP
-        ('image/png', b'da pic')
+        >>> cb = CouchBase(env)
+        >>> cb.get_att('db1', 'doc1', 'att1')
+        Attachment(content_type='text/plain', data=b'hello, world')
 
 
 
@@ -540,6 +593,7 @@ Functions
 
     For example:
 
+    >>> from microfiber import dumps
     >>> doc = {
     ...     'hello': 'мир',
     ...     'welcome': 'все',
@@ -549,8 +603,9 @@ Functions
 
     Whereas if you directly call ``json.dumps()`` without *ensure_ascii=False*:
 
+    >>> import json
     >>> json.dumps(doc, sort_keys=True)
-    '{"hello": "\\\\u043c\\\\u0438\\\\u0440", "welcome": "\\\\u0432\\\\u0441\\\\u0435"}'
+    '{"hello": "\\u043c\\u0438\\u0440", "welcome": "\\u0432\\u0441\\u0435"}'
 
     By default compact encoding is used, but if you supply *pretty=True*,
     4-space indentation will be used:
@@ -562,18 +617,6 @@ Functions
     }
 
 
-.. function:: dc3_env()
-
-    Return the dc3 environment information.
-
-    For example, to create a :class:`Database` with the correct per-user `dc3`_
-    environment:
-
-    >>> from microfiber import dc3_env, Database
-    >>> db = Database('dmedia-0', dc3_env())
-    >>> db.url
-    'http://localhost:41289/'
-
 
 .. function:: dmedia_env()
 
@@ -583,9 +626,7 @@ Functions
     `Dmedia`_ environment:
 
     >>> from microfiber import dmedia_env, Database
-    >>> db = Database('dmedia-0', dmedia_env())
-    >>> db.url
-    'http://localhost:41289/'
+    >>> db = Database('dmedia-1', dmedia_env())  #doctest: +SKIP 
 
     If you're using Microfiber to work with `Dmedia`_ or `Novacut`_, please use
     this function instead of :func:`dc3_env()` as starting with the Dmedia 12.01
@@ -697,9 +738,9 @@ Exceptions
         The exact return value from the CouchDB request.
 
 
-
 .. _`Novacut`: https://wiki.ubuntu.com/Novacut
 .. _`UserCouch`: https://launchpad.net/usercouch
+.. _`CouchDB REST API`: http://couchdb.readthedocs.org/en/latest/api/index.html
 .. _`dc3`: https://launchpad.net/dc3
 .. _`Dmedia`: https://launchpad.net/dmedia
 .. _`python-couchdb`: http://packages.python.org/CouchDB/client.html#database
