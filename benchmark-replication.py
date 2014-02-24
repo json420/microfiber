@@ -42,8 +42,8 @@ def benchmark(func, src):
 
 src = Server(dmedia_env())
 results = []
-results.append(benchmark(couchdb, src))
-results.append(benchmark(couchdb_filtered, src))
+#results.append(benchmark(couchdb, src))
+#results.append(benchmark(couchdb_filtered, src))
 results.append(benchmark(microfiber, src))
 
 print('')

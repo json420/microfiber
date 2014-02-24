@@ -269,12 +269,18 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     src_update_seq = src_doc.get('update_seq')
     dst_update_seq = dst_doc.get('update_seq')
 
-    # Some session state is just to make logging/debugging easier:
+    assert mode in ('push', 'pull')
+    if mode == 'push':
+        label = '{} => {}{}'.format(src.name, dst.url, dst.name)
+    else:
+        label = '{} <= {}{}'.format(dst.name, src.url, src.name)
+
+    # Some session state is just to make logging/debugging easier (especially
+    # the 'label':
     session = {
-        'src_fqn': '{}.{}'.format(src_id, src.name),
         'src_doc': src_doc,
         'dst_doc': dst_doc,
-        'dst_fqn': '{}.{}'.format(dst_id, dst.name),
+        'label': label,
     }
     if (
             session_id == dst_doc.get('session_id')
@@ -283,6 +289,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
         session['update_seq'] = min(src_update_seq, dst_update_seq)
+        log.info('resuming at %d %s', session['update_seq'], session['label'])
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
     # Other session state we don't want to log above:
@@ -308,6 +315,9 @@ def save_session(session):
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
+    current_seq = src.get()['update_seq']
+    percent = (0 if current_seq == 0 else 100 * update_seq // current_seq)
+    log.info('%d/%d %d%% %s', update_seq, current_seq, percent, session['label'])
 
 
 def changes_for_revs_diff(result):
@@ -371,28 +381,27 @@ def replicate_one_batch(session):
 
 
 def replicate(session):
-    log.info('replicate: %s =>  %s', session['src'], session['dst'])
+    log.info('replicate %s', session['label'])
     session.pop('feed', None)
     stop_at_seq = session['src'].get()['update_seq']
     start = time.monotonic()
     while replicate_one_batch(session):
         save_session(session)
         if session['update_seq'] >= stop_at_seq:
-            log.info('current update_seq %d >= stop_at_seq %d', 
-                session['update_seq'], stop_at_seq 
+            log.info('%s: current update_seq %d >= stop_at_seq %d', 
+                session['label'], session['update_seq'], stop_at_seq 
             )
             break
     elapsed = time.monotonic() - start
-    log.info('%.3fs to replicate %d docs from %r to %r',
-        elapsed, session['doc_count'], session['src'], session['dst']
-    )
+    doc_count = session['doc_count']
+    if session['doc_count'] > 0:
+        log.info('%.3fs to replicate %d docs %s',
+            elapsed, session['doc_count'], session['label']
+        )
 
 
 def replicate_continuously(session):
-    log.info('replicate_continuously: %s =>  %s',
-        session['src_fqn'],
-        session['dst_fqn'],
-    )
+    log.info('replicate_continuously %s', session['label'])
     session['feed'] = 'longpoll'
     last = time.monotonic()
     while True:
@@ -401,11 +410,6 @@ def replicate_continuously(session):
             if now - last > 30:
                 last = now
                 save_session(session)
-                log.info('checkpoint at %d: %s =>  %s',
-                    session['update_seq'],
-                    session['src_fqn'],
-                    session['dst_fqn'],
-                )
 
 
 def replicate_then_replicate_continuously(session):
