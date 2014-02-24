@@ -381,7 +381,6 @@ def replicate_one_batch(session):
 
 
 def replicate(session, timeout=None):
-    log.info('replicate %s', session['label'])
     session.pop('feed', None)
     stop_at_seq = session['src'].get()['update_seq']
     start_time = time.monotonic()
@@ -391,28 +390,18 @@ def replicate(session, timeout=None):
             log.warning('%s second timeout reached %s', timeout, session['label'])
             break
         if session['update_seq'] >= stop_at_seq:
-            log.info('%s: current update_seq %d >= stop_at_seq %d', 
-                session['label'], session['update_seq'], stop_at_seq 
-            )
             break
     elapsed = time.monotonic() - start_time
-    doc_count = session['doc_count']
-    if session['doc_count'] > 0:
-        log.info('%.3fs to replicate %d docs %s',
-            elapsed, session['doc_count'], session['label']
-        )
+    log.info('%.3fs to replicate %d docs %s',
+        elapsed, session['doc_count'], session['label']
+    )
 
 
 def replicate_continuously(session):
-    log.info('replicate_continuously %s', session['label'])
     session['feed'] = 'longpoll'
-    last = time.monotonic()
     while True:
         if replicate_one_batch(session):
-            now = time.monotonic()
-            if now - last > 30:
-                last = now
-                save_session(session)
+            log.info('continuous %d %s', session['update_seq'], session['label'])
 
 
 def replicate_then_replicate_continuously(session):
