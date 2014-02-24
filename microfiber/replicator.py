@@ -433,7 +433,6 @@ class Replicator:
 
     def run(self):
         names = self.get_names()
-        log.info('initial replications: %r', names)
         self.bring_up(names)
         while True:
             self.monitor_once()
