@@ -380,19 +380,22 @@ def replicate_one_batch(session):
     return sequence_was_updated(session)
 
 
-def replicate(session):
+def replicate(session, timeout=None):
     log.info('replicate %s', session['label'])
     session.pop('feed', None)
     stop_at_seq = session['src'].get()['update_seq']
-    start = time.monotonic()
+    start_time = time.monotonic()
     while replicate_one_batch(session):
         save_session(session)
+        if timeout and time.monotonic() - start_time > timeout:
+            log.warning('%s second timeout reached %s', timeout, session['label'])
+            break
         if session['update_seq'] >= stop_at_seq:
             log.info('%s: current update_seq %d >= stop_at_seq %d', 
                 session['label'], session['update_seq'], stop_at_seq 
             )
             break
-    elapsed = time.monotonic() - start
+    elapsed = time.monotonic() - start_time
     doc_count = session['doc_count']
     if session['doc_count'] > 0:
         log.info('%.3fs to replicate %d docs %s',
