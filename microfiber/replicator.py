@@ -403,23 +403,25 @@ def replicate_continuously(session):
         replicate_one_batch(session)
 
 
-def replicate_then_replicate_continuously(session):
-    replicate(session)
-    replicate_continuously(session)
-
-
 def iter_normal_names(src):
     for name in src.get('_all_dbs'):
         if not name.startswith('_'):
             yield name
 
 
+def replicate_then_replicate_continuously(src_id, src, dst_id, dst, mode):
+    session = load_session(src_id, src, dst_id, dst, mode)
+    replicate(session)
+    replicate_continuously(session)
+
+
+
 class Replicator:
     def __init__(self, src_env, dst_env, names_filter_func=None, mode='push'):
         self.src = Server(src_env)
-        self.src_id = self.src.get()['uuid']
+        self.src_id = self.src.get()['uuid']  # Is src reachable?
         self.dst = Server(dst_env)
-        self.dst_id = self.dst.get()['uuid']
+        self.dst_id = self.dst.get()['uuid']  # Is dst reachable?
         assert names_filter_func is None or callable(names_filter_func)
         self.names_filter_func = names_filter_func
         assert mode in ('push', 'pull')
@@ -441,50 +443,29 @@ class Replicator:
         start = time.monotonic()
         self.reap_threads()
         delta = time.monotonic() - start
-        if delta < 5:
-            time.sleep(5 - delta)
-        self.dst.get()  # Make sure we can still reach dst server
-        names = self.get_names()  # Will do same for src server
+        if delta < 10:
+            time.sleep(10 - delta)
+        self.dst.get()  # Is dst reachable?
+        names = self.get_names()  # Is src reachable?
         for name in set(names) - set(self.threads):
-            self.restart_thread(name)
+            self.start_thread(name)
 
     def bring_up(self, names):
-        """
-        Gracefully do initial sync-up.
-
-        With how Dmedia historically used the CouchDB replicator, there was a
-        crashing tidal wave of parallel connections and requests when a peer
-        first came online.  There were a number of problems with this:
-
-            1. Bad user experience - the CPU fans tend to kick up on a laptop,
-               there's a lot of IO, and as CouchDB is very fsync happy, other
-               applications can get very unresponsive while waiting for writes
-               to complete during this initial sync-up
-
-            2. Poor connection reuse - now that we've enabled perfect-forward-
-               secrecy (and with ``ssl.OP_SINGLE_ECDH_USE`` at  that), creating
-               connections is quite expensive; however, once the connection is
-               created, there's surprisingly little overhead when making, say,
-               hundreds of HTTP requests through that same SSL connection
-
-            3. No way to prioritize what gets synced first - above all else, we
-               want to get "dmedia-1" in sync as quickly as possible, and we
-               don't want the syncing of other DBs to slow this down
-        """
         assert self.threads == {}
         for name in names:
-            assert name not in self.threads
-            src = self.src.database(name)
-            dst = self.dst.database(name)
-            session = load_session(self.src_id, src, self.dst_id, dst, self.mode)
-            replicate(session)
-            thread = threading.Thread(
-                target=replicate_continuously,
-                args=(session,),
-                daemon=True,
-            )
-            thread.start()
-            self.threads[name] = thread
+            self.start_thread(name)
+
+    def start_thread(self, name):
+        assert name not in self.threads
+        src = self.src.database(name)
+        dst = self.dst.database(name)
+        thread = threading.Thread(
+            target=replicate_then_replicate_continuously,
+            args=(self.src_id, src, self.dst_id, dst, self.mode),
+            daemon=True,
+        )
+        thread.start()
+        self.threads[name] = thread
 
     def reap_threads(self, timeout=1):
         reaped = []
@@ -498,22 +479,6 @@ class Replicator:
             thread.join()  # Little safety check
             log.warning('reaped thread for %r (possible crash)', name)
         return reaped
-
-    def restart_thread(self, name):
-        """
-        Start continuous replication in a new thread.
-        """
-        assert name not in self.threads
-        src = self.src.database(name)
-        dst = self.dst.database(name)
-        session = load_session(self.src_id, src, self.dst_id, dst, self.mode)
-        thread = threading.Thread(
-            target=replicate_then_replicate_continuously,
-            args=(session,),
-            daemon=True,
-        )
-        thread.start()
-        self.threads[name] = thread
 
 
 def _run_replicator(src_env, dst_env, names_filter_func, mode):
