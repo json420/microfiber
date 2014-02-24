@@ -289,7 +289,6 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
         session['update_seq'] = min(src_update_seq, dst_update_seq)
-        log.info('resuming at %d %s', session['update_seq'], session['label'])
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
     # Other session state we don't want to log above:
@@ -391,17 +390,17 @@ def replicate(session, timeout=None):
             break
         if session['update_seq'] >= stop_at_seq:
             break
-    elapsed = time.monotonic() - start_time
-    log.info('%.3fs to replicate %d docs %s',
-        elapsed, session['doc_count'], session['label']
-    )
+    if session['doc_count'] > 0:
+        elapsed = time.monotonic() - start_time
+        log.info('%.3fs to replicate %d docs %s',
+            elapsed, session['doc_count'], session['label']
+        )
 
 
 def replicate_continuously(session):
     session['feed'] = 'longpoll'
     while True:
-        if replicate_one_batch(session):
-            log.info('continuous %d %s', session['update_seq'], session['label'])
+        replicate_one_batch(session)
 
 
 def replicate_then_replicate_continuously(session):
