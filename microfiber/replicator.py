@@ -268,13 +268,11 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     session_id = src_doc.get('session_id')
     src_update_seq = src_doc.get('update_seq')
     dst_update_seq = dst_doc.get('update_seq')
-
     assert mode in ('push', 'pull')
     if mode == 'push':
         label = '{} => {}{}'.format(src.name, dst.url, dst.name)
     else:
         label = '{} <= {}{}'.format(dst.name, src.url, src.name)
-
     # Some session state is just to make logging/debugging easier (especially
     # the 'label':
     session = {
@@ -289,6 +287,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
         session['update_seq'] = min(src_update_seq, dst_update_seq)
+        log.info('resuming at %d %s', session['update_seq'], session['label'])
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
     # Other session state we don't want to log above:
@@ -398,6 +397,7 @@ def replicate(session, timeout=None):
 
 
 def replicate_continuously(session):
+    log.info('starting continuous %s', session['label'])
     session['feed'] = 'longpoll'
     while True:
         replicate_one_batch(session)
@@ -413,7 +413,6 @@ def replicate_then_replicate_continuously(src_id, src, dst_id, dst, mode):
     session = load_session(src_id, src, dst_id, dst, mode)
     replicate(session)
     replicate_continuously(session)
-
 
 
 class Replicator:
