@@ -409,8 +409,7 @@ def iter_normal_names(src):
             yield name
 
 
-def replicate_then_replicate_continuously(src_id, src, dst_id, dst, mode):
-    session = load_session(src_id, src, dst_id, dst, mode)
+def replicate_then_replicate_continuously(session):
     replicate(session)
     replicate_continuously(session)
 
@@ -458,9 +457,10 @@ class Replicator:
         assert name not in self.threads
         src = self.src.database(name)
         dst = self.dst.database(name)
+        session = load_session(self.src_id, src, self.dst_id, dst, self.mode)
         thread = threading.Thread(
             target=replicate_then_replicate_continuously,
-            args=(self.src_id, src, self.dst_id, dst, self.mode),
+            args=(session,),
             daemon=True,
         )
         thread.start()
