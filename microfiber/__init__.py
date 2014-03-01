@@ -82,7 +82,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '14.02.0'
+__version__ = '14.02.1'
 log = logging.getLogger()
 USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__, 
     platform.dist()[0], platform.dist()[1], platform.machine()
@@ -537,6 +537,8 @@ def build_ssl_context(config):
         assert ctx.verify_mode == ssl.CERT_REQUIRED
         assert ctx.options & ssl.OP_NO_COMPRESSION
         return ctx
+    if config.get('check_hostname') is True:
+        raise Exception('Microfiber 14.02 does not support check_hostname=True')
     return build_client_sslctx(config)
 
 
@@ -603,7 +605,6 @@ class Context:
         if t.scheme == 'https':
             ssl_config = self.env.get('ssl', {})
             self.ssl_ctx = build_ssl_context(ssl_config)
-            self.check_hostname = ssl_config.get('check_hostname', True)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
