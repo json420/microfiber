@@ -57,7 +57,7 @@ import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 from degu.client import create_client, create_sslclient, build_client_sslctx
-from degu.base import EmptyLineError, TLS
+from degu.base import EmptyLineError
 
 
 __all__ = (
@@ -533,12 +533,9 @@ def build_ssl_context(config):
     if 'context' in config:
         ctx = config['context']
         assert isinstance(ctx, ssl.SSLContext)
-        assert ctx.protocol == TLS.protocol
         assert ctx.verify_mode == ssl.CERT_REQUIRED
         assert ctx.options & ssl.OP_NO_COMPRESSION
         return ctx
-    if config.get('check_hostname') is True:
-        raise Exception('Microfiber 14.02 does not support check_hostname=True')
     return build_client_sslctx(config)
 
 
