@@ -173,7 +173,7 @@ import logging
 import time
 import threading
 
-from dbase32 import log_id, db32enc, isdb32
+from dbase32 import time_id, db32enc, isdb32
 
 from . import dumps, NotFound, BadRequest, Server
 
@@ -293,7 +293,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     # Other session state we don't want to log above:
     session['src'] = src
     session['dst'] = dst
-    session['session_id'] = log_id()  # ID for this new session
+    session['session_id'] = time_id()  # ID for this new session
     session['doc_count'] = 0
     return session
 
@@ -399,8 +399,15 @@ def replicate(session, timeout=None):
 def replicate_continuously(session):
     log.info('starting continuous %s', session['label'])
     session['feed'] = 'longpoll'
+    last_count = session['doc_count']
     while True:
-        replicate_one_batch(session)
+        if replicate_one_batch(session):
+            count = session['doc_count'] - last_count
+            if count > 0:
+                log.info('%s docs at %s %s',
+                    count, session['update_seq'], session['label']
+                )
+                last_count = session['doc_count']
 
 
 def iter_normal_names(src):
