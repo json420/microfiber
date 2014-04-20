@@ -175,7 +175,7 @@ import threading
 
 from dbase32 import time_id, db32enc, isdb32
 
-from . import dumps, NotFound, BadRequest, Server
+from . import dumps, NotFound, Server
 
 
 log = logging.getLogger()

@@ -44,7 +44,7 @@ from base64 import b64encode
 import json
 from gzip import GzipFile
 import time
-from hashlib import sha1, sha512
+from hashlib import sha1
 import hmac
 from urllib.parse import urlparse, urlencode, quote_plus
 import ssl

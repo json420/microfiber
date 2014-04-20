@@ -31,16 +31,15 @@ Unit tests for `microfiber` module.
 from unittest import TestCase
 import os
 from os import path
-from base64 import b64encode, b64decode
+from base64 import b64encode
 from copy import deepcopy
 import json
 import gzip
 import time
-import io
 import tempfile
 import shutil
 from hashlib import md5
-from urllib.parse import urlparse, urlencode
+from urllib.parse import urlparse
 import ssl
 import threading
 from random import SystemRandom
@@ -436,13 +435,13 @@ class TestFunctions(TestCase):
         config = {
             'ca_file': pki.get_server_config()['key_file']
         }
-        with self.assertRaises(ssl.SSLError) as cm:
+        with self.assertRaises(ssl.SSLError):
             microfiber.build_ssl_context(config)
 
         # Leave out key_file, make sure cert_file is actually being used
         config = pki.get_client_config()
         del config['key_file']
-        with self.assertRaises(ssl.SSLError) as cm:
+        with self.assertRaises(ssl.SSLError):
             microfiber.build_ssl_context(config)
 
         # Test with config['context']
@@ -2126,7 +2125,7 @@ class TestCouchBaseLive(CouchTestCase):
         time.sleep(30)  # The connection should close, raising BadStatusLine
 
         # Get the doc
-        doc = inst.get('foo', 'bar')
+        inst.get('foo', 'bar')
 
     def test_put_att(self):
         inst = microfiber.CouchBase(self.env)
@@ -2453,7 +2452,7 @@ class TestPermutations(LiveTestCase):
                 bad = deepcopy(env)
                 del bad['ssl']['ca_file']
                 uc = microfiber.CouchBase(bad)
-                with self.assertRaises(ssl.SSLError) as cm:
+                with self.assertRaises(ssl.SSLError):
                     uc.get()
 
                 # FIXME: In Python 3.4, ssl.SSLContext.wrap_socket() will do the
@@ -3026,7 +3025,7 @@ class TestDatabaseLive(CouchTestCase):
         self.assertTrue(db.ensure())
 
         # Design doc missing:
-        with self.assertRaises(NotFound) as cm:
+        with self.assertRaises(NotFound):
             list(db.iter_view('doc', 'type', 'foo'))
 
         # Empty DB:
