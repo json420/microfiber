@@ -221,13 +221,13 @@ def random_id2():
 def dc3_env():
     import subprocess
     env_s = subprocess.check_output(DC3_CMD)
-    return json.loads(env_s.decode('utf-8'))
+    return json.loads(env_s.decode())
 
 
 def dmedia_env():
     import subprocess
     env_s = subprocess.check_output(DMEDIA_CMD)
-    return json.loads(env_s.decode('utf-8'))
+    return json.loads(env_s.decode())
 
 
 def dumps(obj, pretty=False):
@@ -280,7 +280,7 @@ def _json_body(obj):
         return None
     if isinstance(obj, (bytes, BufferedReader)):
         return obj
-    return dumps(obj).encode('utf-8')
+    return dumps(obj).encode()
 
 
 def encode_attachment(attachment):
@@ -301,7 +301,7 @@ def encode_attachment(attachment):
     assert isinstance(content_type, str)
     return {
         'content_type': content_type,
-        'data': b64encode(data).decode('utf-8'),        
+        'data': b64encode(data).decode(),        
     }
 
 
@@ -360,9 +360,9 @@ def _oauth_base_string(method, baseurl, query):
 def _oauth_sign(oauth, base_string):
     key = '&'.join(
         oauth[k] for k in ('consumer_secret', 'token_secret')
-    ).encode('utf-8')
-    h = hmac.new(key, base_string.encode('utf-8'), sha1)
-    return b64encode(h.digest()).decode('utf-8')
+    ).encode()
+    h = hmac.new(key, base_string.encode(), sha1)
+    return b64encode(h.digest()).decode()
 
 
 def _oauth_header(oauth, method, baseurl, query, testing=None):
@@ -390,8 +390,8 @@ def _oauth_header(oauth, method, baseurl, query, testing=None):
 
 
 def basic_auth_header(basic):
-    b = '{username}:{password}'.format(**basic).encode('utf-8')
-    return 'Basic ' + b64encode(b).decode('utf-8')
+    b = '{username}:{password}'.format(**basic).encode()
+    return 'Basic ' + b64encode(b).decode()
 
 
 def _basic_auth_header(basic):
@@ -701,7 +701,7 @@ class CouchBase(object):
         headers['accept'] = 'application/json'
         response = self.request(method, parts, options, body, headers)
         data = (b'' if response.body is None else response.body.read())
-        return json.loads(data.decode('utf-8'))
+        return json.loads(data.decode())
 
     def post(self, obj, *parts, **options):
         """
