@@ -2476,7 +2476,6 @@ class TestPermutations(LiveTestCase):
 
 
 class TestDatabaseLive(CouchTestCase):
-
     def test_ensure(self):
         inst = microfiber.Database('foo', self.env)
         self.assertRaises(NotFound, inst.get)
@@ -2485,6 +2484,22 @@ class TestDatabaseLive(CouchTestCase):
         self.assertFalse(inst.ensure())
         self.assertEqual(inst.delete(), {'ok': True})
         self.assertRaises(NotFound, inst.get)
+
+    def test_wait_for_compact(self):
+        db = microfiber.Database('foo', self.env)
+        self.assertIs(db.ensure(), True)
+        for i in range(50):
+            db.save_many(
+                [{'_id': random_id()} for j in range(100)]
+            )
+        info1 = db.get()
+        self.assertIs(info1['compact_running'], False)
+        self.assertIsNone(db.compact())
+        self.assertIs(db.get()['compact_running'], True)
+        self.assertIsNone(db.wait_for_compact())
+        info2 = db.get()
+        self.assertIs(info2['compact_running'], False)
+        self.assertLess(info2['disk_size'], info1['disk_size'])
 
     def test_non_ascii(self):
         inst = microfiber.Database('foo', self.env)

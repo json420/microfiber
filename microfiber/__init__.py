@@ -952,6 +952,20 @@ class Database(CouchBase):
         except PreconditionFailed:
             return False
 
+    def compact(self, synchronous=False):
+        log.info('compacting %r', self)
+        self.post(None, '_compact')
+        if synchronous:
+            self.wait_for_compact()
+
+    def wait_for_compact(self):
+        start = time.monotonic()
+        while self.get()['compact_running']:
+            time.sleep(1)
+            log.info('waiting compact to finish: %r', self)
+        delta = time.monotonic() - start
+        log.info('%.3f to compact %r', delta, self)
+
     def iter_all_docs(self, chunksize=50):
         """
         Iterate through all docs in the database without duplicates.
