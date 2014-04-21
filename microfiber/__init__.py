@@ -82,7 +82,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '14.04.0'
+__version__ = '14.04.1'
 log = logging.getLogger()
 USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__, 
     platform.dist()[0], platform.dist()[1], platform.machine()
@@ -959,10 +959,13 @@ class Database(CouchBase):
             self.wait_for_compact()
 
     def wait_for_compact(self):
+        if not self.get()['compact_running']:
+            return
         start = time.monotonic()
+        time.sleep(1)
         while self.get()['compact_running']:
-            time.sleep(1)
             log.info('waiting compact to finish: %r', self)
+            time.sleep(1)
         delta = time.monotonic() - start
         log.info('%.3f to compact %r', delta, self)
 
