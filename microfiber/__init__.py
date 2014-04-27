@@ -82,7 +82,7 @@ __all__ = (
     'ServerError',
 )
 
-__version__ = '14.04.1'
+__version__ = '14.05.0'
 log = logging.getLogger()
 USER_AGENT = 'Microfiber/{} ({} {}; {})'.format(__version__, 
     platform.dist()[0], platform.dist()[1], platform.machine()
