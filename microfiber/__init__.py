@@ -579,6 +579,9 @@ class Context:
     `Context` because that will allow all your SSL connections to reuse the
     same ``ssl.SSLContext``.
     """
+
+    __slots__ = ('env', 'basepath', 't', 'url', 'threadlocal', 'client')
+
     def __init__(self, env=None):
         if env is None:
             env = DEFAULT_URL
