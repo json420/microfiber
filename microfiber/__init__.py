@@ -609,12 +609,6 @@ class Context:
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
 
-    def get_connection(self):
-        if self.t.scheme == 'http':
-            return create_client(self.t)
-        else:
-            return create_sslclient(self.ssl_ctx, self.t)
-
     def get_threadlocal_connection(self):
         conn = getattr(self.threadlocal, 'connection', None)
         if conn is None or conn.closed:

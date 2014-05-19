@@ -47,7 +47,7 @@ from random import SystemRandom
 from usercouch.misc import TempCouch
 from degu.misc import TempPKI
 from dbase32 import db32dec, isdb32, random_id
-from degu.client import Client, SSLClient, Response
+from degu.client import Client, SSLClient, Response, Connection
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
@@ -1389,111 +1389,69 @@ class TestContext(TestCase):
             ctx = microfiber.Context(url)
             self.assertEqual(ctx.full_url('/'), url)
 
-    def test_get_connection(self):
-        ctx = microfiber.Context(microfiber.HTTP_IPv4_URL)
-        conn = ctx.get_connection()
-        self.assertIsInstance(conn, Client)
-        self.assertNotIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('127.0.0.1', 5984))
-
-        ctx = microfiber.Context(microfiber.HTTP_IPv6_URL)
-        conn = ctx.get_connection()
-        self.assertIsInstance(conn, Client)
-        self.assertNotIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('::1', 5984))
-
-        ctx = microfiber.Context(microfiber.HTTPS_IPv4_URL)
-        conn = ctx.get_connection()
-        self.assertIsInstance(conn, Client)
-        self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('127.0.0.1', 6984))
-        self.assertIs(conn.sslctx, ctx.ssl_ctx)
-
-        ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
-        conn = ctx.get_connection()
-        self.assertIsInstance(conn, Client)
-        self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('::1', 6984))
-        self.assertIs(conn.sslctx, ctx.ssl_ctx)
-
-        env = {
-            'url': microfiber.HTTPS_IPv4_URL,
-            'ssl': {'check_hostname': True},
-        }
-        ctx = microfiber.Context(env)
-        conn = ctx.get_connection()
-        self.assertIsInstance(conn, Client)
-        self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('127.0.0.1', 6984))
-        self.assertIs(conn.sslctx, ctx.ssl_ctx)
-
-        env = {
-            'url': microfiber.HTTPS_IPv6_URL,
-            'ssl': {'check_hostname': True},
-        }
-        ctx = microfiber.Context(env)
-        conn = ctx.get_connection()
-        self.assertIsInstance(conn, Client)
-        self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('::1', 6984))
-        self.assertIs(conn.sslctx, ctx.ssl_ctx)
-
     def test_get_threadlocal_connection(self):
-        id1 = test_id()
-        id2 = test_id()
+        class DummyConnection:
+            def __init__(self, closed=False):
+                self.closed = closed
+
+        class DummyClient:
+            def __init__(self):
+                self._calls = 0
+
+            def connect(self):
+                self._calls += 1
+                return DummyConnection()
 
         class ContextSubclass(microfiber.Context):
             def __init__(self):
                 self.threadlocal = threading.local()
-                self._calls = 0
+                self.client = DummyClient()
 
-            def get_connection(self):
-                self._calls += 1
-                return id1
-
-        # Test when connection does *not* exist in current thread
+        # Test when connection does *not* exist in current thread:
         ctx = ContextSubclass()
-        self.assertEqual(ctx.get_threadlocal_connection(), id1)
-        self.assertEqual(ctx.threadlocal.connection, id1)
-        self.assertEqual(ctx._calls, 1)
-        self.assertEqual(ctx.get_threadlocal_connection(), id1)
-        self.assertEqual(ctx.threadlocal.connection, id1)
-        self.assertEqual(ctx._calls, 1)
-        del ctx.threadlocal.connection
-        self.assertEqual(ctx.get_threadlocal_connection(), id1)
-        self.assertEqual(ctx.threadlocal.connection, id1)
-        self.assertEqual(ctx._calls, 2)
-        self.assertEqual(ctx.get_threadlocal_connection(), id1)
-        self.assertEqual(ctx.threadlocal.connection, id1)
-        self.assertEqual(ctx._calls, 2)
+        conn1 = ctx.get_threadlocal_connection()
+        self.assertIsInstance(conn1, DummyConnection)
+        self.assertIs(ctx.threadlocal.connection, conn1)
+        self.assertEqual(ctx.client._calls, 1)
+        self.assertIs(ctx.get_threadlocal_connection(), conn1)
+        self.assertIs(ctx.threadlocal.connection, conn1)
+        self.assertEqual(ctx.client._calls, 1)
 
-        # Test when connection does exist in current thread
+        # Test when connection exists in current thread but is closed:
+        conn1.closed = True
+        conn2 = ctx.get_threadlocal_connection()
+        self.assertIsInstance(conn2, DummyConnection)
+        self.assertIsNot(conn2, conn1)
+        self.assertIs(ctx.threadlocal.connection, conn2)
+        self.assertEqual(ctx.client._calls, 2)
+        self.assertIs(ctx.get_threadlocal_connection(), conn2)
+        self.assertIs(ctx.threadlocal.connection, conn2)
+        self.assertEqual(ctx.client._calls, 2)
+
+        # Test when connection exists in current thread:
+        conn3 = DummyConnection()
         ctx = ContextSubclass()
-        ctx.threadlocal.connection = id2
-        self.assertEqual(ctx.get_threadlocal_connection(), id2)
-        self.assertEqual(ctx.threadlocal.connection, id2)
-        self.assertEqual(ctx._calls, 0)
-        self.assertEqual(ctx.get_threadlocal_connection(), id2)
-        self.assertEqual(ctx.threadlocal.connection, id2)
-        self.assertEqual(ctx._calls, 0)
-        del ctx.threadlocal.connection
-        self.assertEqual(ctx.get_threadlocal_connection(), id1)
-        self.assertEqual(ctx.threadlocal.connection, id1)
-        self.assertEqual(ctx._calls, 1)
-        self.assertEqual(ctx.get_threadlocal_connection(), id1)
-        self.assertEqual(ctx.threadlocal.connection, id1)
-        self.assertEqual(ctx._calls, 1)
+        ctx.threadlocal.connection = conn3
+        self.assertIs(ctx.get_threadlocal_connection(), conn3)
+        self.assertIs(ctx.threadlocal.connection, conn3)
+        self.assertEqual(ctx.client._calls, 0)
+        self.assertIs(ctx.get_threadlocal_connection(), conn3)
+        self.assertIs(ctx.threadlocal.connection, conn3)
+        self.assertEqual(ctx.client._calls, 0)
 
-        # Sanity check with the original class:
-        ctx = microfiber.Context(microfiber.HTTPS_IPv6_URL)
-        conn = ctx.get_threadlocal_connection()
-        self.assertIs(conn, ctx.threadlocal.connection)
-        self.assertIsInstance(conn, Client)
-        self.assertIsInstance(conn, SSLClient)
-        self.assertEqual(conn.address, ('::1', 6984))
-        self.assertIs(conn.sslctx, ctx.ssl_ctx)
-        self.assertIs(ctx.get_threadlocal_connection(), conn)
-        self.assertIs(conn, ctx.threadlocal.connection)
+        # Test when connection exists in current thread but is already closed:
+        conn4 = DummyConnection(closed=True)
+        ctx = ContextSubclass()
+        ctx.threadlocal.connection = conn4
+        conn5 = ctx.get_threadlocal_connection()
+        self.assertIsNot(conn5, conn4)
+        self.assertIsInstance(conn5, DummyConnection)
+        self.assertIs(ctx.get_threadlocal_connection(), conn5)
+        self.assertIs(ctx.threadlocal.connection, conn5)
+        self.assertEqual(ctx.client._calls, 1)
+        self.assertIs(ctx.get_threadlocal_connection(), conn5)
+        self.assertIs(ctx.threadlocal.connection, conn5)
+        self.assertEqual(ctx.client._calls, 1)
 
     def test_get_auth_headers(self):
         method = 'GET'
