@@ -544,7 +544,7 @@ class Context:
     Reuse TCP connections between multiple `CouchBase` instances.
 
     When making serial requests one after another, you get considerably better
-    performance when you reuse your ``HTTPConnection`` (or ``HTTPSConnection``).
+    performance when you reuse your ``degu.client.Connection``.
 
     Individual `Server` and `Database` instances automatically do this: each
     thread gets its own thread-local connection that will transparently be
@@ -600,9 +600,9 @@ class Context:
         self.url = self.full_url(self.basepath)
         self.threadlocal = threading.local()
         if t.scheme == 'https':
-            ssl_config = self.env.get('ssl', {})
-            self.ssl_ctx = build_ssl_context(ssl_config)
-            self.client = create_sslclient(self.ssl_ctx, self.t)
+            sslconfig = self.env.get('ssl', {})
+            sslctx = build_ssl_context(sslconfig)
+            self.client = create_sslclient(sslctx, self.t)
         else:
             self.client = create_client(self.t)
 
