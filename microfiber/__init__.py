@@ -544,7 +544,7 @@ class Context:
     Reuse TCP connections between multiple `CouchBase` instances.
 
     When making serial requests one after another, you get considerably better
-    performance when you reuse your ``HTTPConnection`` (or ``HTTPSConnection``).
+    performance when you reuse your ``degu.client.Connection``.
 
     Individual `Server` and `Database` instances automatically do this: each
     thread gets its own thread-local connection that will transparently be
@@ -579,6 +579,9 @@ class Context:
     `Context` because that will allow all your SSL connections to reuse the
     same ``ssl.SSLContext``.
     """
+
+    __slots__ = ('env', 'basepath', 't', 'url', 'threadlocal', 'client')
+
     def __init__(self, env=None):
         if env is None:
             env = DEFAULT_URL
@@ -600,22 +603,21 @@ class Context:
         self.url = self.full_url(self.basepath)
         self.threadlocal = threading.local()
         if t.scheme == 'https':
-            ssl_config = self.env.get('ssl', {})
-            self.ssl_ctx = build_ssl_context(ssl_config)
+            sslconfig = self.env.get('ssl', {})
+            sslctx = build_ssl_context(sslconfig)
+            self.client = create_sslclient(sslctx, self.t)
+        else:
+            self.client = create_client(self.t)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
 
-    def get_connection(self):
-        if self.t.scheme == 'http':
-            return create_client(self.t)
-        else:
-            return create_sslclient(self.ssl_ctx, self.t)
-
     def get_threadlocal_connection(self):
-        if not hasattr(self.threadlocal, 'connection'):
-            self.threadlocal.connection = self.get_connection()
-        return self.threadlocal.connection
+        conn = getattr(self.threadlocal, 'connection', None)
+        if conn is None or conn.closed:
+            conn = self.client.connect()
+            self.threadlocal.connection = conn
+        return conn
 
     def get_auth_headers(self, method, path, query, testing=None):
         if 'oauth' in self.env:
@@ -664,18 +666,14 @@ class CouchBase(object):
         self.basepath = self.ctx.basepath
         self.url = self.ctx.url
 
-    def _full_url(self, path):
-        return self.ctx.full_url(path)
-
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
-        # We automatically retry in 
+        # We automatically retry once in case connection was closed by server:
         try:
             return conn.request(method, path, headers, body)
         except (OSError, EmptyLineError):
             pass
-        # degu.client.Client.request() will close its connection when there is
-        # an exception:
+        conn = self.ctx.get_threadlocal_connection()
         return conn.request(method, path, headers, body)
 
     def request(self, method, parts, options, body=None, headers=None):
