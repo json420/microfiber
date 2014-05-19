@@ -1581,27 +1581,6 @@ class TestCouchBase(TestCase):
         self.assertEqual(inst.url, url)
         self.assertIs(inst.url, inst.ctx.url)
 
-    def test_full_url(self):
-        inst = microfiber.CouchBase('https://localhost:5003/')
-        self.assertEqual(
-            inst._full_url('/'),
-            'https://localhost:5003/'
-        )
-        self.assertEqual(
-            inst._full_url('/db/doc/att?bar=null&foo=true'),
-            'https://localhost:5003/db/doc/att?bar=null&foo=true'
-        )
-
-        inst = microfiber.CouchBase('http://localhost:5003/mydb/')
-        self.assertEqual(
-            inst._full_url('/'),
-            'http://localhost:5003/'
-        )
-        self.assertEqual(
-            inst._full_url('/db/doc/att?bar=null&foo=true'),
-            'http://localhost:5003/db/doc/att?bar=null&foo=true'
-        )
-
 
 class TestServer(TestCase):
     def test_init(self):

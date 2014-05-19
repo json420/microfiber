@@ -666,18 +666,13 @@ class CouchBase(object):
         self.basepath = self.ctx.basepath
         self.url = self.ctx.url
 
-    def _full_url(self, path):
-        return self.ctx.full_url(path)
-
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
-        # We automatically retry in 
+        # We automatically retry once in case connection was closed by server:
         try:
             return conn.request(method, path, headers, body)
         except (OSError, EmptyLineError):
             pass
-        # degu.client.Client.request() will close its connection when there is
-        # an exception:
         conn = self.ctx.get_threadlocal_connection()
         return conn.request(method, path, headers, body)
 
