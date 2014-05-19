@@ -602,6 +602,9 @@ class Context:
         if t.scheme == 'https':
             ssl_config = self.env.get('ssl', {})
             self.ssl_ctx = build_ssl_context(ssl_config)
+            self.client = create_sslclient(self.ssl_ctx, self.t)
+        else:
+            self.client = create_client(self.t)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
@@ -613,9 +616,11 @@ class Context:
             return create_sslclient(self.ssl_ctx, self.t)
 
     def get_threadlocal_connection(self):
-        if not hasattr(self.threadlocal, 'connection'):
-            self.threadlocal.connection = self.get_connection()
-        return self.threadlocal.connection
+        conn = getattr(self.threadlocal, 'connection', None)
+        if conn is None or conn.closed:
+            conn = self.client.connect()
+            self.threadlocal.connection = conn
+        return conn
 
     def get_auth_headers(self, method, path, query, testing=None):
         if 'oauth' in self.env:
@@ -676,6 +681,7 @@ class CouchBase(object):
             pass
         # degu.client.Client.request() will close its connection when there is
         # an exception:
+        conn = self.ctx.get_threadlocal_connection()
         return conn.request(method, path, headers, body)
 
     def request(self, method, parts, options, body=None, headers=None):
