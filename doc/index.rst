@@ -15,7 +15,9 @@ packages are available for Ubuntu in the `Novacut Stable Releases PPA`_ and the
 If you have questions or need help getting started with Microfiber, please stop
 by the `#novacut`_ IRC channel on freenode.
 
-Microfiber is licensed `LGPLv3+`_.
+Microfiber is licensed `LGPLv3+`_, requires `Python 3.4`_ or newer, and depends
+upon `Degu`_ and `Dbase32`_.  To run the Microfiber unit tests, you will also
+need `UserCouch`_ (a build dependency).
 
 
 Contents:
@@ -37,4 +39,8 @@ Contents:
 .. _`Novacut Stable Releases PPA`: https://launchpad.net/~novacut/+archive/stable
 .. _`Novacut Daily Builds PPA`: https://launchpad.net/~novacut/+archive/daily
 .. _`#novacut`: http://webchat.freenode.net/?channels=novacut
+.. _`Python 3.4`: https://docs.python.org/3.4/
+.. _`Degu`: https://launchpad.net/degu
+.. _`Dbase32`: https://launchpad.net/dbase32
+.. _`UserCouch`: https://launchpad.net/usercouch
 
