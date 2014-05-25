@@ -23,10 +23,11 @@ need `UserCouch`_ (a build dependency).
 Contents:
 
 .. toctree::
-   :maxdepth: 2
-   
-   microfiber
-   couchdb_api
+    :maxdepth: 2
+
+    install 
+    microfiber
+    couchdb_api
 
 
 
