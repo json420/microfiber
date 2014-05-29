@@ -341,15 +341,7 @@ def get_missing_changes(session):
         kw['feed'] = 'longpoll'
     if 'update_seq' in session:
         kw['since'] = session['update_seq']
-    try:
-        result = session['src'].get('_changes', **kw)
-    except BadRequest:
-        # FIXME: Sometimes when under high load we get a 400 Bad Request when
-        # making a request to the CouchDB _changes feed.  For now, our solution
-        # is to back off with time.sleep(3.14) and then to retry.
-        log.exception('BadRequest in get_missing_changes():')
-        time.sleep(3.14)
-        return {}
+    result = session['src'].get('_changes', **kw)
     session['new_update_seq'] = result['last_seq']
     changes = changes_for_revs_diff(result)
     if changes:
