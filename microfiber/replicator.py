@@ -373,13 +373,11 @@ def replicate_one_batch(session):
         kw = {
             'revs': True,
             'attachments': True,
-            'atts_since': [],
         }
         if 'possible_ancestors' in info:
-            kw['atts_since'].extend(info['possible_ancestors'])
+            kw['atts_since'] = info['possible_ancestors']
         for _rev in info['missing']:
             docs.append(src.get(_id, rev=_rev, **kw))
-            kw['atts_since'].append(_rev)
     if docs:
         session['dst'].post({'docs': docs, 'new_edits': False}, '_bulk_docs')
         session['doc_count'] += len(docs)
