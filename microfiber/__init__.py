@@ -57,7 +57,6 @@ import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
 from degu.client import create_client, create_sslclient, build_client_sslctx
-from degu.base import EmptyLineError
 
 
 __all__ = (
@@ -671,7 +670,7 @@ class CouchBase(object):
         # We automatically retry once in case connection was closed by server:
         try:
             return conn.request(method, path, headers, body)
-        except (OSError, EmptyLineError):
+        except ConnectionError:
             pass
         conn = self.ctx.get_threadlocal_connection()
         return conn.request(method, path, headers, body)
