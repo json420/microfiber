@@ -430,14 +430,7 @@ def replicate_continuously(session):
                 # Not a perfect solution, but probably still an overall
                 # improvement for now.
                 if count == 1:
-                    # FIXME: 1.1 is certainly *way* too high, but erring on the
-                    # side of "too high" for now helps us evaluate the impact.
-                    # Plus, for now, for evaluation, we're logging every time
-                    # the delay is triggered... so let's not do that too crazy
-                    # often :)
-                    log.warning('slowing continuously replication loop...')
-                    # FIXME: also, remember to remove above damn logging
-                    time.sleep(1.1)
+                    time.sleep(0.4)
 
 
 def iter_normal_names(src):
