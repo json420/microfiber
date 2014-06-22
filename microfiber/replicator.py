@@ -406,6 +406,38 @@ def replicate_continuously(session):
                     count, session['update_seq'], session['label']
                 )
                 last_count = session['doc_count']
+                # We want to avoid a situation where the replicate_one_batch()
+                # loop is running almost as fast as it can, yet only 1 doc is
+                # being replicated per loop.
+                #
+                # Ideally, we want to slow things down just a bit in this case
+                # so that more often than not we replicate 2 or more docs per
+                # loop.
+                #
+                # The user *is* very sensitive to latency when a first change is
+                # made after a period of inactivity, which this hack doesn't
+                # effect.  However, the user is far less sensitive to latency
+                # that occurs in the middle a quick burst of changes, and
+                # likewise the user isn't particularly sensitive as to whether
+                # this burst of changes all come through as a series of discrete
+                # and individually noticeable change events.
+                #
+                # So basically with this hack, we sometimes hide a small amount
+                # of delay in this perceptual blind spot, for the sake of more
+                # efficient replication that is less taxing on CPU, disk, and
+                # network resources.
+                #
+                # Not a perfect solution, but probably still an overall
+                # improvement for now.
+                if count == 1:
+                    # FIXME: 1.1 is certainly *way* too high, but erring on the
+                    # side of "too high" for now helps us evaluate the impact.
+                    # Plus, for now, for evaluation, we're logging every time
+                    # the delay is triggered... so let's not do that too crazy
+                    # often :)
+                    log.warning('slowing continuously replication loop...')
+                    # FIXME: also, remember to remove above damn logging
+                    time.sleep(1.1)
 
 
 def iter_normal_names(src):
