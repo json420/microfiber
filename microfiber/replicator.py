@@ -428,8 +428,10 @@ def replicate_continuously(session):
                 # network resources.
                 #
                 # Not a perfect solution, but probably still an overall
-                # improvement for now.
-                if count == 1:
+                # improvement for now.  Also, currently it seems best to insert
+                # this delay whenever 4 or fewer docs get replicated, as the
+                # loop will replicate up to 50 docs each time when available.
+                if 0 < count < 5:
                     time.sleep(0.4)
 
 
