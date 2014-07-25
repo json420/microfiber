@@ -367,7 +367,16 @@ def replicate_one_batch(session):
             'attachments': True,
         }
         if 'possible_ancestors' in info:
-            kw['atts_since'] = info['possible_ancestors']
+            # NOTE: info['possible_ancestors'] can seemingly be thousands of
+            # items long, and doesn't seem to be constrained by _revs_limit.
+            # So for now, we're only included at most the final 10 revisions.
+            # This issues has thus far only been encountered with CouchDB 1.6.0,
+            # so it might be a regression from 1.5.0.
+            if len(info['possible_ancestors']) > 10:
+                log.warning('%d possible_ancestors for %s',
+                    len(info['possible_ancestors']), _id
+                )
+            kw['atts_since'] = info['possible_ancestors'][-10:]
         for _rev in info['missing']:
             docs.append(src.get(_id, rev=_rev, **kw))
     if docs:
