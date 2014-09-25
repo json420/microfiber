@@ -337,7 +337,11 @@ class TestFunctions(TestCase):
             ]
         )
 
-        # Test key, startkey, endkey with non-ascii values
+        # Test key, startkey, endkey with non-ascii values.
+        #
+        # New in Microfiber 14.09: as Degu 0.9 now only allows ASCII bytes to
+        # exist in the HTTP preamble (and a subset of ASCII at that), we no
+        # longer JSON-encode query parameters with ensure_ascii=False.
         options = dict(
             key='Hanna Sköld',
             startkey='Matias Särs',
@@ -346,9 +350,9 @@ class TestFunctions(TestCase):
         self.assertEqual(
             list(microfiber._queryiter(options)),
             [
-                ('endkey', '"Paweł Moll"'),
-                ('key', '"Hanna Sköld"'),
-                ('startkey', '"Matias Särs"'),
+                ('endkey', '"Pawe\\u0142 Moll"'),
+                ('key', '"Hanna Sk\\u00f6ld"'),
+                ('startkey', '"Matias S\\u00e4rs"'),
             ]
         )
 
