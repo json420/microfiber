@@ -1,11 +1,7 @@
 #!/usr/bin/make -f
 
 %:
-	dh $@ --with=python3 --with=sphinxdoc
-
-
-override_dh_auto_clean:
-	rm -rf build/ doc/_build/
+	dh $@ --with=python3,sphinxdoc --buildsystem=pybuild
 
 override_dh_auto_build:
 	sphinx-build -b html doc doc/_build/html
