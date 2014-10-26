@@ -413,14 +413,14 @@ class TestFunctions(TestCase):
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide ca_file
-        config = pki.get_anonymous_client_config()
+        config = pki.anonymous_client_sslconfig
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide cert_file and key_file (uses openssl default ca_path)
-        config = pki.get_client_config()
+        config = pki.client_sslconfig
         del config['ca_file']
         config['check_hostname'] = True
         ctx = microfiber.build_ssl_context(config)
@@ -429,7 +429,7 @@ class TestFunctions(TestCase):
         self.assertTrue(ctx.options & ssl.OP_NO_COMPRESSION)
 
         # Provide all three
-        config = pki.get_client_config()
+        config = pki.client_sslconfig
         ctx = microfiber.build_ssl_context(config)
         self.assertIsInstance(ctx, ssl.SSLContext)
         self.assertEqual(ctx.verify_mode, ssl.CERT_REQUIRED)
@@ -437,19 +437,19 @@ class TestFunctions(TestCase):
 
         # Provide junk ca_file, make sure ca_file is actually being used
         config = {
-            'ca_file': pki.get_server_config()['key_file']
+            'ca_file': pki.server_sslconfig['key_file']
         }
         with self.assertRaises(ssl.SSLError):
             microfiber.build_ssl_context(config)
 
         # Leave out key_file, make sure cert_file is actually being used
-        config = pki.get_client_config()
+        config = pki.client_sslconfig
         del config['key_file']
         with self.assertRaises(ssl.SSLError):
             microfiber.build_ssl_context(config)
 
         # Test with config['context']
-        config = pki.get_client_config()
+        config = pki.client_sslconfig
         ctx = microfiber.build_ssl_context(config)
         ctx2 = microfiber.build_ssl_context({'context': ctx})
         self.assertIs(ctx, ctx2)
@@ -1340,7 +1340,7 @@ class TestContext(TestCase):
 
         # Test with check_hostname=False
         pki = TempPKI()
-        sslconfig = pki.get_client_config()
+        sslconfig = pki.client_sslconfig
         env = {
             'url': 'https://127.0.0.1:6984/',
             'ssl': sslconfig,
@@ -2420,11 +2420,11 @@ class TestPermutations(LiveTestCase):
                     continue
                 config = {
                     'bind_address': bind_address,
-                    'ssl': pki.get_server_config()
+                    'ssl': pki.server_sslconfig
                 }
                 tmpcouch = TempCouch()
                 env = tmpcouch.bootstrap(auth, config)['x_env_ssl']
-                env['ssl'] = pki.get_client_config()
+                env['ssl'] = pki.client_sslconfig
                 uc = microfiber.CouchBase(env)
                 self.assertEqual(uc.get()['couchdb'], 'Welcome')
                 self.check_with_bad_auth(env, auth)
