@@ -46,7 +46,7 @@ from gzip import GzipFile
 import time
 from hashlib import sha1
 import hmac
-from urllib.parse import urlparse, urlencode, quote_plus
+from urllib.parse import urlparse, urlencode, quote_plus, ParseResult
 import ssl
 import threading
 from queue import Queue
@@ -56,7 +56,7 @@ from collections import namedtuple
 import logging
 
 from dbase32 import random_id, RANDOM_BITS, RANDOM_BYTES, RANDOM_B32LEN
-from degu.client import create_client, create_sslclient, build_client_sslctx
+from degu.client import Client, SSLClient, build_client_sslctx
 
 
 __all__ = (
@@ -103,6 +103,34 @@ URL_CONSTANTS = (
 DEFAULT_URL = HTTP_IPv4_URL
 
 Attachment = namedtuple('Attachment', 'content_type data')
+
+
+def create_client(url, **options):
+    """
+    Convenience function to create a `degu.client.Client` from a URL.
+
+    For example:
+
+    >>> create_client('http://www.example.com/')
+    Client(('www.example.com', 80))
+
+    """
+    t = (url if isinstance(url, ParseResult) else urlparse(url))
+    if t.scheme != 'http':
+        raise ValueError("scheme must be 'http', got {!r}".format(t.scheme))
+    port = (80 if t.port is None else t.port)
+    return Client((t.hostname, port), **options)
+
+
+def create_sslclient(sslctx, url, **options):
+    """
+    Convenience function to create an `SSLClient` from a URL.
+    """
+    t = (url if isinstance(url, ParseResult) else urlparse(url))
+    if t.scheme != 'https':
+        raise ValueError("scheme must be 'https', got {!r}".format(t.scheme))
+    port = (443 if t.port is None else t.port)
+    return SSLClient(sslctx, (t.hostname, port), **options)
 
 
 class BulkConflict(Exception):
