@@ -1267,6 +1267,6 @@ class Database(CouchBase):
         assert response.headers['content-type'] == 'application/json'
         assert response.headers['transfer-encoding'] == 'chunked'
         h = sha1()
-        for (data, extension) in response.body:
+        for (extension, data) in response.body:
             h.update(data)
         return h.hexdigest()
