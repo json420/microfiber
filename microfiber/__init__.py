@@ -40,6 +40,7 @@ Launchpad project:
 """
 
 from io import BufferedReader, TextIOWrapper
+import os
 from base64 import b64encode
 import json
 from gzip import GzipFile
@@ -695,6 +696,16 @@ class CouchBase(object):
 
     def raw_request(self, method, path, body, headers):
         conn = self.ctx.get_threadlocal_connection()
+
+        # Hack for API compatabilty back to when Microfiber used `http.client`
+        # instead of `degu.client`:
+        if isinstance(body, BufferedReader):
+            if 'content-length' in headers:
+                content_length = headers['content-length']
+            else:
+                content_length = os.stat(body.fileno()).st_size
+            body = conn.bodies.Body(body, content_length)
+
         # We automatically retry once in case connection was closed by server:
         try:
             return conn.request(method, path, headers, body)

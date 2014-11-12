@@ -47,7 +47,7 @@ from random import SystemRandom
 from usercouch.misc import TempCouch
 from degu.misc import TempPKI
 from dbase32 import db32dec, isdb32, random_id
-from degu.client import Client, SSLClient, Response, Connection
+from degu.client import Client, SSLClient, Response
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
