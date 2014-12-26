@@ -571,19 +571,6 @@ Functions
     approved", for what that's worth.
 
 
-.. function:: random_id2()
-
-    Returns a random ID with timestamp + 80 bits of base32-encoded random data.
-
-    The ID will be 27-characters long, URL and filesystem safe.  For example:
-
-    >>> random_id2()  #doctest: +SKIP
-    '1313567384-67DFPERIOU66CT56'
-
-    The idea with this 2nd type of random ID is that it will be used for the
-    Dmedia activity log.
-
-
 .. function:: dumps(obj, pretty=False)
 
     Safe and opinionated use of ``json.dumps()``.
