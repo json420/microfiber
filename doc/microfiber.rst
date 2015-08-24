@@ -704,6 +704,7 @@ Exceptions
     This is raised when a bulk operation failed.
 
 
+
 .. exception:: EnhanceYourCalm
 
     420 Enhance Your Calm.
