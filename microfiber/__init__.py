@@ -209,6 +209,9 @@ class BadRangeRequest(ClientError):
 class ExpectationFailed(ClientError):
     '417 Expectation Failed'
 
+class EnhanceYourCalm(ClientError):
+    '420 Enhance Your Calm'
+
 
 class ServerError(HTTPError):
     """
@@ -230,6 +233,7 @@ errors = {
     415: BadContentType,
     416: BadRangeRequest,
     417: ExpectationFailed,
+    420: EnhanceYourCalm,
 }
 
 

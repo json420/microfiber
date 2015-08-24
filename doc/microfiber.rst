@@ -704,6 +704,13 @@ Exceptions
     This is raised when a bulk operation failed.
 
 
+.. exception:: EnhanceYourCalm
+
+    420 Enhance Your Calm.
+
+    Handy when working with the Twitter API.
+
+
 
 .. exception:: ServerError
 

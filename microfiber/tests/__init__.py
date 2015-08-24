@@ -1025,6 +1025,7 @@ class TestErrors(TestCase):
                 415: microfiber.BadContentType,
                 416: microfiber.BadRangeRequest,
                 417: microfiber.ExpectationFailed,
+                420: microfiber.EnhanceYourCalm,
             }
         )
         method = 'MOST'
