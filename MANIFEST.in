@@ -1,2 +1,3 @@
 include COPYING COPYING.LESSER
 include doc/*
+include doc/_static/*
