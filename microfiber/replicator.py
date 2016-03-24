@@ -407,6 +407,7 @@ def replicate_continuously(session):
     log.info('starting continuous %s', session['label'])
     session['feed'] = 'longpoll'
     last_count = session['doc_count']
+    last_update_seq = session['update_seq']
     while True:
         if replicate_one_batch(session):
             count = session['doc_count'] - last_count
@@ -437,11 +438,14 @@ def replicate_continuously(session):
                 # network resources.
                 #
                 # Not a perfect solution, but probably still an overall
-                # improvement for now.  Also, currently it seems best to insert
-                # this delay whenever 4 or fewer docs get replicated, as the
-                # loop will replicate up to 50 docs each time when available.
-                if 0 < count < 5:
-                    time.sleep(0.4)
+                # improvement for now.
+                if count < 5:
+                    time.sleep(0.2)
+
+            # Only save session every 100 update_seq:
+            if session['update_seq'] - last_update_seq >= 100:
+                last_update_seq = session['update_seq']
+                save_session(session)
 
 
 def iter_normal_names(src):
