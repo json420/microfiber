@@ -313,9 +313,7 @@ def save_session(session):
         session[key] = db.update(
             mark_checkpoint, session[key], session_id, update_seq
         )
-    current_seq = src.get()['update_seq']
-    percent = (0 if current_seq == 0 else 100 * update_seq // current_seq)
-    log.info('%d/%d %d%% %s', update_seq, current_seq, percent, session['label'])
+    log.info('saved at %s %s', update_seq, session['label'])
 
 
 def changes_for_revs_diff(result):
@@ -382,6 +380,7 @@ def replicate_one_batch(session):
     if docs:
         session['dst'].post({'docs': docs, 'new_edits': False}, '_bulk_docs')
         session['doc_count'] += len(docs)
+        log.info('%s docs %s', len(docs), session['label'])
     return sequence_was_updated(session)
 
 
@@ -406,42 +405,13 @@ def replicate(session, timeout=None):
 def replicate_continuously(session):
     log.info('starting continuous %s', session['label'])
     session['feed'] = 'longpoll'
-    last_count = session['doc_count']
+    saved_update_seq = session['update_seq']
     while True:
         if replicate_one_batch(session):
-            count = session['doc_count'] - last_count
-            if count > 0:
-                log.info('%s docs at %s %s',
-                    count, session['update_seq'], session['label']
-                )
-                last_count = session['doc_count']
-                # We want to avoid a situation where the replicate_one_batch()
-                # loop is running almost as fast as it can, yet only 1 doc is
-                # being replicated per loop.
-                #
-                # Ideally, we want to slow things down just a bit in this case
-                # so that more often than not we replicate 2 or more docs per
-                # loop.
-                #
-                # The user *is* very sensitive to latency when a first change is
-                # made after a period of inactivity, which this hack doesn't
-                # effect.  However, the user is far less sensitive to latency
-                # that occurs in the middle a quick burst of changes, and
-                # likewise the user isn't particularly sensitive as to whether
-                # this burst of changes all come through as a series of discrete
-                # and individually noticeable change events.
-                #
-                # So basically with this hack, we sometimes hide a small amount
-                # of delay in this perceptual blind spot, for the sake of more
-                # efficient replication that is less taxing on CPU, disk, and
-                # network resources.
-                #
-                # Not a perfect solution, but probably still an overall
-                # improvement for now.  Also, currently it seems best to insert
-                # this delay whenever 4 or fewer docs get replicated, as the
-                # loop will replicate up to 50 docs each time when available.
-                if 0 < count < 5:
-                    time.sleep(0.4)
+            # Only save session every 100 update_seq:
+            if session['update_seq'] - saved_update_seq >= 100:
+                saved_update_seq = session['update_seq']
+                save_session(session)
 
 
 def iter_normal_names(src):
