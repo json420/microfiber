@@ -473,7 +473,7 @@ def replicate_continuously(session):
             log.info('Delay 0.25 for %s', session['label'])
             time.sleep(0.25)
         if seq_delta == 2:
-            log.info('Delay 0.25 for %s', session['label'])
+            log.info('Delay 0.1 for %s', session['label'])
             time.sleep(0.1)
 
 
