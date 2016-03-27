@@ -181,6 +181,10 @@ from . import dumps, NotFound, Server
 log = logging.getLogger()
 
 
+BATCH_SIZE = 50
+CHECKPOINT_SIZE = BATCH_SIZE * 4
+
+
 def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     """
     Build a replication ID.
@@ -199,13 +203,13 @@ def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     Also note that the source and destination database names influence the
     replication ID:
 
-    >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-BAR')
-    'RDJXJIY6R8JNDRMVBI3VYDUN8IF76VNOT66CVICJDE3Y6XQG'
+    >>> build_replication_id('node-A', 'db-FOO', 'node-A', 'db-BAR')
+    'PSX6IQ49BVSM3O6Q88VJJ4AJCT654IFUBDVYQHR9VE7K3GD6'
 
     And likewise have the same directional property:
 
-    >>> build_replication_id('node-A', 'db-BAR', 'node-B', 'db-FOO')
-    '4FYW5LTBNFWJKBDJ8TGIBG9ERVG7RJ7936SM696FSO6RY5J6'
+    >>> build_replication_id('node-A', 'db-BAR', 'node-A', 'db-FOO')
+    '7WXI38MYJSCLGCIVPX4VY3GFMJY4FYXQCX64V9X655CXXXTV'
 
     Finally, the ID is different depending on whether your intent is "push" mode
     or "pull" mode:
@@ -213,32 +217,62 @@ def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO', mode='push')
     'SLAIFEESGWH9C4DASBK4PMGI58F89IQWMI3FKCI6E3P7PSLU'
 
+    Compared to:
+
     >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO', mode='pull')
     '9VUNRR98XJVHG7BBU4VUVQW7MDB9HFX8FU7NHPN8UO53AI5L'
 
     In a nutshell, the hashed JSON Object includes a "replication_node"
     attribute for the ID of the machine the replicator is running on, which
     could actually be a 3rd machine altogether.  However, for now we don't need
-    that, so the API just exposes the 'push' or 'pull' mode flag to select
-    either the *src_node* or the *dst_node* as the replicator_node,
+    that, so the API just exposes the "push" or "pull" mode keyword argument to
+    select either the *src_node* or the *dst_node* as the replicator_node,
     respectively.
 
     It's tempting to use the same replication ID in each the push and pull
     direction, so that, say, a push replication on the *src_node* could later be
     resumed as pull replication running on the *dst_node*.  However, it's
-    prudent for one replicator not to trust the work done by another.  It could
-    be different versions of the software, etc.  In Dmedia in particular, we
-    want to use pull replication as independent mechanism for verifying that the
-    push replication is working, and as a fall-back mechanism if the push
-    replication fails for any reason.
+    prudent for one replicator instance not to trust the work done by another.
+    It could be different versions of the software, etc.  In Dmedia in
+    particular, we want to use pull replication as an independent mechanism for
+    verifying that the push replication is working, and as a fall-back mechanism
+    if the push replication fails for any reason.
+
+    Be aware that when the *src_node* and *dst_node* are the same, you can only
+    use push mode:
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-A', 'db-BAR', mode='push')
+    'PSX6IQ49BVSM3O6Q88VJJ4AJCT654IFUBDVYQHR9VE7K3GD6'
+
+    Compared to:
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-A', 'db-BAR', mode='pull')
+    Traceback (most recent call last):
+      ...
+    ValueError: when src_node and dst_node are the same, mode must be 'push'
+
+    When both the *src_node* and *dst_node* are the same, there is no semantic
+    difference between push mode and pull mode.  In fact, both would get the
+    same replication ID because all attributes, including the "replication_node"
+    attribute, will be the same.
+
+    Rather than silently letting you use the API in an ambiguous way, the
+    Microfiber replicator raises a ``ValueError``.
     """
-    assert (src_node, src_db) != (dst_node, dst_db)
+    if (src_node, src_db) == (dst_node, dst_db):
+        raise ValueError(
+            'cannot replicate to self: {!r}'.format((src_node, src_db))
+        )
     if mode == 'push':
         replicator_node = src_node
     elif mode == 'pull':
         replicator_node = dst_node
     else:
         raise ValueError("mode must be 'push' or 'pull'; got {!r}".format(mode))
+    if src_node == dst_node and mode != 'push':
+        raise ValueError(
+            "when src_node and dst_node are the same, mode must be 'push'"
+        )
     info = {
         'replicator': 'microfiber/protocol0',
         'replicator_node': replicator_node,
@@ -274,7 +308,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     else:
         label = '{} <= {}{}'.format(dst.name, src.url, src.name)
     # Some session state is just to make logging/debugging easier (especially
-    # the 'label':
+    # the 'label'):
     session = {
         'src_doc': src_doc,
         'dst_doc': dst_doc,
@@ -283,6 +317,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     if (
             session_id == dst_doc.get('session_id')
         and isinstance(session_id, str) and isdb32(session_id)
+        and len(session_id) == 24
         and isinstance(src_update_seq, int) and src_update_seq > 0
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
@@ -290,7 +325,9 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
         log.info('resuming at %d %s', session['update_seq'], session['label'])
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
+        session['update_seq'] = 0
     # Other session state we don't want to log above:
+    session['saved_update_seq'] = session['update_seq']
     session['src'] = src
     session['dst'] = dst
     session['session_id'] = time_id()  # ID for this new session
@@ -299,21 +336,33 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
 
 
 def mark_checkpoint(doc, session_id, update_seq):
+    assert isdb32(session_id) and len(session_id) == 24
+    assert update_seq > 0
     doc['session_id'] = session_id
     doc['update_seq'] = update_seq
 
 
-def save_session(session):
+def save_session(session, force=False):
+    saved_update_seq = session['saved_update_seq']
+    update_seq = session['update_seq']
+    assert 0 <= saved_update_seq <= update_seq
+    if saved_update_seq == update_seq:
+        return
+    if not (force is True or update_seq - saved_update_seq >= CHECKPOINT_SIZE):
+        return
+
+    session_id = session['session_id']
     src = session['src']
     dst = session['dst']
+    src_doc = session['src_doc']
+    dst_doc = session['dst_doc']
+
     dst.post(None, '_ensure_full_commit')
-    session_id = session['session_id']
-    update_seq = session['update_seq']
-    for (db, key) in [(src, 'src_doc'), (dst, 'dst_doc')]:
-        session[key] = db.update(
-            mark_checkpoint, session[key], session_id, update_seq
-        )
-    log.info('saved at %s %s', update_seq, session['label'])
+    src.update(mark_checkpoint, src_doc, session_id, update_seq)
+    dst.update(mark_checkpoint, dst_doc, session_id, update_seq)
+
+    log.info('Checkpoint at %s %s', update_seq, session['label'])
+    session['saved_update_seq'] = update_seq
 
 
 def changes_for_revs_diff(result):
@@ -332,13 +381,14 @@ def changes_for_revs_diff(result):
 
 def get_missing_changes(session):
     kw = {
-        'limit': 50,
+        'limit': BATCH_SIZE,
         'style': 'all_docs',
+        'since': session['update_seq'],
     }
-    if 'feed' in session:
-        kw['feed'] = 'longpoll'
-    if 'update_seq' in session:
-        kw['since'] = session['update_seq']
+    feed = session.get('feed')
+    if feed:
+        assert feed == 'longpoll'
+        kw['feed'] = feed
     result = session['src'].get('_changes', **kw)
     session['new_update_seq'] = result['last_seq']
     changes = changes_for_revs_diff(result)
@@ -347,12 +397,12 @@ def get_missing_changes(session):
     return {}
 
 
-def sequence_was_updated(session):
-    new_update_seq = session.pop('new_update_seq', None)
-    if session.get('update_seq') == new_update_seq:
-        return False
+def get_sequence_delta(session):
+    update_seq = session['update_seq']
+    new_update_seq = session.pop('new_update_seq')
+    assert 0 <= update_seq <= new_update_seq
     session['update_seq'] = new_update_seq
-    return True
+    return new_update_seq - update_seq
 
 
 def replicate_one_batch(session):
@@ -379,9 +429,13 @@ def replicate_one_batch(session):
             docs.append(src.get(_id, rev=_rev, **kw))
     if docs:
         session['dst'].post({'docs': docs, 'new_edits': False}, '_bulk_docs')
-        session['doc_count'] += len(docs)
-        log.info('%s docs %s', len(docs), session['label'])
-    return sequence_was_updated(session)
+        count = len(docs)
+        session['doc_count'] += count
+        if count == 1:
+            log.info('1 doc %s', session['label'])
+        else:
+            log.info('%s docs %s', count, session['label'])
+    return get_sequence_delta(session)
 
 
 def replicate(session, timeout=None):
@@ -395,6 +449,7 @@ def replicate(session, timeout=None):
             break
         if session['update_seq'] >= stop_at_seq:
             break
+    save_session(session, force=True)
     if session['doc_count'] > 0:
         elapsed = time.monotonic() - start_time
         log.info('%.3fs to replicate %d docs %s',
@@ -405,13 +460,22 @@ def replicate(session, timeout=None):
 def replicate_continuously(session):
     log.info('starting continuous %s', session['label'])
     session['feed'] = 'longpoll'
-    saved_update_seq = session['update_seq']
     while True:
-        if replicate_one_batch(session):
-            # Only save session every 100 update_seq:
-            if session['update_seq'] - saved_update_seq >= 100:
-                saved_update_seq = session['update_seq']
-                save_session(session)
+        seq_delta = replicate_one_batch(session)
+        save_session(session)
+
+        # We want to avoid a scenario where `replicate_batch()` is running
+        # almost as fast as it can, yet the update_sequence is only advancing by
+        # 1 each time through the loop.  In this case, we want to slow things
+        # down just a touch so more changes can get batched together in each
+        # call to `replicate_batch()`.
+        assert seq_delta >= 0
+        if seq_delta == 1:
+            log.info('Delay 0.25 for %s', session['label'])
+            time.sleep(0.25)
+        if seq_delta == 1:
+            log.info('Delay 0.1 for %s', session['label'])
+            time.sleep(0.1)
 
 
 def iter_normal_names(src):
