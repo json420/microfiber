@@ -1,25 +1,24 @@
-Debianized by Jason Gerard DeRose <jderose@novacut.com>  2011-03-19
+Format: http://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Microfiber
+Upstream-Contact: Jason Gerard DeRose <jderose@novacut.com>
+Source: https://launchpad.net/microfiber/+download
 
-Upstream authors:
+Files: *
+Copyright: Copyright (C) 2011-2016 Novacut Inc
+License: LGPL-3+
+ Microfiber is free software: you can redistribute it and/or modify it under the
+ terms of the GNU Lesser General Public License as published by the Free
+ Software Foundation, either version 3 of the License, or (at your option) any
+ later version.
+ .
+ Microfiber is distributed in the hope that it will be useful, but WITHOUT ANY
+ WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+ PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
+ details.
+ .
+ You should have received a copy of the GNU Lesser General Public License along
+ with  Microfiber.  If not, see <http://www.gnu.org/licenses/>.
+ .
+ On Debian systems, the full text of the GNU Lesser General Public License
+ version 3 can be found in the file `/usr/share/common-licenses/LGPL-3'.
 
-| Jason Gerard DeRose <jderose@novacut.com>
-
-Copyright and license:
-
-| Copyright (C) 2011 Novacut Inc
-|
-| `microfiber` is free software: you can redistribute it and/or modify it under
-| the terms of the GNU Lesser General Public License as published by the Free
-| Software Foundation, either version 3 of the License, or (at your option) any
-| later version.
-|
-| `microfiber` is distributed in the hope that it will be useful, but WITHOUT
-| ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
-| FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public License for more
-| details.
-|
-| You should have received a copy of the GNU Lesser General Public License along
-| with `microfiber`.  If not, see <http://www.gnu.org/licenses/>.
-
-On Debian systems, the full text of the GNU Lesser General Public License is
-available in /usr/share/common-licenses/LGPL-3.
