@@ -769,6 +769,13 @@ class TestFunctions(TestCase):
         self.assertEqual(dst.get(local_pull_id), dst_doc)
         self.assertEqual(src_doc, dst_doc)
 
+    def test_mark_checkpoint(self):
+        _id = random_id()
+        seq = random.randrange(0, 10000)
+        doc = {}
+        self.assertIsNone(replicator.mark_checkpoint(doc, _id, seq))
+        self.assertEqual(doc, {'session_id': _id, 'update_seq': seq})
+
     def test_get_missing_changes(self):
         # Create two CouchDB instances, a Database for each:
         couch1 = TempCouch()
@@ -1290,9 +1297,8 @@ class TestReplicator(TestCase):
         tophash_c = wait_for_sync(db1c, db2c)
         self.assertNotIn(tophash_c, {tophash_1c, tophash_2c})
 
-        # Check database names on each in for kicks:
+        # Check database names on each one for kicks:
         expected = sorted(['_users', '_replicator', name_a, name_b, name_c])
         self.assertEqual(s1.get('_all_dbs'), expected)
         self.assertEqual(s2.get('_all_dbs'), expected)
-
 

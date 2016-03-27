@@ -330,6 +330,8 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
 
 
 def mark_checkpoint(doc, session_id, update_seq):
+#    assert isdb32(session_id) and len(session_id) == 24
+#    assert type(update_seq) is int and update_seq > 0
     doc['session_id'] = session_id
     doc['update_seq'] = update_seq
 
