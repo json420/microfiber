@@ -1,5 +1,5 @@
 # microfiber: fabric for a lightweight Couch
-# Copyright (C) 2014 Novacut Inc
+# Copyright (C) 2011-2016 Novacut Inc
 #
 # This file is part of `microfiber`.
 #

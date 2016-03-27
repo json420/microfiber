@@ -9,7 +9,7 @@ import microfiber
 
 # Project info
 project = 'Microfiber'
-copyright = '2014, Novacut Inc'
+copyright = '2011-2016, Novacut Inc'
 version = microfiber.__version__[:5]
 release = microfiber.__version__
 
