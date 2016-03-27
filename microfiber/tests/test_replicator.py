@@ -122,7 +122,7 @@ class TestConstants(TestCase):
         self.assertIs(type(CHECKPOINT_SIZE), int)
         self.assertGreaterEqual(CHECKPOINT_SIZE, BATCH_SIZE)
         self.assertEqual(CHECKPOINT_SIZE % BATCH_SIZE, 0)
-        self.assertEqual(CHECKPOINT_SIZE, 500)
+        self.assertEqual(CHECKPOINT_SIZE, 200)
 
 
 class TestFunctions(TestCase):
@@ -976,7 +976,7 @@ class TestFunctions(TestCase):
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
             'saved_update_seq': 1,
-            'update_seq': 500,
+            'update_seq': 200,
             'session_id': session_id,
             'src': src,
             'dst': dst,
@@ -1003,8 +1003,8 @@ class TestFunctions(TestCase):
         session['update_seq'] += 1
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
-            'saved_update_seq': 501,
-            'update_seq': 501,
+            'saved_update_seq': 201,
+            'update_seq': 201,
             'session_id': session_id,
             'src': src,
             'dst': dst,
@@ -1012,13 +1012,13 @@ class TestFunctions(TestCase):
                 '_id': local_id,
                 '_rev': '0-2',
                 'session_id': session_id,
-                'update_seq': 501,
+                'update_seq': 201,
             },
             'dst_doc': {
                 '_id': local_id,
                 '_rev': '0-2',
                 'session_id': session_id,
-                'update_seq': 501,
+                'update_seq': 201,
             },
             'label': 'mylabel',
         })

@@ -182,7 +182,7 @@ log = logging.getLogger()
 
 
 BATCH_SIZE = 50
-CHECKPOINT_SIZE = BATCH_SIZE * 10
+CHECKPOINT_SIZE = BATCH_SIZE * 4
 
 
 def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
