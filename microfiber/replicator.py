@@ -232,13 +232,20 @@ def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     push replication is working, and as a fall-back mechanism if the push
     replication fails for any reason.
     """
-    assert (src_node, src_db) != (dst_node, dst_db)
+    if (src_node, src_db) == (dst_node, dst_db):
+        raise ValueError(
+            'cannot replicate to self: {!r}'.format((src_node, src_db))
+        )
     if mode == 'push':
         replicator_node = src_node
     elif mode == 'pull':
         replicator_node = dst_node
     else:
         raise ValueError("mode must be 'push' or 'pull'; got {!r}".format(mode))
+    if src_node == dst_node and mode != 'push':
+        raise ValueError(
+            "when src_node and dst_node are the same, mode must be 'push'"
+        )
     info = {
         'replicator': 'microfiber/protocol0',
         'replicator_node': replicator_node,

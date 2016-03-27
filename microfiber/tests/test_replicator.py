@@ -28,11 +28,19 @@ from unittest import TestCase
 import os
 from random import SystemRandom
 import time
+from hashlib import sha512
 
-from dbase32 import random_id
+from dbase32 import random_id, db32enc
 from usercouch.misc import TempCouch
 
-from microfiber import Server, Database, NotFound, Attachment, encode_attachment
+from microfiber import (
+    Server,
+    Database,
+    NotFound,
+    Attachment,
+    encode_attachment,
+    dumps,
+)
 from microfiber import replicator
 
 
@@ -102,6 +110,193 @@ def wait_for_create(db):
 
 
 class TestFunctions(TestCase):
+    def test_build_replication_id(self):
+        build_replication_id = replicator.build_replication_id
+        same_id = id1 = random_id()
+        same_name = name1 = random_id()
+        id2 = random_id()
+        name2 = random_id()
+
+        # src and dst cannot be the same:
+        args = (same_id, same_name, same_id, same_name)
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args)
+        self.assertEqual(str(cm.exception),
+            'cannot replicate to self: {!r}'.format((id1, name1))
+        )
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args, mode='push')
+        self.assertEqual(str(cm.exception),
+            'cannot replicate to self: {!r}'.format((id1, name1))
+        )
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args, mode='pull')
+        self.assertEqual(str(cm.exception),
+            'cannot replicate to self: {!r}'.format((id1, name1))
+        )
+
+        # mode must be 'push' or 'pull':
+        args = (id1, name1, id2, name2)  # Also used in next section
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args, mode='posh')
+        self.assertEqual(str(cm.exception),
+            "mode must be 'push' or 'pull'; got 'posh'"
+        )
+        mode = random_id()
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args, mode)
+        self.assertEqual(str(cm.exception),
+            "mode must be 'push' or 'pull'; got {!r}".format(mode)
+        )
+
+        # Different src and dst nodes, different src and dst DB names:
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': id1,
+            'src_node': id1,
+            'src_db': name1,
+            'dst_node': id2,
+            'dst_db': name2,
+        }).encode()
+        push_A = db32enc(sha512(data).digest()[:30])
+
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': id2,
+            'src_node': id1,
+            'src_db': name1,
+            'dst_node': id2,
+            'dst_db': name2,
+        }).encode()
+        pull_A = db32enc(sha512(data).digest()[:30])
+
+        self.assertNotEqual(push_A, pull_A)
+        accum = {push_A, pull_A}
+
+        self.assertEqual(build_replication_id(*args), push_A)
+        self.assertEqual(build_replication_id(*args, mode='push'), push_A)
+        self.assertEqual(build_replication_id(*args, mode='pull'), pull_A)
+
+        # Different src and dst nodes, same src and dst DB name:
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': id1,
+            'src_node': id1,
+            'src_db': same_name,
+            'dst_node': id2,
+            'dst_db': same_name,
+        }).encode()
+        push_B = db32enc(sha512(data).digest()[:30])
+
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': id2,
+            'src_node': id1,
+            'src_db': same_name,
+            'dst_node': id2,
+            'dst_db': same_name,
+        }).encode()
+        pull_B = db32enc(sha512(data).digest()[:30])
+
+        self.assertNotEqual(push_B, pull_B)
+        self.assertNotIn(push_B, accum)
+        self.assertNotIn(pull_B, accum)
+        accum.update({push_B, pull_B})
+
+        args = (id1, same_name, id2, same_name)
+        self.assertEqual(build_replication_id(*args), push_B)
+        self.assertEqual(build_replication_id(*args, mode='push'), push_B)
+        self.assertEqual(build_replication_id(*args, mode='pull'), pull_B)
+
+        # As above, but flip src and dst nodes:
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': id2,
+            'src_node': id2,
+            'src_db': same_name,
+            'dst_node': id1,
+            'dst_db': same_name,
+        }).encode()
+        push_C = db32enc(sha512(data).digest()[:30])
+
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': id1,
+            'src_node': id2,
+            'src_db': same_name,
+            'dst_node': id1,
+            'dst_db': same_name,
+        }).encode()
+        pull_C = db32enc(sha512(data).digest()[:30])
+
+        self.assertNotEqual(push_C, pull_C)
+        self.assertNotIn(push_C, accum)
+        self.assertNotIn(pull_C, accum)
+        accum.update({push_C, pull_C})
+
+        args = (id2, same_name, id1, same_name)
+        self.assertEqual(build_replication_id(*args), push_C)
+        self.assertEqual(build_replication_id(*args, mode='push'), push_C)
+        self.assertEqual(build_replication_id(*args, mode='pull'), pull_C)
+
+        # Same src and dst node, different src and dst DB names:
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': same_id,
+            'src_node': same_id,
+            'src_db': name1,
+            'dst_node': same_id,
+            'dst_db': name2,
+        }).encode()
+        D = db32enc(sha512(data).digest()[:30])
+
+        self.assertNotIn(D, accum)
+        accum.add(D)
+
+        args = (same_id, name1, same_id, name2)
+        self.assertEqual(build_replication_id(*args), D)
+        self.assertEqual(build_replication_id(*args, mode='push'), D)
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args, mode='pull')
+        self.assertEqual(str(cm.exception),
+            "when src_node and dst_node are the same, mode must be 'push'"
+        )
+
+        # As above, but flip src and dst DB names:
+        data = dumps({
+            'replicator': 'microfiber/protocol0',
+            'replicator_node': same_id,
+            'src_node': same_id,
+            'src_db': name2,
+            'dst_node': same_id,
+            'dst_db': name1,
+        }).encode()
+        E = db32enc(sha512(data).digest()[:30])
+
+        self.assertNotIn(E, accum)
+        accum.add(E)
+
+        args = (same_id, name2, same_id, name1)
+        self.assertEqual(build_replication_id(*args), E)
+        self.assertEqual(build_replication_id(*args, mode='push'), E)
+        with self.assertRaises(ValueError) as cm:
+            build_replication_id(*args, mode='pull')
+        self.assertEqual(str(cm.exception),
+            "when src_node and dst_node are the same, mode must be 'push'"
+        )
+
+        # Final sanity check:
+        args = (same_id, id1, id2, same_name, name1, name2)
+        self.assertEqual(len(set(args)), 4)
+        self.assertEqual(set(args), {id1, id2, name1, name2})
+        self.assertEqual(same_id, id1)
+        self.assertEqual(same_name, name1)
+
+        rep_ids = (pull_A, push_A, pull_B, push_B, pull_C, push_C, D, E)
+        self.assertEqual(len(set(rep_ids)), len(rep_ids))
+        self.assertEqual(set(rep_ids), accum)
+        self.assertEqual(len(rep_ids), 8)
+
     def test_get_checkpoint(self):
         get_checkpoint = replicator.get_checkpoint
         rep_id = random_id(30)
