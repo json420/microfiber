@@ -87,11 +87,11 @@ def wait_for_sync(db1, db2):
     assert db1.url != db2.url
     assert db1.name == db2.name
     for i in range(30):
+        time.sleep(0.5)
         tophash1 = db1.get_tophash()
         tophash2 = db2.get_tophash()
         if tophash1 == tophash2:
             return tophash1
-        time.sleep(0.5)
     raise Exception(
         'could not achive sync: {} != {}'.format(tophash1, tophash2)
     )
@@ -99,7 +99,7 @@ def wait_for_sync(db1, db2):
 
 def wait_for_create(db):
     for i in range(30):
-        time.sleep(0.5)
+        time.sleep(1)
         try:
             return db.get()
         except NotFound:
@@ -122,7 +122,7 @@ class TestConstants(TestCase):
         self.assertIs(type(CHECKPOINT_SIZE), int)
         self.assertGreaterEqual(CHECKPOINT_SIZE, BATCH_SIZE)
         self.assertEqual(CHECKPOINT_SIZE % BATCH_SIZE, 0)
-        self.assertEqual(CHECKPOINT_SIZE, 200)
+        self.assertEqual(CHECKPOINT_SIZE, 500)
 
 
 class TestFunctions(TestCase):
@@ -978,7 +978,7 @@ class TestFunctions(TestCase):
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
             'saved_update_seq': 1,
-            'update_seq': 200,
+            'update_seq': 500,
             'session_id': session_id,
             'src': src,
             'dst': dst,
@@ -1005,8 +1005,8 @@ class TestFunctions(TestCase):
         session['update_seq'] += 1
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
-            'saved_update_seq': 201,
-            'update_seq': 201,
+            'saved_update_seq': 501,
+            'update_seq': 501,
             'session_id': session_id,
             'src': src,
             'dst': dst,
@@ -1014,13 +1014,13 @@ class TestFunctions(TestCase):
                 '_id': local_id,
                 '_rev': '0-2',
                 'session_id': session_id,
-                'update_seq': 201,
+                'update_seq': 501,
             },
             'dst_doc': {
                 '_id': local_id,
                 '_rev': '0-2',
                 'session_id': session_id,
-                'update_seq': 201,
+                'update_seq': 501,
             },
             'label': 'mylabel',
         })

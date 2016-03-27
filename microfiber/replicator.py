@@ -182,7 +182,7 @@ log = logging.getLogger()
 
 
 BATCH_SIZE = 50
-CHECKPOINT_SIZE = BATCH_SIZE * 4
+CHECKPOINT_SIZE = BATCH_SIZE * 10
 
 
 def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
@@ -470,10 +470,8 @@ def replicate_continuously(session):
         # down just a touch so more changes can get batched together in each
         # call to `replicate_one_batch()`.
         if seq_delta == 1:
-            log.info('Delay 0.25 for %s', session['label'])
-            time.sleep(0.25)
+            time.sleep(0.3)
         if seq_delta == 2:
-            log.info('Delay 0.1 for %s', session['label'])
             time.sleep(0.1)
 
 
