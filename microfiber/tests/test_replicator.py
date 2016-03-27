@@ -974,19 +974,6 @@ class TestFunctions(TestCase):
     def test_get_sequence_delta(self):
         get_sequence_delta = replicator.get_sequence_delta
 
-        # No update_seq in session:
-        session = {'new_update_seq': 0}
-        self.assertEqual(get_sequence_delta(session), 0)
-        self.assertEqual(session, {'update_seq': 0})
-
-        session = {'new_update_seq': 1}
-        self.assertEqual(get_sequence_delta(session), 1)
-        self.assertEqual(session, {'update_seq': 1})
-
-        session = {'new_update_seq': 2}
-        self.assertEqual(get_sequence_delta(session), 2)
-        self.assertEqual(session, {'update_seq': 2})
-
         # update_seq=0:
         session = {'update_seq': 0, 'new_update_seq': 0}
         self.assertEqual(get_sequence_delta(session), 0)
@@ -1013,6 +1000,19 @@ class TestFunctions(TestCase):
         self.assertEqual(get_sequence_delta(session), 2)
         self.assertEqual(session, {'update_seq': 3})
 
+        # update_seq=2:
+        session = {'update_seq': 2, 'new_update_seq': 2}
+        self.assertEqual(get_sequence_delta(session), 0)
+        self.assertEqual(session, {'update_seq': 2})
+
+        session = {'update_seq': 2, 'new_update_seq': 3}
+        self.assertEqual(get_sequence_delta(session), 1)
+        self.assertEqual(session, {'update_seq': 3})
+
+        session = {'update_seq': 2, 'new_update_seq': 4}
+        self.assertEqual(get_sequence_delta(session), 2)
+        self.assertEqual(session, {'update_seq': 4})
+
     def test_replicate(self):
         # Create two CouchDB instances, a Database for each:
         couch1 = TempCouch()
@@ -1023,13 +1023,15 @@ class TestFunctions(TestCase):
         db2.put(None)  # Create DB2
 
         # We'll need a minimal session dict:
+        session_id = random_id()
+        local_id = '_local/' + random_id(30)
         session = {
             'src': db1,
             'dst': db2,
-            'src_doc': {'_id': '_local/myrep'},
-            'dst_doc': {'_id': '_local/myrep'},
+            'src_doc': {'_id': local_id},
+            'dst_doc': {'_id': local_id},
             'label': 'mylabel',
-            'session_id': 'mysession',
+            'session_id': session_id,
             'doc_count': 0,
             'update_seq': 0,
         }
@@ -1040,20 +1042,10 @@ class TestFunctions(TestCase):
             {
                 'src': db1,
                 'dst': db2,
-                'src_doc': {
-                    '_id': '_local/myrep',
-                    '_rev': '0-1',
-                    'session_id': 'mysession',
-                    'update_seq': 0,
-                },
-                'dst_doc': {
-                   '_id': '_local/myrep',
-                    '_rev': '0-1',
-                    'session_id': 'mysession',
-                    'update_seq': 0,
-                },
+                'src_doc': {'_id': local_id},
+                'dst_doc': {'_id': local_id},
                 'label': 'mylabel',
-                'session_id': 'mysession',
+                'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
             }
@@ -1069,19 +1061,19 @@ class TestFunctions(TestCase):
                 'src': db1,
                 'dst': db2,
                 'src_doc': {
-                    '_id': '_local/myrep',
-                    '_rev': '0-3',
-                    'session_id': 'mysession',
+                    '_id': local_id,
+                    '_rev': '0-2',
+                    'session_id': session_id,
                     'update_seq': 69,
                 },
                 'dst_doc': {
-                   '_id': '_local/myrep',
-                    '_rev': '0-3',
-                    'session_id': 'mysession',
+                   '_id': local_id,
+                    '_rev': '0-2',
+                    'session_id': session_id,
                     'update_seq': 69,
                 },
                 'label': 'mylabel',
-                'session_id': 'mysession',
+                'session_id': session_id,
                 'doc_count': 69,
                 'update_seq': 69,
             }
@@ -1095,19 +1087,19 @@ class TestFunctions(TestCase):
                 'src': db1,
                 'dst': db2,
                 'src_doc': {
-                    '_id': '_local/myrep',
-                    '_rev': '0-3',
-                    'session_id': 'mysession',
+                    '_id': local_id,
+                    '_rev': '0-2',
+                    'session_id': session_id,
                     'update_seq': 69,
                 },
                 'dst_doc': {
-                   '_id': '_local/myrep',
-                    '_rev': '0-3',
-                    'session_id': 'mysession',
+                   '_id': local_id,
+                    '_rev': '0-2',
+                    'session_id': session_id,
                     'update_seq': 69,
                 },
                 'label': 'mylabel',
-                'session_id': 'mysession',
+                'session_id': session_id,
                 'doc_count': 69,
                 'update_seq': 69,
             }
@@ -1134,19 +1126,19 @@ class TestFunctions(TestCase):
                 'src': db1,
                 'dst': db2,
                 'src_doc': {
-                    '_id': '_local/myrep',
-                    '_rev': '0-5',
-                    'session_id': 'mysession',
+                    '_id': local_id,
+                    '_rev': '0-4',
+                    'session_id': session_id,
                     'update_seq': 173,
                 },
                 'dst_doc': {
-                   '_id': '_local/myrep',
-                    '_rev': '0-5',
-                    'session_id': 'mysession',
+                   '_id': local_id,
+                    '_rev': '0-4',
+                    'session_id': session_id,
                     'update_seq': 173,
                 },
                 'label': 'mylabel',
-                'session_id': 'mysession',
+                'session_id': session_id,
                 'doc_count': 138,
                 'update_seq': 173,
             }
@@ -1176,19 +1168,19 @@ class TestFunctions(TestCase):
                 'src': db1,
                 'dst': db2,
                 'src_doc': {
-                    '_id': '_local/myrep',
-                    '_rev': '0-7',
-                    'session_id': 'mysession',
+                    '_id': local_id,
+                    '_rev': '0-6',
+                    'session_id': session_id,
                     'update_seq': 311,
                 },
                 'dst_doc': {
-                   '_id': '_local/myrep',
-                    '_rev': '0-7',
-                    'session_id': 'mysession',
+                   '_id': local_id,
+                    '_rev': '0-6',
+                    'session_id': session_id,
                     'update_seq': 311,
                 },
                 'label': 'mylabel',
-                'session_id': 'mysession',
+                'session_id': session_id,
                 'doc_count': 207,
                 'update_seq': 311,
             }

@@ -384,25 +384,11 @@ def get_missing_changes(session):
 
 
 def get_sequence_delta(session):
-    update_seq = session.get('update_seq', 0)
+    update_seq = session['update_seq']
     new_update_seq = session.pop('new_update_seq')
-
-    assert type(update_seq) is int
-    assert type(new_update_seq) is int
     assert 0 <= update_seq <= new_update_seq
-
     session['update_seq'] = new_update_seq
-    delta = new_update_seq - update_seq
-    assert delta >= 0
-    return delta
-
-
-def sequence_was_updated(session):
-    new_update_seq = session.pop('new_update_seq', None)
-    if session.get('update_seq') == new_update_seq:
-        return False
-    session['update_seq'] = new_update_seq
-    return True
+    return new_update_seq - update_seq
 
 
 def replicate_one_batch(session):
@@ -429,9 +415,13 @@ def replicate_one_batch(session):
             docs.append(src.get(_id, rev=_rev, **kw))
     if docs:
         session['dst'].post({'docs': docs, 'new_edits': False}, '_bulk_docs')
-        session['doc_count'] += len(docs)
-        log.info('%s docs %s', len(docs), session['label'])
-    return sequence_was_updated(session)
+        count = len(docs)
+        session['doc_count'] += count
+        if count == 1:
+            log.info('1 doc %s', session['label'])
+        else:
+            log.info('%s docs %s', count, session['label'])
+    return get_sequence_delta(session)
 
 
 def replicate(session, timeout=None):
