@@ -323,7 +323,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
         log.warning('cannot resume replication: %s', dumps(session, True))
         session['update_seq'] = 0
     # Other session state we don't want to log above:
-    #session['saved_update_seq'] = session['update_seq']
+    session['saved_update_seq'] = session['update_seq']
     session['src'] = src
     session['dst'] = dst
     session['session_id'] = time_id()  # ID for this new session

@@ -367,6 +367,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(dst.get()['db_name'], dst_name)
@@ -399,6 +400,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -429,6 +431,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 42,
+                'saved_update_seq': 42,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -454,6 +457,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 69,
+                'saved_update_seq': 69,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -483,6 +487,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -513,6 +518,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -541,6 +547,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 1776,
+                'saved_update_seq': 1776,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -590,6 +597,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(dst.get()['db_name'], dst_name)
@@ -622,6 +630,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -652,6 +661,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 42,
+                'saved_update_seq': 42,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -677,6 +687,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 69,
+                'saved_update_seq': 69,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -706,6 +717,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -736,6 +748,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -764,6 +777,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 1776,
+                'saved_update_seq': 1776,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -781,6 +795,14 @@ class TestFunctions(TestCase):
 
     def test_mark_checkpoint(self):
         _id = random_id()
+        doc = {}
+        self.assertIsNone(replicator.mark_checkpoint(doc, _id, 0))
+        self.assertEqual(doc, {'session_id': _id, 'update_seq': 0})
+
+        doc = {}
+        self.assertIsNone(replicator.mark_checkpoint(doc, _id, 1))
+        self.assertEqual(doc, {'session_id': _id, 'update_seq': 1})
+
         seq = random.randrange(0, 10000)
         doc = {}
         self.assertIsNone(replicator.mark_checkpoint(doc, _id, seq))
