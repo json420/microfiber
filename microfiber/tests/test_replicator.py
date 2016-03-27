@@ -102,6 +102,34 @@ def wait_for_create(db):
 
 
 class TestFunctions(TestCase):
+    def test_get_checkpoint(self):
+        get_checkpoint = replicator.get_checkpoint
+        rep_id = random_id(30)
+        local_id = '_local/' + rep_id
+        couch = TempCouch()
+        db = Database(random_dbname(), couch.bootstrap())
+
+        # Database does not exists:
+        self.assertEqual(get_checkpoint(db, rep_id), {'_id': local_id})
+        with self.assertRaises(NotFound):
+            db.get(local_id)
+
+        # Doc with local_id does not exists:
+        self.assertTrue(db.ensure())
+        self.assertEqual(get_checkpoint(db, rep_id), {'_id': local_id})
+        with self.assertRaises(NotFound):
+            db.get(local_id)
+
+        # Doc with local_id exists:
+        marker = random_id()
+        rev = db.post({'_id': local_id, 'm': marker})['rev']
+        self.assertEqual(get_checkpoint(db, rep_id),
+            {'_id': local_id, '_rev': rev, 'm': marker}
+        )
+        self.assertEqual(db.get(local_id),
+            {'_id': local_id, '_rev': rev, 'm': marker}
+        )
+
     def test_get_missing_changes(self):
         # Create two CouchDB instances, a Database for each:
         couch1 = TempCouch()
