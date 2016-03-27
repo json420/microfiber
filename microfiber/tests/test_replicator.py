@@ -286,6 +286,48 @@ class TestFunctions(TestCase):
         # Directly make sure docs actually match:
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
 
+    def test_get_sequence_delta(self):
+        get_sequence_delta = replicator.get_sequence_delta
+
+        # No update_seq in session:
+        session = {'new_update_seq': 0}
+        self.assertEqual(get_sequence_delta(session), 0)
+        self.assertEqual(session, {'update_seq': 0})
+
+        session = {'new_update_seq': 1}
+        self.assertEqual(get_sequence_delta(session), 1)
+        self.assertEqual(session, {'update_seq': 1})
+
+        session = {'new_update_seq': 2}
+        self.assertEqual(get_sequence_delta(session), 2)
+        self.assertEqual(session, {'update_seq': 2})
+
+        # update_seq=0:
+        session = {'update_seq': 0, 'new_update_seq': 0}
+        self.assertEqual(get_sequence_delta(session), 0)
+        self.assertEqual(session, {'update_seq': 0})
+
+        session = {'update_seq': 0, 'new_update_seq': 1}
+        self.assertEqual(get_sequence_delta(session), 1)
+        self.assertEqual(session, {'update_seq': 1})
+
+        session = {'update_seq': 0, 'new_update_seq': 2}
+        self.assertEqual(get_sequence_delta(session), 2)
+        self.assertEqual(session, {'update_seq': 2})
+
+        # update_seq=1:
+        session = {'update_seq': 1, 'new_update_seq': 1}
+        self.assertEqual(get_sequence_delta(session), 0)
+        self.assertEqual(session, {'update_seq': 1})
+
+        session = {'update_seq': 1, 'new_update_seq': 2}
+        self.assertEqual(get_sequence_delta(session), 1)
+        self.assertEqual(session, {'update_seq': 2})
+
+        session = {'update_seq': 1, 'new_update_seq': 3}
+        self.assertEqual(get_sequence_delta(session), 2)
+        self.assertEqual(session, {'update_seq': 3})
+
     def test_replicate(self):
         # Create two CouchDB instances, a Database for each:
         couch1 = TempCouch()

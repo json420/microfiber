@@ -347,6 +347,20 @@ def get_missing_changes(session):
     return {}
 
 
+def get_sequence_delta(session):
+    update_seq = session.get('update_seq', 0)
+    new_update_seq = session.pop('new_update_seq')
+
+    assert type(update_seq) is int
+    assert type(new_update_seq) is int
+    assert 0 <= update_seq <= new_update_seq
+
+    session['update_seq'] = new_update_seq
+    delta = new_update_seq - update_seq
+    assert delta >= 0
+    return delta
+
+
 def sequence_was_updated(session):
     new_update_seq = session.pop('new_update_seq', None)
     if session.get('update_seq') == new_update_seq:
