@@ -464,17 +464,16 @@ def replicate_continuously(session):
         seq_delta = replicate_one_batch(session)
         save_session(session)
 
-        # We want to avoid a scenario where `replicate_batch()` is running
+        # We want to avoid a scenario where `replicate_one_batch()` is running
         # almost as fast as it can, yet the update_sequence is only advancing by
         # 1 each time through the loop.  In this case, we want to slow things
         # down just a touch so more changes can get batched together in each
-        # call to `replicate_batch()`.
-        assert seq_delta >= 0
+        # call to `replicate_one_batch()`.
         if seq_delta == 1:
             log.info('Delay 0.25 for %s', session['label'])
             time.sleep(0.25)
-        if seq_delta == 1:
-            log.info('Delay 0.1 for %s', session['label'])
+        if seq_delta == 2:
+            log.info('Delay 0.25 for %s', session['label'])
             time.sleep(0.1)
 
 

@@ -162,7 +162,7 @@ class TestFunctions(TestCase):
         )
         mode = random_id()
         with self.assertRaises(ValueError) as cm:
-            build_replication_id(*args, mode)
+            build_replication_id(*args, mode=mode)
         self.assertEqual(str(cm.exception),
             "mode must be 'push' or 'pull'; got {!r}".format(mode)
         )
