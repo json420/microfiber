@@ -332,23 +332,31 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
 
 
 def mark_checkpoint(doc, session_id, update_seq):
-#    assert isdb32(session_id) and len(session_id) == 24
-#    assert type(update_seq) is int and update_seq > 0
+    assert isdb32(session_id) and len(session_id) == 24
+    assert update_seq > 0
     doc['session_id'] = session_id
     doc['update_seq'] = update_seq
 
 
 def save_session(session):
+    saved_update_seq = session['saved_update_seq']
+    update_seq = session['update_seq']
+    assert 0 <= saved_update_seq <= update_seq
+    if saved_update_seq == update_seq:
+        return
+
+    session_id = session['session_id']
     src = session['src']
     dst = session['dst']
+    src_doc = session['src_doc']
+    dst_doc = session['dst_doc']
+
     dst.post(None, '_ensure_full_commit')
-    session_id = session['session_id']
-    update_seq = session['update_seq']
-    for (db, key) in [(src, 'src_doc'), (dst, 'dst_doc')]:
-        session[key] = db.update(
-            mark_checkpoint, session[key], session_id, update_seq
-        )
+    src.update(mark_checkpoint, src_doc, session_id, update_seq)
+    dst.update(mark_checkpoint, dst_doc, session_id, update_seq)
+
     log.info('saved at %s %s', update_seq, session['label'])
+    session['saved_update_seq'] = update_seq
 
 
 def changes_for_revs_diff(result):

@@ -796,17 +796,34 @@ class TestFunctions(TestCase):
     def test_mark_checkpoint(self):
         _id = random_id()
         doc = {}
-        self.assertIsNone(replicator.mark_checkpoint(doc, _id, 0))
-        self.assertEqual(doc, {'session_id': _id, 'update_seq': 0})
-
-        doc = {}
         self.assertIsNone(replicator.mark_checkpoint(doc, _id, 1))
         self.assertEqual(doc, {'session_id': _id, 'update_seq': 1})
+
+        doc = {}
+        self.assertIsNone(replicator.mark_checkpoint(doc, _id, 2))
+        self.assertEqual(doc, {'session_id': _id, 'update_seq': 2})
 
         seq = random.randrange(0, 10000)
         doc = {}
         self.assertIsNone(replicator.mark_checkpoint(doc, _id, seq))
         self.assertEqual(doc, {'session_id': _id, 'update_seq': seq})
+
+    def test_save_session(self):
+        save_session = replicator.save_session
+
+        # Nothing should be done with saved_update_seq == update_seq:
+        session = {'saved_update_seq': 0, 'update_seq': 0}
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {'saved_update_seq': 0, 'update_seq': 0})
+
+        session = {'saved_update_seq': 1, 'update_seq': 1}
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {'saved_update_seq': 1, 'update_seq': 1})
+
+        seq = random.randrange(0, 10000)
+        session = {'saved_update_seq': seq, 'update_seq': seq}
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {'saved_update_seq': seq, 'update_seq': seq})
 
     def test_get_missing_changes(self):
         # Create two CouchDB instances, a Database for each:
@@ -1035,6 +1052,13 @@ class TestFunctions(TestCase):
         self.assertEqual(get_sequence_delta(session), 2)
         self.assertEqual(session, {'update_seq': 4})
 
+        # random value test:
+        seq = random.randrange(0, 10000)
+        new_seq = seq + random.randrange(0, 10000)
+        session = {'update_seq': seq, 'new_update_seq': new_seq}
+        self.assertEqual(get_sequence_delta(session), new_seq - seq)
+        self.assertEqual(session, {'update_seq': new_seq})
+
     def test_replicate(self):
         # Create two CouchDB instances, a Database for each:
         couch1 = TempCouch()
@@ -1056,6 +1080,7 @@ class TestFunctions(TestCase):
             'session_id': session_id,
             'doc_count': 0,
             'update_seq': 0,
+            'saved_update_seq': 0,
         }
 
         # First try when src is empty:
@@ -1070,6 +1095,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 0,
                 'update_seq': 0,
+                'saved_update_seq': 0,
             }
         )
 
@@ -1098,6 +1124,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 69,
                 'update_seq': 69,
+                'saved_update_seq': 69,
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
@@ -1124,6 +1151,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 69,
                 'update_seq': 69,
+                'saved_update_seq': 69,
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
@@ -1163,6 +1191,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 138,
                 'update_seq': 173,
+                'saved_update_seq': 173,
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
@@ -1205,6 +1234,7 @@ class TestFunctions(TestCase):
                 'session_id': session_id,
                 'doc_count': 207,
                 'update_seq': 311,
+                'saved_update_seq': 311,
             }
         )
         self.assertEqual(db1.get_many(ids), db2.get_many(ids))
