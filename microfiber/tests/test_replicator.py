@@ -110,8 +110,6 @@ def wait_for_create(db):
 
 
 class TestFunctions(TestCase):
-    maxDiff = None
-
     def test_build_replication_id(self):
         build_replication_id = replicator.build_replication_id
         same_id = id1 = random_id()
@@ -550,6 +548,225 @@ class TestFunctions(TestCase):
         src.save(src_doc)
         self.assertEqual(src.get(local_push_id), src_doc)
         self.assertEqual(dst.get(local_push_id), dst_doc)
+        self.assertEqual(src_doc, dst_doc)
+
+        ########################################################################
+        # Oh my, we need to do it all again, this time for pull replication:
+        self.assertEqual(src.delete(), {'ok': True})
+        self.assertEqual(dst.delete(), {'ok': True})
+
+        pull_id = replicator.build_replication_id(
+            src_id, src_name, dst_id, dst_name, mode='pull'
+        )
+        local_pull_id = '_local/' + pull_id
+        pull_label = '{} <= {}{}'.format(dst_name, src.url, src_name)
+
+        # Create src Database, but don't create dst Database (so we can make
+        # sure load_session() creates dst Database):
+        self.assertTrue(src.ensure())
+        with self.assertRaises(NotFound):
+            dst.get()
+
+        # src checkpoint doc missing, dst database doesn't exist:
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': {'_id': local_pull_id},
+                'dst_doc': {'_id': local_pull_id},
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+            }
+        )
+        self.assertEqual(dst.get()['db_name'], dst_name)
+        with self.assertRaises(NotFound):
+            src.get(local_pull_id)
+        with self.assertRaises(NotFound):
+            dst.get(local_pull_id)
+
+        # Both src and dst checkpoint docs exist and have same update_seq, but
+        # previous session_id doesn't match:
+        old_id1 = random_id()
+        old_id2 = random_id()
+        src_doc = {'_id': local_pull_id, 'session_id': old_id1, 'update_seq': 69}
+        dst_doc = {'_id': local_pull_id, 'session_id': old_id2, 'update_seq': 69}
+        src.save(src_doc)
+        dst.save(dst_doc)
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': src_doc,
+                'dst_doc': dst_doc,
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+            }
+        )
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
+        self.assertNotEqual(src_doc, dst_doc)
+
+        # Both src and dst checkpoint docs have same session_id, but previous
+        # update_seq doesn't match (so the lowest should be choosen):
+        old_id = random_id()
+        src_doc['session_id'] = old_id
+        dst_doc['session_id'] = old_id
+        dst_doc['update_seq'] = 42
+        src.save(src_doc)
+        dst.save(dst_doc)
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': src_doc,
+                'dst_doc': dst_doc,
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+                'update_seq': 42,
+            }
+        )
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
+        self.assertNotEqual(src_doc, dst_doc)
+
+        # Same as above, but this time dst_doc has the larger update_seq:
+        dst_doc['update_seq'] = 3469
+        dst.save(dst_doc)
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': src_doc,
+                'dst_doc': dst_doc,
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+                'update_seq': 69,
+            }
+        )
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
+        self.assertNotEqual(src_doc, dst_doc)
+
+        # Both checkpoint docs have same update_seq but are missing session_id:
+        del src_doc['session_id']
+        del dst_doc['session_id']
+        src_doc['update_seq'] = 1776
+        dst_doc['update_seq'] = 1776
+        src.save(src_doc)
+        dst.save(dst_doc)
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': src_doc,
+                'dst_doc': dst_doc,
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+            }
+        )
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
+        self.assertNotEqual(src_doc, dst_doc)
+
+        # Both checkpoint docs have same session_id but are missing update_seq:
+        del src_doc['update_seq']
+        del dst_doc['update_seq']
+        old_id = random_id()
+        src_doc['session_id'] = old_id
+        dst_doc['session_id'] = old_id
+        src.save(src_doc)
+        dst.save(dst_doc)
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': src_doc,
+                'dst_doc': dst_doc,
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+            }
+        )
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
+        self.assertNotEqual(src_doc, dst_doc)
+
+        # The moons again align, both checkpoint docs have matching session_id
+        # and update_seq:
+        src_doc['update_seq'] = 1776
+        dst_doc['update_seq'] = 1776
+        src.save(src_doc)
+        dst.save(dst_doc)
+        session = load_session(src_id, src, dst_id, dst, mode='pull')
+        self.assertIsInstance(session, dict)
+        session_id = session['session_id']
+        self.assertIsInstance(session_id, str)
+        self.assertTrue(isdb32(session_id))
+        self.assertEqual(len(session_id), 24)
+        self.assertEqual(session,
+            {
+                'src_doc': src_doc,
+                'dst_doc': dst_doc,
+                'label': pull_label,
+                'src': src,
+                'dst': dst,
+                'session_id': session_id,
+                'doc_count': 0,
+                'update_seq': 1776,
+            }
+        )
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
+        self.assertNotEqual(src_doc, dst_doc)
+
+        # Sanity check: dst_doc should be one revision ahead but otherwise
+        # exactly equal:
+        self.assertEqual(src_doc['_rev'], '0-5')
+        self.assertEqual(dst_doc['_rev'], '0-6')
+        src.save(src_doc)
+        self.assertEqual(src.get(local_pull_id), src_doc)
+        self.assertEqual(dst.get(local_pull_id), dst_doc)
         self.assertEqual(src_doc, dst_doc)
 
     def test_get_missing_changes(self):
