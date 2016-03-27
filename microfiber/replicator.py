@@ -199,13 +199,13 @@ def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     Also note that the source and destination database names influence the
     replication ID:
 
-    >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-BAR')
-    'RDJXJIY6R8JNDRMVBI3VYDUN8IF76VNOT66CVICJDE3Y6XQG'
+    >>> build_replication_id('node-A', 'db-FOO', 'node-A', 'db-BAR')
+    'PSX6IQ49BVSM3O6Q88VJJ4AJCT654IFUBDVYQHR9VE7K3GD6'
 
     And likewise have the same directional property:
 
-    >>> build_replication_id('node-A', 'db-BAR', 'node-B', 'db-FOO')
-    '4FYW5LTBNFWJKBDJ8TGIBG9ERVG7RJ7936SM696FSO6RY5J6'
+    >>> build_replication_id('node-A', 'db-BAR', 'node-A', 'db-FOO')
+    '7WXI38MYJSCLGCIVPX4VY3GFMJY4FYXQCX64V9X655CXXXTV'
 
     Finally, the ID is different depending on whether your intent is "push" mode
     or "pull" mode:
@@ -213,24 +213,47 @@ def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO', mode='push')
     'SLAIFEESGWH9C4DASBK4PMGI58F89IQWMI3FKCI6E3P7PSLU'
 
+    Compared to:
+
     >>> build_replication_id('node-A', 'db-FOO', 'node-B', 'db-FOO', mode='pull')
     '9VUNRR98XJVHG7BBU4VUVQW7MDB9HFX8FU7NHPN8UO53AI5L'
 
     In a nutshell, the hashed JSON Object includes a "replication_node"
     attribute for the ID of the machine the replicator is running on, which
     could actually be a 3rd machine altogether.  However, for now we don't need
-    that, so the API just exposes the 'push' or 'pull' mode flag to select
-    either the *src_node* or the *dst_node* as the replicator_node,
+    that, so the API just exposes the "push" or "pull" mode keyword argument to
+    select either the *src_node* or the *dst_node* as the replicator_node,
     respectively.
 
     It's tempting to use the same replication ID in each the push and pull
     direction, so that, say, a push replication on the *src_node* could later be
     resumed as pull replication running on the *dst_node*.  However, it's
-    prudent for one replicator not to trust the work done by another.  It could
-    be different versions of the software, etc.  In Dmedia in particular, we
-    want to use pull replication as independent mechanism for verifying that the
-    push replication is working, and as a fall-back mechanism if the push
-    replication fails for any reason.
+    prudent for one replicator instance not to trust the work done by another.
+    It could be different versions of the software, etc.  In Dmedia in
+    particular, we want to use pull replication as an independent mechanism for
+    verifying that the push replication is working, and as a fall-back mechanism
+    if the push replication fails for any reason.
+
+    Be aware that when the *src_node* and *dst_node* are the same, you can only
+    use push mode:
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-A', 'db-BAR', mode='push')
+    'PSX6IQ49BVSM3O6Q88VJJ4AJCT654IFUBDVYQHR9VE7K3GD6'
+
+    Compared to:
+
+    >>> build_replication_id('node-A', 'db-FOO', 'node-A', 'db-BAR', mode='pull')
+    Traceback (most recent call last):
+      ...
+    ValueError: when src_node and dst_node are the same, mode must be 'push'
+
+    When both the *src_node* and *dst_node* are the same, there is no semantic
+    difference between push mode and pull mode.  In fact, both would get the
+    same replication ID because all attributes, including the "replication_node"
+    attribute, will be the same.
+
+    Rather than silently letting you use the API in an ambiguous way, the
+    Microfiber replicator raises a ``ValueError``.
     """
     if (src_node, src_db) == (dst_node, dst_db):
         raise ValueError(
