@@ -348,6 +348,8 @@ def save_session(session, force=False):
     assert 0 <= saved_update_seq <= update_seq
     if saved_update_seq == update_seq:
         return
+    if not (force is True or update_seq - saved_update_seq >= CHECKPOINT_SIZE):
+        return
 
     session_id = session['session_id']
     src = session['src']
@@ -359,7 +361,7 @@ def save_session(session, force=False):
     src.update(mark_checkpoint, src_doc, session_id, update_seq)
     dst.update(mark_checkpoint, dst_doc, session_id, update_seq)
 
-    log.info('saved at %s %s', update_seq, session['label'])
+    log.info('Checkpoint at %s %s', update_seq, session['label'])
     session['saved_update_seq'] = update_seq
 
 
@@ -447,6 +449,7 @@ def replicate(session, timeout=None):
             break
         if session['update_seq'] >= stop_at_seq:
             break
+    save_session(session, force=True)
     if session['doc_count'] > 0:
         elapsed = time.monotonic() - start_time
         log.info('%.3fs to replicate %d docs %s',
@@ -457,13 +460,22 @@ def replicate(session, timeout=None):
 def replicate_continuously(session):
     log.info('starting continuous %s', session['label'])
     session['feed'] = 'longpoll'
-    saved_update_seq = session['update_seq']
     while True:
-        if replicate_one_batch(session):
-            # Only save session every 100 update_seq:
-            if session['update_seq'] - saved_update_seq >= 100:
-                saved_update_seq = session['update_seq']
-                save_session(session)
+        seq_delta = replicate_one_batch(session)
+        save_session(session)
+
+        # We want to avoid a scenario where `replicate_batch()` is running
+        # almost as fast as it can, yet the update_sequence is only advancing by
+        # 1 each time through the loop.  In this case, we want to slow things
+        # down just a touch so more changes can get batched together in each
+        # call to `replicate_batch()`.
+        assert seq_delta >= 0
+        if seq_delta == 1:
+            log.info('Delay 0.25 for %s', session['label'])
+            time.sleep(0.25)
+        if seq_delta == 1:
+            log.info('Delay 0.1 for %s', session['label'])
+            time.sleep(0.1)
 
 
 def iter_normal_names(src):

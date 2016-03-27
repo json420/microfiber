@@ -109,6 +109,22 @@ def wait_for_create(db):
     )
 
 
+class TestConstants(TestCase):
+    def test_BATCH_SIZE(self):
+        BATCH_SIZE = replicator.BATCH_SIZE
+        self.assertIs(type(BATCH_SIZE), int)
+        self.assertGreaterEqual(BATCH_SIZE, 10)
+        self.assertEqual(BATCH_SIZE, 50)
+
+    def test_CHECKPOINT_SIZE(self):
+        CHECKPOINT_SIZE = replicator.CHECKPOINT_SIZE
+        BATCH_SIZE = replicator.BATCH_SIZE
+        self.assertIs(type(CHECKPOINT_SIZE), int)
+        self.assertGreaterEqual(CHECKPOINT_SIZE, BATCH_SIZE)
+        self.assertEqual(CHECKPOINT_SIZE % BATCH_SIZE, 0)
+        self.assertEqual(CHECKPOINT_SIZE, 200)
+
+
 class TestFunctions(TestCase):
     maxDiff = None
 
@@ -815,14 +831,20 @@ class TestFunctions(TestCase):
         session = {'saved_update_seq': 0, 'update_seq': 0}
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {'saved_update_seq': 0, 'update_seq': 0})
+        self.assertIsNone(save_session(session, force=True))
+        self.assertEqual(session, {'saved_update_seq': 0, 'update_seq': 0})
 
         session = {'saved_update_seq': 1, 'update_seq': 1}
         self.assertIsNone(save_session(session))
+        self.assertEqual(session, {'saved_update_seq': 1, 'update_seq': 1})
+        self.assertIsNone(save_session(session, force=True))
         self.assertEqual(session, {'saved_update_seq': 1, 'update_seq': 1})
 
         seq = random.randrange(0, 10000)
         session = {'saved_update_seq': seq, 'update_seq': seq}
         self.assertIsNone(save_session(session))
+        self.assertEqual(session, {'saved_update_seq': seq, 'update_seq': seq})
+        self.assertIsNone(save_session(session, force=True))
         self.assertEqual(session, {'saved_update_seq': seq, 'update_seq': seq})
 
         # Setup for remaining tests:
@@ -863,10 +885,44 @@ class TestFunctions(TestCase):
         with self.assertRaises(NotFound):
             dst.get(local_id)
 
-        # Increment update_seq by 1:
+        # Even with force=True, should not checkpoint:
+        self.assertIsNone(save_session(session, force=True))
+        self.assertEqual(session, {
+            'saved_update_seq': 0,
+            'update_seq': 0,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {'_id': local_id},
+            'dst_doc': {'_id': local_id},
+            'label': 'mylabel',
+        })
+        with self.assertRaises(NotFound):
+            src.get(local_id)
+        with self.assertRaises(NotFound):
+            dst.get(local_id)
+
+        # Increment update_seq by 1, should not checkpoint without force=True:
         session['update_seq'] += 1
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
+            'saved_update_seq': 0,
+            'update_seq': 1,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {'_id': local_id},
+            'dst_doc': {'_id': local_id},
+            'label': 'mylabel',
+        })
+        with self.assertRaises(NotFound):
+            src.get(local_id)
+        with self.assertRaises(NotFound):
+            dst.get(local_id)
+
+        # Now should checkpoint when we use force=True:
+        self.assertIsNone(save_session(session, force=True))
+        self.assertEqual(session, {
             'saved_update_seq': 1,
             'update_seq': 1,
             'session_id': session_id,
@@ -890,7 +946,7 @@ class TestFunctions(TestCase):
         self.assertEqual(dst.get(local_id), session['dst_doc'])
         self.assertEqual(session['src_doc'], session['dst_doc'])
 
-        # Should do nothing as update_seq hasn't changed:
+        # Should not checkpoint as update_seq hasn't changed:
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
             'saved_update_seq': 1,
@@ -916,26 +972,27 @@ class TestFunctions(TestCase):
         self.assertEqual(dst.get(local_id), session['dst_doc'])
         self.assertEqual(session['src_doc'], session['dst_doc'])
 
-        # Increment update_seq by 17:
-        session['update_seq'] += 17
+        # Increment update_seq by (CHECKPOINT_SIZE - 1), should not checkpoint
+        # without force=True:
+        session['update_seq'] += (replicator.CHECKPOINT_SIZE - 1)
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
-            'saved_update_seq': 18,
-            'update_seq': 18,
+            'saved_update_seq': 1,
+            'update_seq': 200,
             'session_id': session_id,
             'src': src,
             'dst': dst,
             'src_doc': {
                 '_id': local_id,
-                '_rev': '0-2',
+                '_rev': '0-1',
                 'session_id': session_id,
-                'update_seq': 18,
+                'update_seq': 1,
             },
             'dst_doc': {
                 '_id': local_id,
-                '_rev': '0-2',
+                '_rev': '0-1',
                 'session_id': session_id,
-                'update_seq': 18,
+                'update_seq': 1,
             },
             'label': 'mylabel',
         })
@@ -943,11 +1000,13 @@ class TestFunctions(TestCase):
         self.assertEqual(dst.get(local_id), session['dst_doc'])
         self.assertEqual(session['src_doc'], session['dst_doc'])
 
-        # Should do nothing as update_seq hasn't changed:
+        # Increment update_seq by 1, should now checkpoint even without
+        # force=True:
+        session['update_seq'] += 1
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {
-            'saved_update_seq': 18,
-            'update_seq': 18,
+            'saved_update_seq': 201,
+            'update_seq': 201,
             'session_id': session_id,
             'src': src,
             'dst': dst,
@@ -955,13 +1014,13 @@ class TestFunctions(TestCase):
                 '_id': local_id,
                 '_rev': '0-2',
                 'session_id': session_id,
-                'update_seq': 18,
+                'update_seq': 201,
             },
             'dst_doc': {
                 '_id': local_id,
                 '_rev': '0-2',
                 'session_id': session_id,
-                'update_seq': 18,
+                'update_seq': 201,
             },
             'label': 'mylabel',
         })
@@ -1254,13 +1313,13 @@ class TestFunctions(TestCase):
                 'dst': db2,
                 'src_doc': {
                     '_id': local_id,
-                    '_rev': '0-2',
+                    '_rev': '0-1',
                     'session_id': session_id,
                     'update_seq': 69,
                 },
                 'dst_doc': {
                    '_id': local_id,
-                    '_rev': '0-2',
+                    '_rev': '0-1',
                     'session_id': session_id,
                     'update_seq': 69,
                 },
@@ -1281,13 +1340,13 @@ class TestFunctions(TestCase):
                 'dst': db2,
                 'src_doc': {
                     '_id': local_id,
-                    '_rev': '0-2',
+                    '_rev': '0-1',
                     'session_id': session_id,
                     'update_seq': 69,
                 },
                 'dst_doc': {
                    '_id': local_id,
-                    '_rev': '0-2',
+                    '_rev': '0-1',
                     'session_id': session_id,
                     'update_seq': 69,
                 },
@@ -1321,13 +1380,13 @@ class TestFunctions(TestCase):
                 'dst': db2,
                 'src_doc': {
                     '_id': local_id,
-                    '_rev': '0-4',
+                    '_rev': '0-2',
                     'session_id': session_id,
                     'update_seq': 173,
                 },
                 'dst_doc': {
                    '_id': local_id,
-                    '_rev': '0-4',
+                    '_rev': '0-2',
                     'session_id': session_id,
                     'update_seq': 173,
                 },
@@ -1364,13 +1423,13 @@ class TestFunctions(TestCase):
                 'dst': db2,
                 'src_doc': {
                     '_id': local_id,
-                    '_rev': '0-6',
+                    '_rev': '0-3',
                     'session_id': session_id,
                     'update_seq': 311,
                 },
                 'dst_doc': {
                    '_id': local_id,
-                    '_rev': '0-6',
+                    '_rev': '0-3',
                     'session_id': session_id,
                     'update_seq': 311,
                 },
