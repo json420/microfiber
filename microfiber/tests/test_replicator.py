@@ -126,8 +126,6 @@ class TestConstants(TestCase):
 
 
 class TestFunctions(TestCase):
-    maxDiff = None
-
     def test_build_replication_id(self):
         build_replication_id = replicator.build_replication_id
         same_id = id1 = random_id()
