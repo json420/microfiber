@@ -321,7 +321,9 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
         log.info('resuming at %d %s', session['update_seq'], session['label'])
     else:
         log.warning('cannot resume replication: %s', dumps(session, True))
+        session['update_seq'] = 0
     # Other session state we don't want to log above:
+    #session['saved_update_seq'] = session['update_seq']
     session['src'] = src
     session['dst'] = dst
     session['session_id'] = time_id()  # ID for this new session
@@ -367,11 +369,12 @@ def get_missing_changes(session):
     kw = {
         'limit': 50,
         'style': 'all_docs',
+        'since': session['update_seq'],
     }
-    if 'feed' in session:
-        kw['feed'] = 'longpoll'
-    if 'update_seq' in session:
-        kw['since'] = session['update_seq']
+    feed = session.get('feed')
+    if feed:
+        assert feed == 'longpoll'
+        kw['feed'] = feed
     result = session['src'].get('_changes', **kw)
     session['new_update_seq'] = result['last_seq']
     changes = changes_for_revs_diff(result)

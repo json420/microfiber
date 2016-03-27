@@ -110,6 +110,8 @@ def wait_for_create(db):
 
 
 class TestFunctions(TestCase):
+    maxDiff = None
+
     def test_build_replication_id(self):
         build_replication_id = replicator.build_replication_id
         same_id = id1 = random_id()
@@ -364,6 +366,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(dst.get()['db_name'], dst_name)
@@ -395,6 +398,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -478,6 +482,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -507,6 +512,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_push_id), src_doc)
@@ -583,6 +589,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(dst.get()['db_name'], dst_name)
@@ -614,6 +621,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -697,6 +705,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -726,6 +735,7 @@ class TestFunctions(TestCase):
                 'dst': dst,
                 'session_id': session_id,
                 'doc_count': 0,
+                'update_seq': 0,
             }
         )
         self.assertEqual(src.get(local_pull_id), src_doc)
@@ -789,6 +799,7 @@ class TestFunctions(TestCase):
         session = {
             'src': db1,
             'dst': db2,
+            'update_seq': 0,
         }
 
         # Create and save some random test docs:
@@ -858,7 +869,7 @@ class TestFunctions(TestCase):
         # make sure get_missing_changes() returns the same missing:
         self.assertEqual(replicator.get_missing_changes(session), missing)
         self.assertEqual(session.pop('new_update_seq'), 50)
-        self.assertEqual(session, {'src': db1, 'dst': db2})
+        self.assertEqual(session, {'src': db1, 'dst': db2, 'update_seq': 0})
 
         # Save first 17 docs into db2, test when not all are missing:
         db2.post({'docs': docs[:17], 'new_edits': False}, '_bulk_docs')
@@ -874,7 +885,7 @@ class TestFunctions(TestCase):
         )
         self.assertEqual(replicator.get_missing_changes(session), missing)
         self.assertEqual(session.pop('new_update_seq'), 50)
-        self.assertEqual(session, {'src': db1, 'dst': db2})
+        self.assertEqual(session, {'src': db1, 'dst': db2, 'update_seq': 0})
 
         #################################
         # Simulate 2nd replication batch:
@@ -946,10 +957,10 @@ class TestFunctions(TestCase):
         ###############################################
         # Finally, test with nothing is missing in db2:
         db2.post({'docs': docs, 'new_edits': False}, '_bulk_docs')
-        session.pop('update_seq')
+        session['update_seq'] = 0
         self.assertEqual(replicator.get_missing_changes(session), {})
         self.assertEqual(session,
-            {'src': db1, 'dst': db2, 'new_update_seq': 50}
+            {'src': db1, 'dst': db2, 'update_seq': 0, 'new_update_seq': 50}
         )
         session['update_seq'] = session.pop('new_update_seq')
         self.assertEqual(replicator.get_missing_changes(session), {})
@@ -1020,6 +1031,7 @@ class TestFunctions(TestCase):
             'label': 'mylabel',
             'session_id': 'mysession',
             'doc_count': 0,
+            'update_seq': 0,
         }
 
         # First try when src is empty:
