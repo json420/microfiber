@@ -471,7 +471,7 @@ def replicate_continuously(session):
         # call to `replicate_one_batch()`.
         if seq_delta == 1:
             time.sleep(0.3)
-        if seq_delta == 2:
+        elif seq_delta == 2:
             time.sleep(0.1)
 
 
