@@ -304,7 +304,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     else:
         label = '{} <= {}{}'.format(dst.name, src.url, src.name)
     # Some session state is just to make logging/debugging easier (especially
-    # the 'label':
+    # the 'label'):
     session = {
         'src_doc': src_doc,
         'dst_doc': dst_doc,
@@ -313,6 +313,7 @@ def load_session(src_id, src, dst_id, dst, mode='push'):
     if (
             session_id == dst_doc.get('session_id')
         and isinstance(session_id, str) and isdb32(session_id)
+        and len(session_id) == 24
         and isinstance(src_update_seq, int) and src_update_seq > 0
         and isinstance(dst_update_seq, int) and dst_update_seq > 0
     ):
