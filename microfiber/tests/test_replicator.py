@@ -825,6 +825,150 @@ class TestFunctions(TestCase):
         self.assertIsNone(save_session(session))
         self.assertEqual(session, {'saved_update_seq': seq, 'update_seq': seq})
 
+        # Setup for remaining tests:
+        src_couch = TempCouch()
+        dst_couch = TempCouch()
+        src = Database(random_dbname(), src_couch.bootstrap())
+        dst = Database(random_dbname(), dst_couch.bootstrap())
+        self.assertTrue(src.ensure())
+        self.assertTrue(dst.ensure())
+
+        session_id = random_id()
+        local_id = '_local/' + random_id(30)
+        session = {
+            'saved_update_seq': 0,
+            'update_seq': 0,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {'_id': local_id},
+            'dst_doc': {'_id': local_id},
+            'label': 'mylabel',
+        }
+
+        # Should still do nothing when saved_update_seq == update_seq:
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {
+            'saved_update_seq': 0,
+            'update_seq': 0,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {'_id': local_id},
+            'dst_doc': {'_id': local_id},
+            'label': 'mylabel',
+        })
+        with self.assertRaises(NotFound):
+            src.get(local_id)
+        with self.assertRaises(NotFound):
+            dst.get(local_id)
+
+        # Increment update_seq by 1:
+        session['update_seq'] += 1
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {
+            'saved_update_seq': 1,
+            'update_seq': 1,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {
+                '_id': local_id,
+                '_rev': '0-1',
+                'session_id': session_id,
+                'update_seq': 1,
+            },
+            'dst_doc': {
+                '_id': local_id,
+                '_rev': '0-1',
+                'session_id': session_id,
+                'update_seq': 1,
+            },
+            'label': 'mylabel',
+        })
+        self.assertEqual(src.get(local_id), session['src_doc'])
+        self.assertEqual(dst.get(local_id), session['dst_doc'])
+        self.assertEqual(session['src_doc'], session['dst_doc'])
+
+        # Should do nothing as update_seq hasn't changed:
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {
+            'saved_update_seq': 1,
+            'update_seq': 1,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {
+                '_id': local_id,
+                '_rev': '0-1',
+                'session_id': session_id,
+                'update_seq': 1,
+            },
+            'dst_doc': {
+                '_id': local_id,
+                '_rev': '0-1',
+                'session_id': session_id,
+                'update_seq': 1,
+            },
+            'label': 'mylabel',
+        })
+        self.assertEqual(src.get(local_id), session['src_doc'])
+        self.assertEqual(dst.get(local_id), session['dst_doc'])
+        self.assertEqual(session['src_doc'], session['dst_doc'])
+
+        # Increment update_seq by 17:
+        session['update_seq'] += 17
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {
+            'saved_update_seq': 18,
+            'update_seq': 18,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {
+                '_id': local_id,
+                '_rev': '0-2',
+                'session_id': session_id,
+                'update_seq': 18,
+            },
+            'dst_doc': {
+                '_id': local_id,
+                '_rev': '0-2',
+                'session_id': session_id,
+                'update_seq': 18,
+            },
+            'label': 'mylabel',
+        })
+        self.assertEqual(src.get(local_id), session['src_doc'])
+        self.assertEqual(dst.get(local_id), session['dst_doc'])
+        self.assertEqual(session['src_doc'], session['dst_doc'])
+
+        # Should do nothing as update_seq hasn't changed:
+        self.assertIsNone(save_session(session))
+        self.assertEqual(session, {
+            'saved_update_seq': 18,
+            'update_seq': 18,
+            'session_id': session_id,
+            'src': src,
+            'dst': dst,
+            'src_doc': {
+                '_id': local_id,
+                '_rev': '0-2',
+                'session_id': session_id,
+                'update_seq': 18,
+            },
+            'dst_doc': {
+                '_id': local_id,
+                '_rev': '0-2',
+                'session_id': session_id,
+                'update_seq': 18,
+            },
+            'label': 'mylabel',
+        })
+        self.assertEqual(src.get(local_id), session['src_doc'])
+        self.assertEqual(dst.get(local_id), session['dst_doc'])
+        self.assertEqual(session['src_doc'], session['dst_doc'])
+
     def test_get_missing_changes(self):
         # Create two CouchDB instances, a Database for each:
         couch1 = TempCouch()

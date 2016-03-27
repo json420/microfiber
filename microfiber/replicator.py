@@ -181,6 +181,10 @@ from . import dumps, NotFound, Server
 log = logging.getLogger()
 
 
+BATCH_SIZE = 50
+CHECKPOINT_SIZE = BATCH_SIZE * 4
+
+
 def build_replication_id(src_node, src_db, dst_node, dst_db, mode='push'):
     """
     Build a replication ID.
@@ -338,7 +342,7 @@ def mark_checkpoint(doc, session_id, update_seq):
     doc['update_seq'] = update_seq
 
 
-def save_session(session):
+def save_session(session, force=False):
     saved_update_seq = session['saved_update_seq']
     update_seq = session['update_seq']
     assert 0 <= saved_update_seq <= update_seq
@@ -375,7 +379,7 @@ def changes_for_revs_diff(result):
 
 def get_missing_changes(session):
     kw = {
-        'limit': 50,
+        'limit': BATCH_SIZE,
         'style': 'all_docs',
         'since': session['update_seq'],
     }
