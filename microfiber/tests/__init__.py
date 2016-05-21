@@ -1447,6 +1447,7 @@ class TestContext(TestCase):
         # Random username and password used below:
         basic = {'username': random_id(), 'password': random_id()}
         authorization = microfiber.basic_auth_header(basic)
+        token = random_id()
 
         # IPv4 with authorization:
         env = {
@@ -1470,6 +1471,11 @@ class TestContext(TestCase):
         self.assertEqual(ctx.client.base_headers, (
             ('authorization', authorization),
         ))
+        env['authorization'] = token  # Should override 'basic'
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', token),
+        ))
 
         # IPv6 with authorization:
         env = {
@@ -1492,6 +1498,11 @@ class TestContext(TestCase):
         ctx = microfiber.Context(env)
         self.assertEqual(ctx.client.base_headers, (
             ('authorization', authorization),
+        ))
+        env['authorization'] = token  # Should override 'basic'
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', token),
         ))
 
     def test_full_url(self):
@@ -2474,7 +2485,13 @@ class TestPermutations(LiveTestCase):
         """
         if auth == 'basic':
             bad = deepcopy(env)
+            del bad['authorization']
             bad['basic']['password'] = random_id()
+            uc = microfiber.CouchBase(bad)
+            with self.assertRaises(microfiber.Unauthorized):
+                uc.get()
+            bad = deepcopy(env)
+            bad['authorization'] = random_id()
             uc = microfiber.CouchBase(bad)
             with self.assertRaises(microfiber.Unauthorized):
                 uc.get()

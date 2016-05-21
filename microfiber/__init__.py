@@ -637,8 +637,11 @@ class Context:
         options = {}
         if self.env.get('no_host') is True:
             options['host'] = None
-        if 'basic' in self.env and 'oauth' not in self.env:
-            options['authorization'] = basic_auth_header(self.env['basic'])
+        if 'oauth' not in self.env:
+            if 'authorization' in self.env:
+                options['authorization'] = env['authorization']
+            elif 'basic' in self.env:
+                options['authorization'] = basic_auth_header(self.env['basic'])
         if t.scheme == 'https':
             sslconfig = self.env.get('ssl', {})
             sslctx = build_ssl_context(sslconfig)
