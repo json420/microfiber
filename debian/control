@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 9),
     dh-python,
     python3-all (>= 3.4),
     python3-sphinx,
-    python3-usercouch (>= 15.08),
+    python3-usercouch (>= 16.05),
     python3-dbase32 (>= 1.5),
     python3-degu (>= 0.16),
 Standards-Version: 3.9.7

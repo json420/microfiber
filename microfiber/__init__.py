@@ -635,6 +635,8 @@ class Context:
         self.url = self.full_url(self.basepath)
         self.threadlocal = threading.local()
         options = {}
+        if self.env.get('no_host') is True:
+            options['host'] = None
         if 'basic' in self.env and 'oauth' not in self.env:
             options['authorization'] = basic_auth_header(self.env['basic'])
         if t.scheme == 'https':
@@ -643,7 +645,8 @@ class Context:
             self.client = create_sslclient(sslctx, self.t, **options)
         else:
             self.client = create_client(self.t, **options)
-        self.client.set_base_header('user-agent', USER_AGENT)
+        if self.env.get('no_user_agent') is not True:
+            self.client.set_base_header('user-agent', USER_AGENT)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])

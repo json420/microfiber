@@ -1405,6 +1405,95 @@ class TestContext(TestCase):
         self.assertIsInstance(ctx.client.sslctx, ssl.SSLContext)
         self.assertIs(ctx.client.sslctx.check_hostname, True)
 
+        #######################################
+        # Test degu.client.Client.base_headers:
+
+        # IPv4:
+        env = {
+            'url': 'http://127.0.0.1:12345/',
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('host', '127.0.0.1:12345'),
+            ('user-agent', microfiber.USER_AGENT),
+        ))
+        env['no_host'] = True
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('user-agent', microfiber.USER_AGENT),
+        ))
+        env['no_user_agent'] = True
+        ctx = microfiber.Context(env)
+        self.assertIsNone(ctx.client.base_headers)
+
+        # IPv6:
+        env = {
+            'url': 'http://[::1]:23456/',
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('host', '[::1]:23456'),
+            ('user-agent', microfiber.USER_AGENT),
+        ))
+        env['no_user_agent'] = True
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('host', '[::1]:23456'),
+        ))
+        env['no_host'] = True
+        ctx = microfiber.Context(env)
+        self.assertIsNone(ctx.client.base_headers)
+
+        # Random username and password used below:
+        basic = {'username': random_id(), 'password': random_id()}
+        authorization = microfiber.basic_auth_header(basic)
+
+        # IPv4 with authorization:
+        env = {
+            'url': 'http://127.0.0.1:12345/',
+            'basic': basic.copy(),
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', authorization),
+            ('host', '127.0.0.1:12345'),
+            ('user-agent', microfiber.USER_AGENT),
+        ))
+        env['no_host'] = True
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', authorization),
+            ('user-agent', microfiber.USER_AGENT),
+        ))
+        env['no_user_agent'] = True
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', authorization),
+        ))
+
+        # IPv6 with authorization:
+        env = {
+            'url': 'http://[::1]:23456/',
+            'basic': basic.copy(),
+        }
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', authorization),
+            ('host', '[::1]:23456'),
+            ('user-agent', microfiber.USER_AGENT),
+        ))
+        env['no_user_agent'] = True
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', authorization),
+            ('host', '[::1]:23456'),
+        ))
+        env['no_host'] = True
+        ctx = microfiber.Context(env)
+        self.assertEqual(ctx.client.base_headers, (
+            ('authorization', authorization),
+        ))
+
     def test_full_url(self):
         ctx = microfiber.Context('https://localhost:5003/')
         self.assertEqual(
