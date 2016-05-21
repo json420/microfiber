@@ -634,12 +634,16 @@ class Context:
         self.t = t
         self.url = self.full_url(self.basepath)
         self.threadlocal = threading.local()
+        options = {}
+        if 'basic' in self.env and 'oauth' not in self.env:
+            options['authorization'] = basic_auth_header(self.env['basic'])
         if t.scheme == 'https':
             sslconfig = self.env.get('ssl', {})
             sslctx = build_ssl_context(sslconfig)
-            self.client = create_sslclient(sslctx, self.t)
+            self.client = create_sslclient(sslctx, self.t, **options)
         else:
-            self.client = create_client(self.t)
+            self.client = create_client(self.t, **options)
+        self.client.set_base_header('user-agent', USER_AGENT)
 
     def full_url(self, path):
         return ''.join([self.t.scheme, '://', self.t.netloc, path])
@@ -695,6 +699,7 @@ class CouchBase(object):
     def __init__(self, env=None, ctx=None):
         self.ctx = (Context(env) if ctx is None else ctx)
         self.env = self.ctx.env
+        self._oauth = self.env.get('oauth')
         self.basepath = self.ctx.basepath
         self.url = self.ctx.url
 
@@ -719,15 +724,18 @@ class CouchBase(object):
         return conn.request(method, path, headers, body)
 
     def request(self, method, parts, options, body=None, headers=None):
-        h = {'user-agent': USER_AGENT}
-        if headers:
-            h.update(headers)
+        if headers is None:
+            headers = {}
         path = (self.basepath + '/'.join(parts) if parts else self.basepath)
         query = (tuple(_queryiter(options)) if options else tuple())
-        h.update(self.ctx.get_auth_headers(method, path, query))
+        if self._oauth is not None:
+            baseurl = self.ctx.full_url(path)
+            headers.update(
+                _oauth_header(self._oauth, method, baseurl, dict(query))
+            )
         if query:
             path = '?'.join([path, urlencode(query)])
-        response = self.raw_request(method, path, body, h)
+        response = self.raw_request(method, path, body, headers)
         if response.status >= 500:
             raise ServerError(response, method, path)
         if response.status >= 400:
