@@ -1,5 +1,5 @@
-microfiber (16.05.0~alpha) xenial; urgency=low
+microfiber (16.05.0) xenial; urgency=low
 
-  * Upstream pre-release
+  * Upstream release
 
- -- Jason Gerard DeRose <jderose@novacut.com>  Sat, 23 Apr 2016 16:53:44 -0600
+ -- Jason Gerard DeRose <jderose@novacut.com>  Thu, 26 May 2016 22:48:43 -0600
