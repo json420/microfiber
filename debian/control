@@ -7,7 +7,7 @@ Build-Depends: debhelper (>= 9),
     python3-all (>= 3.4),
     python3-sphinx,
     python3-usercouch (>= 16.05),
-    python3-dbase32 (>= 1.5),
+    python3-dbase32 (>= 1.7),
     python3-degu (>= 0.16),
 Standards-Version: 3.9.7
 X-Python3-Version: >= 3.4
@@ -16,7 +16,7 @@ Homepage: https://launchpad.net/microfiber
 Package: python3-microfiber
 Architecture: all
 Depends: ${python3:Depends}, ${misc:Depends},
-    python3-dbase32 (>= 1.5),
+    python3-dbase32 (>= 1.7),
     python3-degu (>= 0.16),
 Suggests: python3-usercouch, python3-microfiber-doc
 Description: fabric for a lightweight Couch
