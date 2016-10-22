@@ -719,7 +719,7 @@ class CouchBase(object):
                 content_length = headers['content-length']
             else:
                 content_length = os.stat(body.fileno()).st_size
-            body = conn.bodies.Body(body, content_length)
+            body = conn.api.Body(body, content_length)
 
         # We automatically retry once in case connection was closed by server:
         try:
