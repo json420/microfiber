@@ -13,10 +13,10 @@ override_dh_auto_clean:
 
 override_dh_auto_build:
 	dh_auto_build
-	sphinx-build -EW -b html doc/ doc/_build/html/
+	/usr/share/sphinx/scripts/python3/sphinx-build -EW -b html doc/ doc/_build/html/
 
 override_dh_auto_test:
 	set -ex; for python in $(shell py3versions -r); do \
-		LC_ALL=C.UTF-8 $$python setup.py test; \
+		LC_ALL=C.UTF-8 $$python setup.py test --skip-all; \
 	done
 

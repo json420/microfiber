@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # microfiber: fabric for a lightweight Couch
 # Copyright (C) 2011-2016 Novacut Inc
 #

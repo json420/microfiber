@@ -56,11 +56,13 @@ class Test(Command):
     description = 'run unit tests and doc tests'
 
     user_options = [
+        ('skip-all', None, 'skip all tests'),
         ('no-live', None, 'skip live tests against tmp CouchDB instances'),
         ('skip-slow', None, 'skip only the slow 30 second live timeout test'),
     ]
 
     def initialize_options(self):
+        self.skip_all = 0
         self.no_live = 0
         self.skip_slow = 0
 
@@ -68,6 +70,8 @@ class Test(Command):
         pass
 
     def run(self):
+        if self.skip_all:
+            sys.exit(0)
         if self.no_live:
             os.environ['MICROFIBER_TEST_NO_LIVE'] = 'true'
         if self.skip_slow:
