@@ -2513,7 +2513,8 @@ class TestPermutations(LiveTestCase):
     def test_http(self):
         for bind_address in self.bind_addresses:
             for auth in self.auths:
-                if auth == 'oauth' and bind_address == '::1':
+                # Note: OAuth 1.0 is not supported by CouchDB 2.x
+                if auth == 'oauth' and (bind_address == '::1' or COUCHDB2):
                     continue
                 tmpcouch = TempCouch()
                 env = tmpcouch.bootstrap(auth, {'bind_address': bind_address})
