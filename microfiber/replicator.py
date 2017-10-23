@@ -463,8 +463,9 @@ def replicate_continuously(session):
 
 def iter_normal_names(src):
     for name in src.get('_all_dbs'):
-        if not name.startswith('_'):
-            yield name
+        if name.startswith('_') or name.startswith('shards/'):
+            continue
+        yield name
 
 
 def replicate_then_replicate_continuously(session):

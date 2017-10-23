@@ -1555,7 +1555,7 @@ class TestReplicator(TestCase):
         self.assertNotIn(tophash_c, {tophash_1c, tophash_2c})
 
         # Check database names on each one for kicks:
-        expected = sorted(['_users', '_replicator', name_a, name_b, name_c])
-        self.assertEqual(s1.get('_all_dbs'), expected)
-        self.assertEqual(s2.get('_all_dbs'), expected)
+        expected = sorted([name_a, name_b, name_c])
+        for s in [s1, s2]:
+            self.assertEqual(list(replicator.iter_normal_names(s)), expected)
 
