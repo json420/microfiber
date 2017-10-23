@@ -2341,7 +2341,9 @@ class TestCouchBaseLive(CouchTestCase):
             set(ret).issuperset(['couchdb', 'version'])
         )
         self.assertTrue(
-            set(ret).issubset(['couchdb', 'version', 'uuid', 'vendor'])
+            set(ret).issubset(
+                ['couchdb', 'version', 'uuid', 'vendor', 'features']
+            )
         )
         self.assertEqual(ret['couchdb'], 'Welcome')
         self.assertIsInstance(ret['version'], str)
