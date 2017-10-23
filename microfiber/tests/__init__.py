@@ -40,6 +40,7 @@ import ssl
 import threading
 from random import SystemRandom
 
+import usercouch
 from usercouch.misc import TempCouch
 from degu.misc import TempPKI
 from dbase32 import db32dec, isdb32, random_id
@@ -2749,7 +2750,8 @@ class TestDatabaseLive(CouchTestCase):
 
         Pro tip: these are not the semantics you're looking for!
         """
-        self.skipTest('FIXME: broken with CouchDB 2.1.0')
+        if usercouch.couch_version.couchdb2:
+            self.skipTest('Not supported by CouchDB 2.x')
         db = microfiber.Database('foo', self.env)
         db.ensure()
         db.post({'_id': 'example'})
