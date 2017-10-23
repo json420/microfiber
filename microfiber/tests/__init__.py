@@ -50,6 +50,9 @@ import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
 
 
+COUCHDB2 = usercouch.couch_version.couchdb2
+
+
 random = SystemRandom()
 
 # OAuth 1.0a test vector from http://oauth.net/core/1.0a/#anchor46
@@ -2055,8 +2058,8 @@ class CouchTestCase(LiveTestCase):
 class ReplicationTestCase(LiveTestCase):
     def setUp(self):
         super().setUp()
-        if usercouch.couch_version.couchdb2:
-            self.skipTest('FIXME: Broken on CouchDB 2.1')
+        if COUCHDB2:
+            self.skipTest('FIXME: Broken on CouchDB 2.x')
         self.tmp1 = TempCouch()
         self.env1 = self.tmp1.bootstrap()
         self.tmp2 = TempCouch()
@@ -2752,7 +2755,7 @@ class TestDatabaseLive(CouchTestCase):
 
         Pro tip: these are not the semantics you're looking for!
         """
-        if usercouch.couch_version.couchdb2:
+        if COUCHDB2:
             self.skipTest('Not supported by CouchDB 2.x')
         db = microfiber.Database('foo', self.env)
         db.ensure()
@@ -2956,7 +2959,8 @@ class TestDatabaseLive(CouchTestCase):
         )
 
     def test_bulksave(self):
-        self.skipTest('FIXME: broken with CouchDB 2.1.0')
+        if COUCHDB2:
+            self.skipTest('Not supported by CouchDB 2.x')
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
 
