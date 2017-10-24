@@ -1557,5 +1557,5 @@ class TestReplicator(TestCase):
         # Check database names on each one for kicks:
         expected = sorted([name_a, name_b, name_c])
         for s in [s1, s2]:
-            self.assertEqual(list(replicator.iter_normal_names(s)), expected)
+            self.assertEqual(s.normal_db_names(), expected)
 

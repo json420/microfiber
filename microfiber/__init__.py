@@ -942,6 +942,12 @@ class Server(CouchBase):
         obj = pull_replication(local_db, remote_db, remote_env, **kw)
         return self.post(obj, '_replicate')
 
+    def normal_db_names(self):
+        return list(filter(
+            lambda n: not (n.startswith('_') or n.startswith('shards/')),
+            self.get('_all_dbs')
+        ))
+
 
 class Database(CouchBase):
     """
