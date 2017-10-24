@@ -87,7 +87,7 @@ def wait_for_sync(db1, db2):
     assert db1.url != db2.url
     assert db1.name == db2.name
     for i in range(30):
-        time.sleep(0.5)
+        time.sleep(1)
         tophash1 = db1.get_tophash()
         tophash2 = db2.get_tophash()
         if tophash1 == tophash2:
