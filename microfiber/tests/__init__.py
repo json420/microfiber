@@ -2567,6 +2567,16 @@ class TestPermutations(LiveTestCase):
                 #    uc.get()
 
 
+class TestServerLive(CouchTestCase):
+    def test_normal_db_names(self):
+        s = microfiber.Server(self.env)
+        self.assertEqual(s.normal_db_names(), [])
+        s.put(None, 'foo')
+        self.assertEqual(s.normal_db_names(), ['foo'])
+        s.put(None, 'bar')
+        self.assertEqual(s.normal_db_names(), ['bar', 'foo'])
+
+
 class TestDatabaseLive(CouchTestCase):
     def test_ensure(self):
         inst = microfiber.Database('foo', self.env)
