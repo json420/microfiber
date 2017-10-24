@@ -87,7 +87,7 @@ def wait_for_sync(db1, db2):
     assert db1.url != db2.url
     assert db1.name == db2.name
     for i in range(30):
-        time.sleep(0.5)
+        time.sleep(1)
         tophash1 = db1.get_tophash()
         tophash2 = db2.get_tophash()
         if tophash1 == tophash2:
@@ -1555,7 +1555,7 @@ class TestReplicator(TestCase):
         self.assertNotIn(tophash_c, {tophash_1c, tophash_2c})
 
         # Check database names on each one for kicks:
-        expected = sorted(['_users', '_replicator', name_a, name_b, name_c])
-        self.assertEqual(s1.get('_all_dbs'), expected)
-        self.assertEqual(s2.get('_all_dbs'), expected)
+        expected = sorted([name_a, name_b, name_c])
+        for s in [s1, s2]:
+            self.assertEqual(s.normal_db_names(), expected)
 

@@ -461,12 +461,6 @@ def replicate_continuously(session):
             save_session(session)
 
 
-def iter_normal_names(src):
-    for name in src.get('_all_dbs'):
-        if not name.startswith('_'):
-            yield name
-
-
 def replicate_then_replicate_continuously(session):
     replicate(session)
     replicate_continuously(session)
@@ -486,7 +480,7 @@ class Replicator:
 
     def get_names(self):
         return sorted(
-            filter(self.names_filter_func, iter_normal_names(self.src))
+            filter(self.names_filter_func, self.src.normal_db_names())
         )
 
     def run(self):

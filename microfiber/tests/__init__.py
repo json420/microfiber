@@ -40,6 +40,7 @@ import ssl
 import threading
 from random import SystemRandom
 
+import usercouch
 from usercouch.misc import TempCouch
 from degu.misc import TempPKI
 from dbase32 import db32dec, isdb32, random_id
@@ -47,6 +48,9 @@ from degu.client import Client, SSLClient, Response
 
 import microfiber
 from microfiber import NotFound, MethodNotAllowed, Conflict, PreconditionFailed
+
+
+COUCHDB2 = usercouch.couch_version.couchdb2
 
 
 random = SystemRandom()
@@ -2054,6 +2058,8 @@ class CouchTestCase(LiveTestCase):
 class ReplicationTestCase(LiveTestCase):
     def setUp(self):
         super().setUp()
+        if COUCHDB2:
+            self.skipTest('FIXME: Broken on CouchDB 2.x')
         self.tmp1 = TempCouch()
         self.env1 = self.tmp1.bootstrap()
         self.tmp2 = TempCouch()
@@ -2341,7 +2347,9 @@ class TestCouchBaseLive(CouchTestCase):
             set(ret).issuperset(['couchdb', 'version'])
         )
         self.assertTrue(
-            set(ret).issubset(['couchdb', 'version', 'uuid', 'vendor'])
+            set(ret).issubset(
+                ['couchdb', 'version', 'uuid', 'vendor', 'features']
+            )
         )
         self.assertEqual(ret['couchdb'], 'Welcome')
         self.assertIsInstance(ret['version'], str)
@@ -2505,7 +2513,8 @@ class TestPermutations(LiveTestCase):
     def test_http(self):
         for bind_address in self.bind_addresses:
             for auth in self.auths:
-                if auth == 'oauth' and bind_address == '::1':
+                # Note: OAuth 1.0 is not supported by CouchDB 2.x
+                if auth == 'oauth' and (bind_address == '::1' or COUCHDB2):
                     continue
                 tmpcouch = TempCouch()
                 env = tmpcouch.bootstrap(auth, {'bind_address': bind_address})
@@ -2556,6 +2565,16 @@ class TestPermutations(LiveTestCase):
                 # uc = microfiber.CouchBase(bad)
                 # with self.assertRaises(ssl.CertificateError) as cm:
                 #    uc.get()
+
+
+class TestServerLive(CouchTestCase):
+    def test_normal_db_names(self):
+        s = microfiber.Server(self.env)
+        self.assertEqual(s.normal_db_names(), [])
+        s.put(None, 'foo')
+        self.assertEqual(s.normal_db_names(), ['foo'])
+        s.put(None, 'bar')
+        self.assertEqual(s.normal_db_names(), ['bar', 'foo'])
 
 
 class TestDatabaseLive(CouchTestCase):
@@ -2747,6 +2766,8 @@ class TestDatabaseLive(CouchTestCase):
 
         Pro tip: these are not the semantics you're looking for!
         """
+        if COUCHDB2:
+            self.skipTest('Not supported by CouchDB 2.x')
         db = microfiber.Database('foo', self.env)
         db.ensure()
         db.post({'_id': 'example'})
@@ -2949,6 +2970,8 @@ class TestDatabaseLive(CouchTestCase):
         )
 
     def test_bulksave(self):
+        if COUCHDB2:
+            self.skipTest('Not supported by CouchDB 2.x')
         db = microfiber.Database('foo', self.env)
         self.assertTrue(db.ensure())
 
