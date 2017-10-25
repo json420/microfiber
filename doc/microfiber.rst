@@ -356,9 +356,11 @@ Server class
 ============
 
 In addition to the seven REST adapter methods inherited from :class:`CouchBase`,
-the :class:`Server` class provides one convenience method:
+the :class:`Server` class provides two convenience methods:
 
     * :meth:`Server.database()`
+    * :meth:`Server.normal_db_names()`
+
 
 .. class:: Server(env='http://localhost:5984/')
 
@@ -389,6 +391,12 @@ the :class:`Server` class provides one convenience method:
         If you call this method with ``ensure=True``, a call to
         :meth:`Database.ensure()` is made prior to returning the instance.
 
+    .. method:: normal_db_names()
+
+        Get list of user-created (non-special) database names.
+
+        This method returns the names of the (user-created) databases currently
+        present on the CouchDB instance in question.
 
 
 Database class

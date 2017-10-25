@@ -732,21 +732,30 @@ will include the CouchDB version and other useful info.
 This will retrieve the list of databases in this CouchDB instance.  For example,
 when no user-created databases exists:
 
->>> s.get('_all_dbs')
+>>> s.get('_all_dbs')  #doctest: +SKIP
 ['_replicator', '_users']
+>>> s.normal_db_names()
+[]
 
 And now if we create a database:
 
 >>> s.put(None, 'foo')
 {'ok': True}
->>> s.get('_all_dbs')
+>>> s.get('_all_dbs')  #doctest: +SKIP
 ['_replicator', '_users', 'foo']
+>>> s.normal_db_names()
+['foo']
 
 And finally if we create another database (note the database names are returned
 in sorted order):
 
 >>> s.put(None, 'bar')
 {'ok': True}
->>> s.get('_all_dbs')
+>>> s.get('_all_dbs')  #doctest: +SKIP
 ['_replicator', '_users', 'bar', 'foo']
+>>> s.normal_db_names()
+['bar', 'foo']
+
+>>> couch.kill()
+True
 
